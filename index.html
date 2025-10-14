@@ -45,17 +45,17 @@
 
         body {
             font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--background);
+            background-color: var(--background);
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23EAE8E3' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
             color: var(--text-primary);
-            font-size: var(--font-size-base); /* Use dynamic base font size */
+            font-size: var(--font-size-base);
             line-height: 1.7;
             -webkit-font-smoothing: antialiased;
             padding: 1rem;
-            padding-bottom: 120px; /* Space for sticky footer */
+            padding-bottom: 120px;
             position: relative;
         }
         
-        /* Watermark */
         body::after {
             content: 'CONFIDENTIAL';
             position: fixed;
@@ -77,14 +77,14 @@
             background: var(--surface);
             border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 20px 60px var(--shadow);
+            box-shadow: 0 10px 15px -3px var(--shadow), 0 4px 6px -2px var(--shadow);
             border: 1px solid var(--border);
         }
 
         .header {
             background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
             color: var(--surface);
-            padding: 2.5rem 2rem; /* Reduced padding */
+            padding: 2.5rem 2rem;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -101,16 +101,20 @@
         }
 
         .header h1 {
-            font-family: 'Cormorant Garamond', serif; /* Matched to section headers */
+            font-family: 'Cormorant Garamond', serif;
             font-size: var(--font-size-h1);
             font-weight: 700;
-            /* letter-spacing: 1.5px; */ /* REVISION: Removed for a tighter look, similar to section headers */
             position: relative;
-            margin-bottom: 0.25rem; /* Reduced margin */
+            margin-bottom: 0.25rem;
+            background: linear-gradient(135deg, #FFFFFF 60%, #F5EFE6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
         }
 
         .header .subtitle {
-            font-size: clamp(0.9rem, 0.8rem + 0.5vw, 1rem); /* Slightly smaller subtitle */
+            font-size: clamp(0.9rem, 0.8rem + 0.5vw, 1rem);
             color: var(--light-gold-bg);
             font-weight: 500;
             opacity: 0.95;
@@ -148,6 +152,13 @@
             font-weight: 500;
         }
         
+        #cleanerName {
+            font-size: 1.1em;
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            color: var(--primary-green);
+        }
+        
         .info-field input:focus {
             outline: none;
             border-color: var(--accent-gold);
@@ -177,8 +188,8 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.07);
         }
 
-        .guide-card.kit { border-left-color: #5F8B7D; } /* Muted Green */
-        .guide-card.agents { border-left-color: #D4A373; } /* Muted Orange */
+        .guide-card.kit { border-left-color: #5F8B7D; }
+        .guide-card.agents { border-left-color: #D4A373; }
 
         .guide-card-header {
             display: flex;
@@ -195,16 +206,15 @@
         }
         
         .guide-card p {
-            font-size: clamp(0.88em, 0.85em + 0.15vw, 0.92em); /* Dynamic font size for guide */
+            font-size: clamp(0.88em, 0.85em + 0.15vw, 0.92em);
             line-height: 1.8;
             color: var(--text-secondary);
         }
         .guide-card .item { 
             margin-bottom: 0.5rem; 
-            display: block; /* REVISION: Ensures items stack vertically and wrap correctly */
+            display: block; 
         }
         .guide-card .item strong { color: var(--text-primary); }
-
 
         .navigation-tabs {
             display: flex;
@@ -255,7 +265,7 @@
         
         .card h2 {
             font-family: 'Cormorant Garamond', serif;
-            font-size: var(--font-size-h2); /* Use dynamic h2 font size */
+            font-size: var(--font-size-h2);
             font-weight: 700;
             margin-bottom: 1.5rem;
             color: var(--primary-green);
@@ -329,6 +339,71 @@
         .item-detail code {
             background-color: #f0f0f0; padding: 2px 6px;
             border-radius: 4px; font-family: monospace; font-size: 0.9em;
+        }
+        
+        .scenario-box {
+            background: linear-gradient(105deg, #fdfcf9, #fbf8f2);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            margin: 1.5rem 0;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .scenario-box .icon {
+            font-size: 1.8rem;
+            margin-top: 0.25rem;
+        }
+        .scenario-box .content .title {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            color: var(--primary-green);
+            font-size: 1.2em;
+            margin-bottom: 0.5rem;
+        }
+        .scenario-box .content .instruction {
+            font-size: 0.95em;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .scenario-box .content .instruction strong.on {
+            color: var(--success);
+            font-weight: 700;
+        }
+        .scenario-box .content .instruction strong.off {
+            color: var(--error);
+            font-weight: 700;
+        }
+        
+        .warning-box {
+            background: #fef0f1;
+            border: 1px solid #fde2e4;
+            padding: 1.25rem;
+            margin: 1.5rem 0;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        .warning-box .icon {
+            font-size: 1.8rem;
+            margin-top: 0.25rem;
+            color: var(--error);
+        }
+        .warning-box .content .title {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 700;
+            color: var(--error);
+            font-size: 1.2em;
+            margin-bottom: 0.5rem;
+        }
+        .warning-box .content .instruction {
+            font-size: 1em; /* REVISION: Increased font size for better readability */
+            line-height: 1.6;
+            color: #8c2a32; /* REVISION: Softened red text color */
         }
 
         .photo-upload {
@@ -584,16 +659,16 @@
         const checklistData = [
             {
                 title: "Get Ready & Check", icon: "🔍",
-                description: "<strong>🎯 What we're doing:</strong> Think of this like getting your tools ready before starting any job. We check FIRST so we don't clean over problems.<br><br><strong>💡 Why it helps:</strong> Opening windows and turning on all lights makes it easier to see dirt and dust. Fresh air helps cleaning products work better too!",
+                description: `<strong>🎯 What we're doing:</strong> Getting your tools ready and checking for problems FIRST.<br><br><strong>💡 Why it helps:</strong> Seeing everything clearly with lights and fresh air makes cleaning easier and stops you from cleaning over a problem.<div class="warning-box"><div class="icon">⚠️</div><div class="content"><div class="title">IMPORTANT: Found a Problem?</div><div class="instruction">If you see something broken, a bad stain, or find that something is missing, <strong>stop!</strong> Take a picture right away and report it to us. This is very important to get it fixed or to charge the last guest.</div></div></div>`,
                 hasPhotos: true,
                 photoTitle: "📸 Take Photos of Any Problems",
-                photoHint: "If you see broken items or things left behind by guests, take a photo. This protects you and helps fix problems faster.",
+                photoHint: "If you see broken items, missing things, or stains, take a photo. This protects you and helps fix problems faster.",
                 hasNotes: true,
                 notesTitle: "📝 Write Down Any Problems You Found:",
                 items: [
                     { id: "check_0_1", text: "Get all your cleaning tools ready", detail: "Grab your: cleaning sprays, cloths (at least 4), vacuum, mop, fresh bed sheets, fresh towels, bathroom supplies (soap, shampoo), coffee packs (2), water bottles (2), and tissues." },
-                    { id: "check_1_1", text: "Knock and say 'Housekeeping', then open all windows and turn on all lights", detail: "Knock 3 times loudly. This lets guests know you're there. Open windows for fresh air. Turn on every light so you can see dirt clearly. <code>Important:</code> This step is primarily for mid-stay cleaning when a guest may be present." },
-                    { id: "check_1_4", text: "Test if everything works (TV, WiFi, AC, lights)", detail: "Turn on the TV and test the remote. Check if WiFi works on your phone. Turn on AC to feel if it's cooling. Flip every light switch." },
+                    { id: "check_1_1", text: "Knock and say 'Housekeeping', then open all windows and turn on all lights", detail: "Knock 3 times loudly. Open windows for fresh air. Turn on every light so you can see dirt clearly. <code>Important:</code> This step is primarily for mid-stay cleaning when a guest may be present." },
+                    { id: "check_1_4", text: "Test if everything works (TV, WiFi, AC, lights, ref, microwave)", detail: "Turn on the TV and test the remote. Check if WiFi works on your phone. Turn on AC to feel if it's cooling. Flip every light switch. Check if the refrigerator is cold and the microwave powers on." },
                     { id: "check_1_5", text: "Look for broken things or water leaks", detail: "Check under sinks for drips. Look at walls for cracks or stains. Check furniture for damage. Look around the AC for water." },
                     { id: "check_1_7", text: "Search everywhere for items guests left behind", detail: "Important spots to check: inside drawers, under the bed, behind doors, between mattress and headboard, under couch cushions." },
                 ]
@@ -605,11 +680,11 @@
                     { id: "check_2_1", text: "Take out all trash and throw away any food or containers", detail: "Check every room (bedroom, bathroom, kitchen, balcony). Put everything in trash bags. This stops bad smells from spreading." },
                     { id: "check_2_4", text: "Take off all bed sheets and towels, start washing them", detail: "Remove all bedding and towels. If you see stains, spray them first. Put them in the washing machine NOW so it works while you clean." },
                     { id: "check_3_1", text: "Spray cleaner inside toilet and all over shower/bathtub", detail: "Spray EVERYWHERE in the toilet (especially under the rim). Spray the shower walls from top to bottom. DON'T SCRUB YET - just spray and leave it!" },
-                    { id: "check_3_4", text: "Spray kitchen cleaner on stove and inside microwave", detail: "Spray greasy areas like the stovetop and inside the microwave. Let it sit for 10-15 minutes to dissolve the grease. This makes scrubbing much easier!" }
+                    { id: "check_3_4", text: "Spray kitchen cleaner on stove and inside microwave", detail: "First, check if they look clean and have no bad smell. If they are clean, just wipe them with a clean cloth. If you see grease or dirt, spray them well and let it sit for 10-15 minutes before scrubbing." }
                 ]
             },
             {
-                title: "Clean Bedroom", icon: "🛏️",
+                title: "Clean Bedroom & Living Room", icon: "🛏️",
                 description: "<strong>🎯 What we're doing:</strong> Clean from high to low, dust before wet cleaning.<br><br><strong>💡 Why this order:</strong> Dust falls down when you clean. So we start at the ceiling and work our way down. We dust BEFORE mopping because dust + water = mud!",
                 hasPhotos: true,
                 photoTitle: "📸 Take Photos of Finished Bedroom *REQUIRED*",
@@ -619,6 +694,8 @@
                     { id: "check_4_5", text: "Clean things people touch a lot", detail: "Use disinfectant spray on: light switches, TV remote, AC remote, door handles (both sides), thermostat." },
                     { id: "check_5_2", text: "Make the bed perfectly (like in hotels)", detail: "Pull sheets tight with no wrinkles. Make hospital corners at the bottom (tuck in tightly). Make it look crisp and professional." },
                     { id: "check_5_6", text: "Fluff pillows and arrange them nicely", detail: "Shake pillows hard to make them puffy. Arrange them perfectly straight and even. This makes the bed look luxurious." },
+                    { id: "check_5_7", text: "Check and refill the room fragrance", detail: "Look at the bottle of the room perfume. If it's almost empty, fill it up so the room smells nice for the new guest." },
+                    { id: "check_5_8", text: "Arrange items and clean mirrors", detail: "Put everything back in its special spot: the TV remote, AC remote, plants, and tissue box. Make sure all mirrors are super clean with no fingerprints." }
                 ]
             },
             {
@@ -630,9 +707,11 @@
                 items: [
                     { id: "check_7_4", text: "Scrub and clean the toilet, shower, and sink", detail: "Now scrub the toilet (remember, the cleaner has been sitting!). Scrub shower and tub, then rinse well with water. Clean the sink and make the faucet shine." },
                     { id: "check_7_2", text: "Clean mirrors and glass until there are NO streaks", detail: "Pro trick: After cleaning shower glass, use a squeegee (rubber wiper) to dry it completely. This stops water spots and looks professional." },
+                    { id: "check_7_5", text: "Check toilet smell and clean the bathroom vent", detail: "Does the toilet area smell bad? If yes, report it. Also, look at the vent above the mirror. If you see dust, use a vacuum or broom to clean it all off." },
                     { id: "check_6_1", text: "Clean inside and outside of all kitchen appliances", detail: "Clean inside microwave (no oil or food). Wipe outside of fridge, rice cooker, kettle. Make the stovetop shiny." },
                     { id: "check_6_4", text: "Clean and polish sink, faucet, and counters", detail: "Make the faucet SUPER shiny - this shows you did a detailed job. Wipe all counters including edges and backsplash." },
-                    { id: "check_7_7", text: "Refill all bathroom and kitchen supplies", detail: "Fold towels neatly (in thirds). Check and refill: hand soap, body wash, shampoo, dish soap. Make sure everything is at least half full." },
+                    { id: "check_6_5", text: "Check the dishwashing sponge", detail: "Is the sponge old, wet, or yucky? Put a brand new, dry one for the guest. Wash and dry the old one if it's still okay to be used next time." },
+                    { id: "check_7_7", text: "Refill all bathroom and kitchen supplies", detail: "Fold towels neatly (in thirds). Check and refill: hand soap, body wash, shampoo, dish soap. Ensure guest amenities are complete: coffee packs (2), water bottles (2), and full toiletries." },
                 ]
             },
             {
@@ -647,8 +726,8 @@
                     { id: "check_8_1", text: "Vacuum then mop all floors", detail: "Start from the far corner and work backward toward the exit. This way you don't step on clean floors." },
                     { id: "check_balcony", text: "Clean the balcony table, chairs, and railing", detail: "Wipe down outdoor furniture so guests can enjoy the balcony too." },
                     { id: "check_9_1", text: "Walk through as if you're a guest - check for fingerprints and dust", detail: "Pretend you just arrived as a guest. Look for smudges on mirrors, glass, chrome, and door handles. Wipe them off." },
-                    { id: "check_9_4", text: "Set up the room perfectly for guests", detail: "Set AC to comfortable 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight and centered." },
-                    { id: "check_10_6", text: "Final safety check before leaving", detail: "Make sure: you took out all cleaning supplies, all windows are closed and locked, and the front door is locked. <br><br><strong>IMPORTANT:</strong> If no guest is arriving today or tomorrow, switch OFF the water heater from the main breaker panel. Switch it back ON only when a guest is confirmed to be arriving." }
+                    { id: "check_9_4", text: "Set up the room perfectly for guests", detail: "Set AC to 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight. <strong>Crucially, ensure the refrigerator is switched on and getting cold for the guest.</strong>" },
+                    { id: "check_10_6", text: "Final power & safety check before leaving", detail: `What to do with power before you leave? It depends on when the next guest comes.<div class="scenario-box"><div class="icon">☀️</div><div class="content"><div class="title">IF a guest is coming TODAY (before 2 PM):</div><div class="instruction">Leave the <strong class="on">fridge</strong> and the <strong class="on">water heater</strong> ON. Turn <strong class="off">OFF</strong> all the lights. The aircon can be turned on later when the guest is very close to arriving.</div></div></div><div class="scenario-box"><div class="icon">🌙</div><div class="content"><div class="title">IF a guest is coming LATER or NO GUEST today:</div><div class="instruction">Walk around and turn <strong class="off">OFF</strong> everything. Then, go to the breaker box. Find the switch for the <strong class="off">Water Heater</strong> and flip it <strong class="off">OFF</strong>. Leave all other switches ON for the WiFi and cameras.</div></div></div>Finally, make sure all windows are closed and the front door is locked.` }
                 ]
             }
         ];
@@ -788,7 +867,7 @@
         function setupSwipeListeners() {
             let touchstartX = 0;
             let touchendX = 0;
-            const swipeThreshold = 50; // Minimum distance for a swipe
+            const swipeThreshold = 50;
 
             cardContainer.addEventListener('touchstart', function(event) {
                 touchstartX = event.changedTouches[0].screenX;
@@ -885,7 +964,6 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // Get the data URL with JPEG compression (0.7 quality)
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                         resolve(dataUrl);
                     };
@@ -903,7 +981,7 @@
             const previewContainer = document.getElementById(`preview_${sectionId}`);
             
             for (const file of Array.from(input.files)) {
-                if (file.size > 10 * 1024 * 1024) { // Increased pre-compression limit
+                if (file.size > 10 * 1024 * 1024) {
                     alert(`❌ File ${file.name} is too large (max 10MB).`);
                     continue;
                 }
@@ -927,14 +1005,13 @@
                 }
             }
             saveDraft();
-            input.value = ''; // Clear the input
+            input.value = '';
         }
 
         function saveDraft() {
             const formData = new FormData(document.getElementById('cleaningForm'));
             const data = Object.fromEntries(formData.entries());
             document.querySelectorAll('input[type="checkbox"]').forEach(cb => data[cb.id] = cb.checked);
-            // We don't save photos in draft to avoid storage limits
             localStorage.setItem('cleaningFormDraft', JSON.stringify({ data }));
         }
 
@@ -996,7 +1073,7 @@
                 document.querySelectorAll('textarea[id^="notes_"]').forEach(textarea => {
                     if (textarea.value.trim()) {
                         const sectionIndex = parseInt(textarea.id.split('_')[2]);
-                        const sectionTitle = checklistData[sectionIndex - 1].title;
+                        const sectionTitle = checklistData[sectionIndex - 2].title;
                         allNotes.push(`[${sectionTitle}]: ${textarea.value.trim()}`);
                     }
                 });

@@ -2,26 +2,35 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.web3forms.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co;">
-    <title>Cascade Hideaway - Gold Standard Checklist</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co;">
+    
+    <title>Cascade Hideaway - Cleaning and Turn-over Report</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Cormorant+Garamond:wght@700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --brand-green: #3D6E64;
-            --brand-gold: #C89B52;
-            --light-gold: #E0C492;
-            --background: #F9F6F1;
-            --text-dark: #222222;
-            --text-light: #555555;
-            --border-color: #EAE8E2;
-            --success: #00332B;
-            --error: #8C2A2A;
-            --white: #FFFFFF;
+            /* New color palette inspired by the Welcome Book */
+            --primary-green: #46554D;
+            --accent-gold: #B48C4F;
+            --light-gold-bg: #F5EFE6; /* Main accent background */
+            --background: #F8F7F5; /* Softer body background */
+            --surface: #FFFFFF;
+            --text-primary: #333333;
+            --text-secondary: #707070;
+            --border: #EAE8E3;
+            --success: #006B54;
+            --error: #C1414D;
+            --shadow: rgba(44, 95, 79, 0.08);
+
+            /* Dynamic font sizes using clamp() for fluid typography */
+            --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+            --font-size-h1: clamp(2.2rem, 1.5rem + 3.5vw, 3.2rem);
+            --font-size-h2: clamp(2rem, 1.5rem + 2.5vw, 2.8rem);
         }
 
         * {
@@ -35,109 +44,79 @@
         }
 
         body {
-            font-family: 'Lato', sans-serif;
-            background-color: var(--background);
-            color: var(--text-dark);
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            font-size: var(--font-size-base); /* Use dynamic base font size */
             line-height: 1.7;
             -webkit-font-smoothing: antialiased;
+            padding: 1rem;
+            padding-bottom: 120px; /* Space for sticky footer */
+            position: relative;
+        }
+        
+        /* Watermark */
+        body::after {
+            content: 'CONFIDENTIAL';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: clamp(4rem, 1rem + 20vw, 12rem);
+            color: rgba(0, 0, 0, 0.04);
+            font-weight: 700;
+            z-index: -1;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 10px;
         }
         
         .main-container {
             max-width: 900px;
-            margin: 1rem auto;
-            background: var(--white);
-            border: 1px solid var(--border-color);
-            box-shadow: 0 15px 50px rgba(0,0,0,0.08);
-            border-radius: 16px;
+            margin: 0 auto;
+            background: var(--surface);
+            border-radius: 20px;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            box-shadow: 0 20px 60px var(--shadow);
+            border: 1px solid var(--border);
         }
 
         .header {
-            background-color: var(--brand-green);
-            color: var(--white);
-            padding: 2.5rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
+            color: var(--surface);
+            padding: 2.5rem 2rem; /* Reduced padding */
             text-align: center;
             position: relative;
+            overflow: hidden;
         }
         
-        .header::before, .header::after {
-            content: '✨';
-            position: absolute;
-            font-size: 80px;
-            opacity: 0.1;
-            z-index: 0;
-        }
         .header::before {
             content: '🌿';
-            top: -10px;
-            right: 0;
+            position: absolute;
+            font-size: 120px;
+            opacity: 0.08;
+            top: -20px;
+            right: -20px;
             transform: rotate(-15deg);
         }
-        .header::after {
-            bottom: -20px;
-            left: -10px;
-            font-size: 60px;
-        }
-
 
         .header h1 {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 3.2em;
+            font-family: 'Cormorant Garamond', serif; /* Matched to section headers */
+            font-size: var(--font-size-h1);
             font-weight: 700;
-            letter-spacing: 1px;
+            /* letter-spacing: 1.5px; */ /* REVISION: Removed for a tighter look, similar to section headers */
             position: relative;
-            z-index: 1;
+            margin-bottom: 0.25rem; /* Reduced margin */
         }
 
         .header .subtitle {
-            font-family: 'Lato', sans-serif;
-            font-size: 1.1em;
-            color: var(--light-gold);
-            font-weight: 400;
-            position: relative;
-            z-index: 1;
-        }
-
-        .progress-section {
-            position: sticky;
-            top: 0;
-            background-color: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            z-index: 100;
-        }
-
-        .progress-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-            font-size: 0.9em;
-            font-weight: 700;
-            color: var(--text-dark);
-        }
-        
-        .progress-label .percentage {
-            font-weight: 700;
-            color: var(--brand-green);
-            font-size: 1.2em;
-        }
-
-        .progress-track {
-            height: 12px;
-            background: var(--border-color);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--brand-gold) 0%, var(--light-gold) 100%);
-            transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1);
-            border-radius: 6px;
+            font-size: clamp(0.9rem, 0.8rem + 0.5vw, 1rem); /* Slightly smaller subtitle */
+            color: var(--light-gold-bg);
+            font-weight: 500;
+            opacity: 0.95;
+            font-family: 'Montserrat', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .info-field-grid {
@@ -148,80 +127,124 @@
         }
         
         .info-field label {
-            font-size: 0.9em;
-            font-weight: 700;
+            font-size: 0.8em;
+            font-weight: 600;
             margin-bottom: 0.5rem;
             display: block;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
         }
 
-        .info-field input, .info-field select {
+        .info-field input {
             width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
             font-size: 1em;
-            font-family: 'Lato', sans-serif;
-            background: var(--white);
-            transition: all 0.2s ease;
+            font-family: 'Montserrat', sans-serif;
+            background: #FDFDFD;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            font-weight: 500;
         }
         
-        .info-field input:focus, .info-field select:focus {
+        .info-field input:focus {
             outline: none;
-            border-color: var(--brand-gold);
-            box-shadow: 0 0 0 3px rgba(180, 138, 60, 0.2);
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 4px rgba(180, 140, 79, 0.15);
+            background: var(--surface);
         }
         
-        .checklist-body {
-            position: relative;
+        .info-guides {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2.5rem;
+            padding-top: 2.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .guide-card {
+            background: #FFFFFF;
+            border-radius: 15px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            border-left-width: 5px;
+            transition: all 0.3s ease;
+        }
+        .guide-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.07);
+        }
+
+        .guide-card.kit { border-left-color: #5F8B7D; } /* Muted Green */
+        .guide-card.agents { border-left-color: #D4A373; } /* Muted Orange */
+
+        .guide-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .guide-card-header .icon { font-size: 1.5em; }
+        .guide-card-header h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.6em;
+            color: var(--primary-green);
+            margin: 0;
         }
         
+        .guide-card p {
+            font-size: clamp(0.88em, 0.85em + 0.15vw, 0.92em); /* Dynamic font size for guide */
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+        .guide-card .item { 
+            margin-bottom: 0.5rem; 
+            display: block; /* REVISION: Ensures items stack vertically and wrap correctly */
+        }
+        .guide-card .item strong { color: var(--text-primary); }
+
+
         .navigation-tabs {
             display: flex;
             overflow-x: auto;
-            border-bottom: 1px solid var(--border-color);
-            padding: 0.5rem 1.5rem;
-            scrollbar-width: none; /* Firefox */
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1.5rem 0;
+            gap: 0.5rem;
+            scrollbar-width: none;
         }
-        .navigation-tabs::-webkit-scrollbar {
-            display: none; /* Safari and Chrome */
-        }
+        .navigation-tabs::-webkit-scrollbar { display: none; }
 
         .nav-tab {
-            padding: 0.75rem 1rem;
+            padding: 0.85rem 1.25rem;
             cursor: pointer;
             border-bottom: 3px solid transparent;
-            color: var(--text-light);
-            font-weight: 700;
+            color: var(--text-secondary);
+            font-weight: 600;
             font-size: 0.9em;
             white-space: nowrap;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            border-radius: 8px 8px 0 0;
         }
-        .nav-tab.active {
-            color: var(--brand-green);
-            border-bottom-color: var(--brand-gold);
-        }
-        .nav-tab.completed {
-            color: var(--brand-green);
-        }
-        .nav-tab .icon {
-            margin-right: 0.5rem;
-        }
+        .nav-tab:hover { background: rgba(180, 140, 79, 0.08); color: var(--primary-green); }
+        .nav-tab.active { color: var(--primary-green); border-bottom-color: var(--accent-gold); background: rgba(180, 140, 79, 0.05); }
+        .nav-tab.completed { color: var(--success); }
+        .nav-tab .icon { margin-right: 0.5rem; font-size: 1.1em; }
 
         .card-container {
             position: relative;
             overflow: hidden;
-            padding: 1.5rem;
+            padding: 2.5rem;
             min-height: 500px; 
+            touch-action: pan-y;
         }
 
         .card {
             top: 0; left: 0; width: 100%;
-            padding: 1.5rem;
-            opacity: 0; visibility: hidden;
-            position: absolute;
-            transform: translateX(20px);
-            transition: opacity 0.4s ease, transform 0.4s ease, visibility 0.4s;
+            opacity: 0; visibility: hidden; position: absolute;
+            transform: translateX(30px);
+            transition: opacity 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), visibility 0.5s;
         }
 
         .card.active {
@@ -231,229 +254,254 @@
         }
         
         .card h2 {
-            font-size: 1.8em;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: var(--font-size-h2); /* Use dynamic h2 font size */
             font-weight: 700;
-            margin-bottom: 1rem;
-            color: var(--brand-green);
+            margin-bottom: 1.5rem;
+            color: var(--primary-green);
         }
 
-        .section-description {
-            background-color: #F1EEE9; padding: 1rem;
-            margin-bottom: 1.5rem; border-radius: 8px;
-            border-left: 4px solid var(--brand-gold);
+        .section-description, .pro-tip {
+            background: var(--light-gold-bg);
+            padding: 1.25rem;
+            margin-bottom: 1.75rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-gold);
             font-size: 0.95em;
+            line-height: 1.7;
         }
+        .pro-tip { margin-top: 1.75rem; }
 
-        .pro-tip {
-             background-color: rgba(200, 155, 82, 0.1); padding: 1rem;
-            margin-top: 1.5rem; border-radius: 8px;
-            border-left: 4px solid var(--light-gold);
-            font-size: 0.95em;
-        }
-        .pro-tip strong { color: var(--brand-gold); }
+        .pro-tip strong { color: var(--primary-green); font-weight: 700; }
         
         .checklist-item {
-            padding: 1rem 0; border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: flex-start; gap: 1rem;
+            padding: 1.25rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            transition: background 0.3s ease;
+        }
+        .checklist-item:hover {
+            background: rgba(180, 140, 79, 0.03);
+            margin: 0 -1.25rem;
+            padding-left: 1.25rem;
+            padding-right: 1.25rem;
+            border-radius: 8px;
         }
         .checklist-item:last-child { border-bottom: none; }
         
         .checklist-item input[type="checkbox"] {
             -webkit-appearance: none; appearance: none;
-            margin-top: 5px; width: 1.5em; height: 1.5em;
-            border: 2px solid var(--border-color); border-radius: 6px;
-            display: grid; place-content: center; flex-shrink: 0;
+            margin-top: 4px;
+            width: 1.5em; height: 1.5em;
+            border: 2.5px solid var(--border);
+            border-radius: 6px;
+            display: grid;
+            place-content: center;
+            flex-shrink: 0;
             cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
+        .checklist-item input[type="checkbox"]:hover { border-color: var(--accent-gold); transform: scale(1.05); }
+
         .checklist-item input[type="checkbox"]::before {
-            content: ""; width: 0.8em; height: 0.8em;
-            transform: scale(0); transition: 120ms transform ease-in-out;
-            box-shadow: inset 1em 1em var(--brand-gold);
-            transform-origin: bottom left;
+            content: ""; width: 0.75em; height: 0.75em;
+            transform: scale(0);
+            transition: 180ms transform ease-in-out;
+            box-shadow: inset 1em 1em var(--accent-gold);
+            transform-origin: center;
             clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
         }
 
+        .checklist-item input[type="checkbox"]:checked { background: var(--light-gold-bg); border-color: var(--accent-gold); }
         .checklist-item input[type="checkbox"]:checked::before { transform: scale(1); }
 
-        .checklist-item label {
-            flex: 1; cursor: pointer; font-weight: 700;
-            transition: color 0.3s ease;
-        }
-
-        .checklist-item.checked label {
-            text-decoration: line-through;
-            color: var(--text-light);
-        }
+        .checklist-item label { flex: 1; cursor: pointer; font-weight: 600; transition: color 0.3s ease; font-size: 1.02em; }
+        .checklist-item.checked label { text-decoration: line-through; color: var(--text-secondary); opacity: 0.7; }
 
         .item-detail {
-            font-size: 0.9em; color: var(--text-light);
-            margin-top: 0.25rem; padding-left: 0.5rem;
-            font-weight: 400;
+            font-size: 0.9em; color: var(--text-secondary);
+            margin-top: 0.35rem; padding-left: 0.5rem;
+            font-weight: 400; line-height: 1.6;
+        }
+        .item-detail code {
+            background-color: #f0f0f0; padding: 2px 6px;
+            border-radius: 4px; font-family: monospace; font-size: 0.9em;
         }
 
         .photo-upload {
-            border: 2px dashed var(--light-gold); border-radius: 12px;
-            padding: 1.5rem; margin: 1.5rem 0; text-align: center;
+            border: 2px dashed var(--accent-gold); border-radius: 14px;
+            padding: 1.75rem; margin: 1.5rem 0; text-align: center;
+            background: rgba(180, 140, 79, 0.03); transition: all 0.3s ease;
         }
-
-        .photo-upload h4 {
-            color: var(--brand-green); margin-bottom: 0.5rem;
-            font-size: 1.1em; font-weight: 700;
-        }
-
-        .photo-upload .photo-hint {
-            font-size: 0.9em; color: var(--text-light);
-            margin-bottom: 1rem;
-        }
+        .photo-upload:hover { border-color: var(--primary-green); background: rgba(180, 140, 79, 0.06); }
+        .photo-upload h4 { color: var(--primary-green); margin-bottom: 0.5rem; font-size: 1.15em; font-weight: 700; }
+        .photo-upload .photo-hint { font-size: 0.9em; color: var(--text-secondary); margin-bottom: 1.25rem; }
         
         input[type="file"] { display: none; }
 
+        .photo-btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
         .photo-upload-btn {
-            background-color: var(--brand-gold); color: var(--white);
-            padding: 0.75rem 1.5rem; border-radius: 25px;
-            cursor: pointer; display: inline-block; font-weight: 700;
-            transition: all 0.3s ease; border: none;
+            background: var(--surface);
+            color: var(--accent-gold);
+            border: 2px solid var(--accent-gold);
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px; cursor: pointer; display: inline-block; font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .photo-upload-btn.primary {
+            background: linear-gradient(135deg, var(--accent-gold) 0%, #a57e45 100%);
+            color: var(--surface);
+            border-color: var(--accent-gold);
+            box-shadow: 0 4px 12px rgba(180, 140, 79, 0.3);
         }
         .photo-upload-btn:hover {
-            background-color: #a57c36; transform: translateY(-2px);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(180, 140, 79, 0.2);
         }
         
-        .photo-preview {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 1rem; margin-top: 1rem;
-        }
-
+        .photo-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
         .photo-preview-item {
-            position: relative; border-radius: 8px;
-            overflow: hidden; aspect-ratio: 1;
+            position: relative; border-radius: 10px; overflow: hidden;
+            aspect-ratio: 1; border: 2px solid var(--border);
+            transition: transform 0.2s ease;
         }
-        .photo-preview-item img {
-            width: 100%; height: 100%; object-fit: cover;
-        }
+        .photo-preview-item:hover { transform: scale(1.03); }
+        .photo-preview-item img { width: 100%; height: 100%; object-fit: cover; }
         .photo-preview-item .remove-photo {
-            position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white;
-            border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer;
-            font-size: 16px; display: flex; align-items: center; justify-content: center;
+            position: absolute; top: 6px; right: 6px;
+            background: rgba(193, 65, 77, 0.9); color: white; border: none;
+            border-radius: 50%; width: 28px; height: 28px;
+            cursor: pointer; font-size: 18px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .photo-preview-item .remove-photo:hover { background: var(--error); transform: scale(1.1); }
+        
+        .navigation-footer {
+            position: sticky; bottom: 0; left: 0; width: 100%;
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px);
+            border-top: 1px solid var(--border); z-index: 100; padding: 1rem;
+        }
+        .navigation-controls {
+            max-width: 900px; margin: 0 auto;
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
         }
         
-        .navigation-buttons {
-            display: flex; justify-content: space-between;
-            padding: 1rem 1.5rem; border-top: 1px solid var(--border-color);
+        .progress-section { flex-grow: 1; }
+        .progress-label {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 0.5rem; font-size: 0.8em; font-weight: 600;
+        }
+        .progress-label .percentage { font-weight: 700; color: var(--primary-green); }
+        .progress-track { height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-gold) 0%, var(--primary-green) 100%);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
         }
 
         .nav-btn {
-            background-color: var(--brand-green); color: var(--white);
-            border: none; padding: 0.8rem 2rem;
-            font-size: 1em; border-radius: 25px; cursor: pointer;
-            transition: all 0.3s; font-weight: 700;
-            font-family: 'Lato', sans-serif;
+            background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
+            color: var(--surface); border: none; padding: 0.9rem 2rem;
+            font-size: 1em; border-radius: 30px; cursor: pointer;
+            transition: all 0.3s ease; font-weight: 600;
+            font-family: 'Montserrat', sans-serif;
+            box-shadow: 0 4px 12px rgba(44, 95, 79, 0.3);
+            flex-shrink: 0;
         }
-        .nav-btn:hover:not(:disabled) {
-            transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 51, 43, 0.2);
-        }
-        .nav-btn:disabled {
-            background-color: #ccc; cursor: not-allowed; opacity: 0.7;
-        }
-        
-        #submitBtn { background-color: var(--brand-gold); }
+        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(44, 95, 79, 0.4); }
+        .nav-btn:disabled { background: linear-gradient(135deg, #ccc 0%, #bbb 100%); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
+        #submitBtn { background: linear-gradient(135deg, var(--accent-gold) 0%, #a57e45 100%); }
 
-        .submission-status {
-            padding: 0 1.5rem 1rem; text-align: center;
-        }
-        .submit-message {
-            padding: 1rem; border-radius: 8px; display: none;
-        }
-        .submit-message.success {
-            background: #e6f1f0; color: var(--success); border: 1px solid var(--success); display: block;
-        }
-        .submit-message.error {
-            background: #f8d7da; color: var(--error); border: 1px solid var(--error); display: block;
-        }
+        .submission-status { padding: 0 2rem 1.5rem; text-align: center; }
+        .submit-message { padding: 1.25rem; border-radius: 12px; display: none; font-weight: 500; }
+        .submit-message.success { background: #e8f5f1; color: var(--success); border: 1px solid var(--success); display: block; }
+        .submit-message.error { background: #fef0f1; color: var(--error); border: 1px solid var(--error); display: block; }
 
         .footer {
-            background-color: var(--brand-green); color: var(--light-gold); text-align: center;
-            padding: 1.5rem; font-size: 1em;
+            background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
+            color: var(--light-gold-bg); text-align: center; padding: 2rem;
+            font-size: 1em; word-wrap: break-word;
         }
-        .confidentiality-notice {
-            margin-top: 0.5rem;
+        
+        .security-footer {
+            text-align: center;
+            padding: 2rem 1rem;
             font-size: 0.8em;
-            color: rgba(255, 255, 255, 0.5);
+            color: var(--text-secondary);
+        }
+        .security-footer p {
+            margin: 0.5rem 0;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
         
         .loading-spinner {
-            border: 3px solid rgba(255,255,255,0.3); border-top: 3px solid var(--white);
-            border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
-            display: inline-block; margin-left: 10px; vertical-align: middle;
+            border: 3px solid rgba(255,255,255,0.3); border-top: 3px solid var(--surface);
+            border-radius: 50%; width: 20px; height: 20px;
+            animation: spin 1s linear infinite; display: inline-block;
+            margin-left: 10px; vertical-align: middle;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal {
-            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
-            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6);
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.65);
             align-items: center; justify-content: center;
         }
         .modal-content {
-            background-color: #fefefe; margin: auto; padding: 2rem; border-radius: 12px;
-            border: 1px solid #ddd; width: 90%; max-width: 500px; text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            background-color: var(--surface); margin: auto; padding: 2.5rem;
+            border-radius: 16px; border: none; width: 90%; max-width: 500px;
+            text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
-        .modal-content h3 { font-size: 1.5em; color: var(--brand-green); margin-bottom: 1rem; }
-        .modal-content p { margin-bottom: 1.5rem; color: var(--text-light); }
+        .modal-content h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.8em; color: var(--primary-green); margin-bottom: 1rem;
+        }
+        .modal-content p { margin-bottom: 1.75rem; color: var(--text-secondary); line-height: 1.6; }
         .modal-buttons { display: flex; justify-content: center; gap: 1rem; }
-        .modal-btn { padding: 0.8rem 1.5rem; border-radius: 25px; border: none; font-weight: 700; cursor: pointer; }
-        #modal-submit-anyway { background-color: var(--brand-gold); color: white; }
-        #modal-go-back { background-color: #eee; color: var(--text-dark); }
+        .modal-btn { padding: 0.9rem 1.75rem; border-radius: 30px; border: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        #modal-confirm-action, #error-modal-close {
+            background: linear-gradient(135deg, var(--accent-gold) 0%, #a57e45 100%);
+            color: white; box-shadow: 0 4px 12px rgba(180, 140, 79, 0.3);
+        }
+        #modal-confirm-action:hover, #error-modal-close:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(180, 140, 79, 0.4); }
+        #modal-go-back { background: #f5f5f5; color: var(--text-primary); }
+        #modal-go-back:hover { background: #e8e8e8; }
+        .modal-content ol { text-align: left; margin-left: 20px; margin-bottom: 1.5rem; }
+        .modal-content li { margin-bottom: 0.75rem; }
+        .modal-content code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
 
-        .workflow-diagram {
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1rem;
-             background-color: var(--background);
+        textarea {
+            width: 100%; padding: 0.85rem 1rem; border: 1px solid var(--border);
+            border-radius: 10px; font-size: 1em; font-family: 'Montserrat', sans-serif;
+            min-height: 120px; margin-top: 0.5rem; resize: vertical;
+            transition: all 0.2s ease;
         }
-        .workflow-diagram h3 {
-             font-size: 1.1em; text-align: center;
-             margin-bottom: 1rem; color: var(--brand-green);
-        }
-        .workflow-steps {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .workflow-step {
-            text-align: center;
-            font-size: 0.8em;
-            color: var(--text-dark);
-            font-weight: 700;
-            background: rgba(255, 255, 255, 0.7);
-            border: 1px solid rgba(234, 232, 226, 0.9);
-            padding: 0.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            backdrop-filter: blur(4px);
-            flex-grow: 1;
-            flex-basis: 0;
-        }
-         .workflow-step .emoji { font-size: 1.2em; }
-
-        .workflow-arrow {
-            color: var(--light-gold);
-            font-size: 1.5em;
-            font-weight: 700;
-            flex-grow: 0;
-        }
+        textarea:focus { outline: none; border-color: var(--accent-gold); box-shadow: 0 0 0 4px rgba(180, 140, 79, 0.15); }
 
         @media screen and (max-width: 768px) {
-            .main-container { margin: 0; border-radius: 0; }
-            .header h1 { font-size: 2.5em; }
-            .card { padding: 1rem; }
-            .navigation-tabs { padding: 0.5rem 1rem; }
+            body { padding: 0.5rem; padding-bottom: 120px; }
+            .main-container { border-radius: 15px; }
+            .header h1 { font-size: var(--font-size-h1); }
+            .card-container { padding: 1.5rem; }
+            .navigation-tabs { padding: 0.75rem 1rem 0; }
             .nav-tab .label { display: none; }
-            .workflow-steps { flex-wrap: wrap; justify-content: center; }
-            .workflow-step { font-size: 0.7em; flex-basis: 40%; margin-bottom: 0.5rem; }
-            .workflow-arrow { display: none; }
-            .workflow-arrow:nth-of-type(2) { display: block; margin: 0.5rem 0; transform: rotate(90deg); width: 100%; }
+        }
+        @media screen and (max-width: 480px) {
+            .nav-btn { padding: 0.8rem 1.2rem; font-size: 0.9em;}
         }
     </style>
 </head>
@@ -461,173 +509,218 @@
     <div class="main-container">
         <header class="header">
             <h1>CASCADE HIDEAWAY</h1>
-            <p class="subtitle">Deep Clean Checklist & Quality Report</p>
+            <p class="subtitle">Cleaning and Turn-over Report</p>
         </header>
 
         <form id="cleaningForm">
+            <div class="navigation-tabs"></div>
+            <div class="card-container"></div>
+            <div class="submission-status">
+                 <div id="submitMessage" class="submit-message"></div>
+            </div>
+        </form>
+
+        <footer class="footer">
+            ✨ Calm • Clean • Consistent — Every Stay ✨
+        </footer>
+    </div>
+    
+    <div class="security-footer">
+        <p>© 2025 Cascade Hideaway. All Rights Reserved.</p>
+        <p>This document is confidential and proprietary. For authorized use only. Unauthorized reproduction, distribution, or commercial use is strictly prohibited.</p>
+    </div>
+    
+    <div class="navigation-footer">
+        <div class="navigation-controls">
+            <button type="button" class="nav-btn" id="prevBtn">← Previous</button>
             <div class="progress-section">
                 <div class="progress-label">
-                    <span>Overall Progress</span>
+                    <span>Progress</span>
                     <span class="percentage">0%</span>
                 </div>
                 <div class="progress-track">
                     <div class="progress-fill" style="width: 0%"></div>
                 </div>
             </div>
-            
-            <div class="checklist-body">
-                <div class="navigation-tabs"></div>
-                <div class="card-container"></div>
-                <div class="submission-status">
-                     <div id="submitMessage" class="submit-message"></div>
-                </div>
-                <div class="navigation-buttons">
-                    <button type="button" class="nav-btn" id="prevBtn">Previous</button>
-                    <button type="button" class="nav-btn" id="nextBtn">Next</button>
-                </div>
-            </div>
-        </form>
-
-        <footer class="footer">
-            ✨ Calm • Clean • Consistent — Every Stay ✨
-            <div class="confidentiality-notice">Confidential: For Internal Cascade Use Only.</div>
-        </footer>
+            <button type="button" class="nav-btn" id="nextBtn">Next →</button>
+        </div>
     </div>
 
-    <!-- Submission Modal -->
     <div id="submissionModal" class="modal">
         <div class="modal-content">
-            <h3>Incomplete Items Found</h3>
-            <p id="modal-message">You have some unchecked items. Are you sure you want to submit the report as is?</p>
+            <h3 id="modal-title">⚠️ Incomplete Items</h3>
+            <p id="modal-message">Some items are unchecked. Continue anyway?</p>
             <div class="modal-buttons">
                 <button type="button" class="modal-btn" id="modal-go-back">Go Back & Review</button>
-                <button type="button" class="modal-btn" id="modal-submit-anyway">Submit As-Is</button>
+                <button type="button" class="modal-btn" id="modal-confirm-action">Continue</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <h3 id="error-modal-title">❌ Script Configuration Error</h3>
+            <div id="error-modal-message" style="text-align: left;">
+                <p>The deployed Google Apps Script is not configured correctly. Please follow these steps carefully:</p>
+                <ol>
+                    <li>Go to your Google Sheet and open the script editor via <strong>Extensions > Apps Script</strong>.</li>
+                    <li>In the script, find the line that says:<br><code>const DRIVE_FOLDER_ID = '...';</code></li>
+                    <li>Make sure your actual Google Drive Folder ID is pasted between the quotes.</li>
+                    <li><strong>This is the most important step:</strong> You must publish the changes. Click the blue <strong>Deploy</strong> button, then select <strong>Manage deployments</strong>.</li>
+                    <li>Select your active deployment, click the <strong>Edit</strong> (pencil) icon, change the version to <strong>"New version"</strong>, and click <strong>Deploy</strong>.</li>
+                </ol>
+                <p>If you create a "New deployment" instead of managing the existing one, you will get a <strong>new URL</strong> that you must paste back into this HTML file.</p>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="modal-btn" id="error-modal-close">OK</button>
             </div>
         </div>
     </div>
 
-
     <script>
-        // --- DATA STRUCTURE (Streamlined Checklist with Restored Details) ---
+        // IMPORTANT: PASTE YOUR GOOGLE APPS SCRIPT URL HERE
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrhdpc-kFMKF7PLq46IPH6fPLLDeod-aHbb9Yk8qfJ3gsKqixBRY3XfpeNj4WMFpqA/exec"; 
+
         const checklistData = [
             {
-                title: "Prep & Inspection", icon: "🔍",
-                description: "<strong>🎯 Goal:</strong> Gather everything you need BEFORE entering. Think of this like a chef preparing 'mise en place'—it saves 10-15 minutes per cleaning! <br><br> <strong>🎯 Why This Matters:</strong> Checking FIRST prevents cleaning over problems. Good ventilation and bright lights help you see every detail and make chemicals work better. Fresh air + bright light = better quality.",
-                hasPhotos: true, photoTitle: "📸 Maintenance Issues or Lost & Found", photoHint: "Take clear photos of ANY damage or lost items. This protects you from blame and helps maintenance fix problems faster!",
-                hasNotes: true, notesTitle: "📝 Issues Found & Lost Items:",
+                title: "Get Ready & Check", icon: "🔍",
+                description: "<strong>🎯 What we're doing:</strong> Think of this like getting your tools ready before starting any job. We check FIRST so we don't clean over problems.<br><br><strong>💡 Why it helps:</strong> Opening windows and turning on all lights makes it easier to see dirt and dust. Fresh air helps cleaning products work better too!",
+                hasPhotos: true,
+                photoTitle: "📸 Take Photos of Any Problems",
+                photoHint: "If you see broken items or things left behind by guests, take a photo. This protects you and helps fix problems faster.",
+                hasNotes: true,
+                notesTitle: "📝 Write Down Any Problems You Found:",
                 items: [
-                    { id: "check_0_1", text: "Gather all supplies, linens, and amenities", detail: "<strong>⚡ Pro Tip:</strong> Use a cleaning caddy! ✓ Supplies: All-purpose, bathroom, degreaser, glass cleaner. ✓ Tools: 4+ microfiber cloths, vacuum, mop. ✓ Linens: Full set for bed & bath. ✓ Amenities: 2 3-in-1 coffee, 2 coffee sticks, 2 500ml water, 2 toiletry kits, tissues, paper towels." },
-                    { id: "check_1_1", text: "Announce entry, open all windows and lights", detail: "Knock 3 times, announce 'Housekeeping'. Full ventilation and all lights on helps you see every detail and removes odors." },
-                    { id: "check_1_4", text: "Test all electronics and fixtures", detail: "Check TV remote, Wi-Fi signal, AC cooling, and every single light switch. Report issues now so repairs can start while you clean." },
-                    { id: "check_1_5", text: "Inspect for damages or leaks", detail: "Look for water stains under all sinks, faucets, toilet base, and AC unit. Check walls for cracks or stains and furniture for damage." },
-                    { id: "check_1_7", text: "Conduct thorough lost & found search", detail: "Crucial spots: Drawers, under bed, behind doors, between mattress & headboard, and under cushions." },
+                    { id: "check_0_1", text: "Get all your cleaning tools ready", detail: "Grab your: cleaning sprays, cloths (at least 4), vacuum, mop, fresh bed sheets, fresh towels, bathroom supplies (soap, shampoo), coffee packs (2), water bottles (2), and tissues." },
+                    { id: "check_1_1", text: "Knock and say 'Housekeeping', then open all windows and turn on all lights", detail: "Knock 3 times loudly. This lets guests know you're there. Open windows for fresh air. Turn on every light so you can see dirt clearly. <code>Important:</code> This step is primarily for mid-stay cleaning when a guest may be present." },
+                    { id: "check_1_4", text: "Test if everything works (TV, WiFi, AC, lights)", detail: "Turn on the TV and test the remote. Check if WiFi works on your phone. Turn on AC to feel if it's cooling. Flip every light switch." },
+                    { id: "check_1_5", text: "Look for broken things or water leaks", detail: "Check under sinks for drips. Look at walls for cracks or stains. Check furniture for damage. Look around the AC for water." },
+                    { id: "check_1_7", text: "Search everywhere for items guests left behind", detail: "Important spots to check: inside drawers, under the bed, behind doors, between mattress and headboard, under couch cushions." },
                 ]
             },
             {
-                title: "Clear Out & Dwell Time", icon: "⏳",
-                description: "<strong>🎯 Why Remove Everything First:</strong> Clearing trash and old linens first gives you clean, empty surfaces. Starting laundry NOW is called 'overlapping tasks'—let the washer work while you work! <br><br> <strong>🧪 What is 'Dwell Time'?</strong> Letting cleaners sit on a surface breaks down grime automatically, meaning MUCH LESS scrubbing for you. <strong>❌ Common Mistake:</strong> Spraying and immediately wiping is why cleaning feels hard!",
+                title: "Remove & Let Chemicals Work", icon: "⏳",
+                description: "<strong>🎯 What we're doing:</strong> We take out trash and spray cleaning products, then WAIT. This is the secret to easy cleaning!<br><br><strong>💡 Why waiting helps:</strong> When you spray cleaner and let it sit (5-10 minutes), it breaks down dirt automatically. If you spray and wipe immediately, you have to scrub really hard. Waiting makes your job easier!",
                 items: [
-                    { id: "check_2_1", text: "Empty all trash bins and remove used items", detail: "Check bedroom, bathroom, kitchen, and balcony. Bag up all trash, food containers, and disposables immediately to prevent odors." },
-                    { id: "check_2_4", text: "Strip all bed linens and bathroom towels", detail: "<strong>⚡ Pro Strategy:</strong> Pre-treat any visible stains before washing. Start the laundry cycle now to overlap tasks and save time." },
-                    { id: "check_3_1", text: "Apply cleaner to toilet bowl and shower/tub", detail: "Coat all surfaces generously—under the rim, shower walls from top to bottom, tub, tiles, and grout. Don't scrub yet!" },
-                    { id: "check_3_4", text: "Apply cleaner/degreaser to stovetop and microwave", detail: "Spray greasy surfaces like the stovetop, backsplash, and inside the microwave. Let it sit for 10-15 minutes to dissolve oil." }
+                    { id: "check_2_1", text: "Take out all trash and throw away any food or containers", detail: "Check every room (bedroom, bathroom, kitchen, balcony). Put everything in trash bags. This stops bad smells from spreading." },
+                    { id: "check_2_4", text: "Take off all bed sheets and towels, start washing them", detail: "Remove all bedding and towels. If you see stains, spray them first. Put them in the washing machine NOW so it works while you clean." },
+                    { id: "check_3_1", text: "Spray cleaner inside toilet and all over shower/bathtub", detail: "Spray EVERYWHERE in the toilet (especially under the rim). Spray the shower walls from top to bottom. DON'T SCRUB YET - just spray and leave it!" },
+                    { id: "check_3_4", text: "Spray kitchen cleaner on stove and inside microwave", detail: "Spray greasy areas like the stovetop and inside the microwave. Let it sit for 10-15 minutes to dissolve the grease. This makes scrubbing much easier!" }
                 ]
             },
             {
-                title: "Studio & Bedroom", icon: "🛏️",
-                description: "<strong>🎯 Why 'Top to Bottom'?</strong> Gravity is your friend! Dust high surfaces first so dust falls onto lower ones. This way, you only clean each surface ONCE. <br><br> <strong>🎯 Why 'Dry' First?</strong> Dust + water = mud! Always do dry dusting before any wet cleaning like mopping.",
-                hasPhotos: true, photoTitle: "📸 Bed & Studio Photos *REQUIRED*", photoHint: "Take photos from the doorway angle to capture the guest's first view. Show the perfectly made bed.",
+                title: "Clean Bedroom", icon: "🛏️",
+                description: "<strong>🎯 What we're doing:</strong> Clean from high to low, dust before wet cleaning.<br><br><strong>💡 Why this order:</strong> Dust falls down when you clean. So we start at the ceiling and work our way down. We dust BEFORE mopping because dust + water = mud!",
+                hasPhotos: true,
+                photoTitle: "📸 Take Photos of Finished Bedroom *REQUIRED*",
+                photoHint: "Stand at the doorway and take a photo showing the whole room. Make sure the bed looks perfect!",
                 items: [
-                    { id: "check_4_1", text: "Dust all surfaces from top to bottom", detail: "Start with ceiling fixtures/fans, then picture frames, shelves, tables, and end with baseboards. Clean windows and sills." },
-                    { id: "check_4_5", text: "Disinfect high-touch points", detail: "Use disinfectant on all light switches, TV remotes, thermostats, and door handles (both sides)." },
-                    { id: "check_5_2", text: "Make the bed to hotel standard", detail: "Use tight, wrinkle-free sheets. Create crisp hospital corners at the foot of the bed for a professional look." },
-                    { id: "check_5_6", text: "Fluff and arrange pillows symmetrically", detail: "Fluff pillows vigorously. A plump, perfectly arranged pillow signals luxury and comfort." },
+                    { id: "check_4_1", text: "Wipe dust from top to bottom", detail: "Start high (ceiling fans, light fixtures) then middle (shelves, tables, picture frames) then low (baseboards). Clean windows and window sills too." },
+                    { id: "check_4_5", text: "Clean things people touch a lot", detail: "Use disinfectant spray on: light switches, TV remote, AC remote, door handles (both sides), thermostat." },
+                    { id: "check_5_2", text: "Make the bed perfectly (like in hotels)", detail: "Pull sheets tight with no wrinkles. Make hospital corners at the bottom (tuck in tightly). Make it look crisp and professional." },
+                    { id: "check_5_6", text: "Fluff pillows and arrange them nicely", detail: "Shake pillows hard to make them puffy. Arrange them perfectly straight and even. This makes the bed look luxurious." },
                 ]
             },
             {
-                title: "Kitchen & Bathroom", icon: "💧",
-                description: "<strong>🎯 Zero-Tolerance Areas:</strong> Now that cleaners have dwelled, grime will lift easily. These rooms are where guests judge cleanliness most harshly. Every surface must be spotless and dry.",
-                hasPhotos: true, photoTitle: "📸 Kitchen & Bathroom Photos *REQUIRED*", photoHint: "Capture the sparkling faucets, streak-free glass, and gleaming appliance surfaces.",
+                title: "Clean Kitchen & Bathroom", icon: "💧",
+                description: "<strong>🎯 What we're doing:</strong> Now the cleaners have been sitting, so dirt comes off easily! These rooms MUST be spotless.<br><br><strong>💡 Why these rooms matter most:</strong> Guests judge cleanliness mainly by the bathroom and kitchen. Everything must sparkle and be completely dry.",
+                hasPhotos: true,
+                photoTitle: "📸 Take Photos of Finished Kitchen & Bathroom *REQUIRED*",
+                photoHint: "Show how clean and shiny everything looks - especially the sink, mirrors, and appliances.",
                 items: [
-                    { id: "check_7_4", text: "Scrub and disinfect toilet, shower, and sink", detail: "Use a dedicated cloth for the toilet. Scrub the shower/tub, then rinse thoroughly. Clean the sink basin and polish the faucet until it shines." },
-                    { id: "check_7_2", text: "Clean all glass and mirrors to a streak-free shine", detail: "<strong>⚡ The Squeegee Secret:</strong> After cleaning, use a squeegee to dry the shower glass completely. This prevents water spots and looks professional." },
-                    { id: "check_6_1", text: "Wipe down all kitchen appliances, inside and out", detail: "Clean microwave interior (no oil/residue) with warm water & cleaner/degreaser. Wipe fridge, rice cooker, kettle, and polish the stovetop." },
-                    { id: "check_6_4", text: "Clean and polish sink, faucet, and countertops", detail: "A gleaming faucet is a key sign of a detailed clean. Wipe all counters, including the kitchen island, edges, and backsplash." },
-                    { id: "check_7_7", text: "Restock amenities & check liquid soaps", detail: "Fold towels in thirds. Restock disposables. Check levels and refill: hand soap, liquid bath soap, shampoo, and dishwashing liquid." },
+                    { id: "check_7_4", text: "Scrub and clean the toilet, shower, and sink", detail: "Now scrub the toilet (remember, the cleaner has been sitting!). Scrub shower and tub, then rinse well with water. Clean the sink and make the faucet shine." },
+                    { id: "check_7_2", text: "Clean mirrors and glass until there are NO streaks", detail: "Pro trick: After cleaning shower glass, use a squeegee (rubber wiper) to dry it completely. This stops water spots and looks professional." },
+                    { id: "check_6_1", text: "Clean inside and outside of all kitchen appliances", detail: "Clean inside microwave (no oil or food). Wipe outside of fridge, rice cooker, kettle. Make the stovetop shiny." },
+                    { id: "check_6_4", text: "Clean and polish sink, faucet, and counters", detail: "Make the faucet SUPER shiny - this shows you did a detailed job. Wipe all counters including edges and backsplash." },
+                    { id: "check_7_7", text: "Refill all bathroom and kitchen supplies", detail: "Fold towels neatly (in thirds). Check and refill: hand soap, body wash, shampoo, dish soap. Make sure everything is at least half full." },
                 ]
             },
             {
-                title: "Final Staging & QA", icon: "✨",
-                description: "<strong>🎯 The 'Wow' Moment:</strong> This is the final pass to transition the space from 'clean' to 'perfectly staged'. <br><br><strong>🎯 Floor Strategy:</strong> Always clean your way out of the unit ('Back to Exit') to avoid stepping on clean floors. Vacuum before mopping to prevent muddy streaks. Clean the bathroom floor LAST as it's the wettest area.",
-                hasPhotos: true, photoTitle: "📸 Final Overview Photos *REQUIRED*", photoHint: "Show the complete transformation. These photos represent your commitment to quality.",
-                hasNotes: true, notesTitle: "📝 Completion Summary & Notes",
+                title: "Final Touches & Quality Check", icon: "✨",
+                description: "<strong>🎯 What we're doing:</strong> This is the final step to make everything PERFECT.<br><br><strong>💡 Pro tip:</strong> Clean floors LAST and work backward toward the door so you don't step on clean floors. Vacuum before mopping so you don't spread dust.",
+                hasPhotos: true,
+                photoTitle: "📸 Take Final Photos of Whole Unit *REQUIRED*",
+                photoHint: "Show the complete transformation. These photos prove your excellent work!",
+                hasNotes: true,
+                notesTitle: "📝 Final Notes & Summary",
                 items: [
-                    { id: "check_8_1", text: "Vacuum and mop all floors", detail: "Start from the furthest corner and work your way toward the exit so you don't step on clean floors." },
-                    { id: "check_balcony", text: "Wipe down balcony table, chairs, and railing", detail: "Ensure the outdoor space is clean and inviting for guests." },
-                    { id: "check_9_1", text: "Final fingerprint and dust check", detail: "<strong>⚡ Guest Perspective:</strong> Re-enter the unit as if you were a guest. Wipe any smudges from glass, mirrors, chrome fixtures, and door handles." },
-                    { id: "check_9_4", text: "Stage the room for guest arrival", detail: "Set AC to a comfortable **23°C**, turn on soft ambient lighting (e.g., bedside lamps), and align all decor symmetrically." },
-                    { id: "check_10_6", text: "Final security check", detail: "Ensure all cleaning supplies are removed, all windows are closed and locked, and the front door is securely locked upon exit." }
+                    { id: "check_8_1", text: "Vacuum then mop all floors", detail: "Start from the far corner and work backward toward the exit. This way you don't step on clean floors." },
+                    { id: "check_balcony", text: "Clean the balcony table, chairs, and railing", detail: "Wipe down outdoor furniture so guests can enjoy the balcony too." },
+                    { id: "check_9_1", text: "Walk through as if you're a guest - check for fingerprints and dust", detail: "Pretend you just arrived as a guest. Look for smudges on mirrors, glass, chrome, and door handles. Wipe them off." },
+                    { id: "check_9_4", text: "Set up the room perfectly for guests", detail: "Set AC to comfortable 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight and centered." },
+                    { id: "check_10_6", text: "Final safety check before leaving", detail: "Make sure: you took out all cleaning supplies, all windows are closed and locked, and the front door is locked. <br><br><strong>IMPORTANT:</strong> If no guest is arriving today or tomorrow, switch OFF the water heater from the main breaker panel. Switch it back ON only when a guest is confirmed to be arriving." }
                 ]
             }
         ];
 
-        // --- GLOBAL STATE ---
-        const allPhotos = {};
+        let allPhotos = {};
         let currentCardIndex = 0;
 
-        // --- DOM ELEMENTS ---
         const cardContainer = document.querySelector('.card-container');
         const navTabsContainer = document.querySelector('.navigation-tabs');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         const submissionModal = document.getElementById('submissionModal');
+        const errorModal = document.getElementById('errorModal');
         const submitMessageDiv = document.getElementById('submitMessage');
 
-        // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            const initialCardData = { title: "Cleaner Info", icon: "👤", isInfoCard: true };
+            const initialCardData = { title: "Your Info", icon: "👤", isInfoCard: true };
             const allSections = [initialCardData, ...checklistData];
-
             generateHTML(allSections);
             setupEventListeners(allSections.length);
+            setupSwipeListeners();
             showCard(0);
             updateProgress();
             loadDraft();
         });
         
-        // --- HTML GENERATION ---
         function generateHTML(sections) {
-            let cardsHTML = ''; let tabsHTML = '';
+            let cardsHTML = '';
+            let tabsHTML = '';
             sections.forEach((section, index) => {
                 const sectionId = `section_${index}`;
                 if (!section.isInfoCard) allPhotos[sectionId] = [];
+                
                 tabsHTML += `<div class="nav-tab" data-index="${index}"><span class="icon">${section.icon}</span><span class="label">${section.title}</span></div>`;
+                
                 cardsHTML += `<div class="card" id="${sectionId}" data-index="${index}">`;
-                 if(section.isInfoCard) {
-                    cardsHTML += `<h2>${section.icon} ${section.title}</h2>`;
-                 } else {
-                    cardsHTML += `<h2 style="font-family: 'Cormorant Garamond', serif; font-size: 2.2em;">${section.icon} ${section.title}</h2>`;
-                 }
+                cardsHTML += `<h2>${section.icon} ${section.title}</h2>`;
 
                 if (section.isInfoCard) {
                     cardsHTML += `<div class="info-field-grid">
-                        <div class="info-field"><label for="unitName">Unit Name</label><input type="text" id="unitName" name="unitName" value="Cascade Bria" readonly></div>
-                        <div class="info-field"><label for="cleanerName">Cleaner Name *</label><input type="text" id="cleanerName" name="cleanerName" required placeholder="Your Full Name"></div>
+                        <div class="info-field"><label for="unitName">Property Name</label><input type="text" id="unitName" name="unitName" value="Cascade Bria" readonly></div>
+                        <div class="info-field">
+                            <label for="cleanerName">Your Full Name *</label>
+                            <input type="text" id="cleanerName" name="cleanerName" required placeholder="Select or type a name" list="cleaner-list">
+                            <datalist id="cleaner-list">
+                                <option value="Ate Kriss"></option>
+                                <option value="Honey Grace"></option>
+                            </datalist>
+                        </div>
                         <div class="info-field"><label for="startTime">Start Time *</label><input type="time" id="startTime" name="startTime" required></div>
-                        <div class="info-field"><label for="endTime">End Time *</label><input type="time" id="endTime" name="endTime" required></div>
                     </div>
-                    <div class="workflow-diagram">
-                        <h3>General Workflow</h3>
-                        <div class="workflow-steps">
-                            <div class="workflow-step"><span class="emoji">🔍</span><br>Prep &<br>Inspect</div>
-                            <div class="workflow-arrow">→</div>
-                            <div class="workflow-step"><span class="emoji">⏳</span><br>Clear Out &<br>Dwell Time</div>
-                            <div class="workflow-arrow">→</div>
-                            <div class="workflow-step"><span class="emoji">🛏️</span><br>Studio &<br>Bedroom</div>
-                            <div class="workflow-arrow">→</div>
-                            <div class="workflow-step"><span class="emoji">💧</span><br>Kitchen &<br>Bathroom</div>
-                             <div class="workflow-arrow">→</div>
-                            <div class="workflow-step"><span class="emoji">✨</span><br>Final Stage<br>& QA</div>
+                    <div class="info-guides">
+                        <div class="guide-card kit">
+                            <div class="guide-card-header">
+                                <span class="icon">📦</span>
+                                <h3>Cleaning Kit</h3>
+                            </div>
+                            <p>
+                                All-Purpose Cleaner, Glass Cleaner, Toilet & Bowl Cleaner, Kitchen Degreaser, Floor Cleaner, Microfiber Cloths (x4), Vacuum and Mop, Complete Linen Set, & Guest Restockables.
+                            </p>
+                        </div>
+                        <div class="guide-card agents">
+                            <div class="guide-card-header">
+                                <span class="icon">💡</span>
+                                <h3>Agents Guide</h3>
+                            </div>
+                             <p>
+                                <span class="item"><strong>Oxy Bleach:</strong> For stain removal on fabrics & grout.</span>
+                                <span class="item"><strong>Domex:</strong> Best for toilet bowls, disinfecting.</span>
+                                <span class="item"><strong>Mr. Muscle:</strong> For general surfaces and kitchen counters.</span>
+                                <span class="item"><strong>Lysol Glass Cleaner:</strong> For streak-free mirrors and windows.</span>
+                            </p>
                         </div>
                     </div>`;
                 } else {
@@ -639,9 +732,27 @@
                         </div>`;
                     });
                      if (section.hasPhotos || section.hasNotes) {
-                        cardsHTML += '<div class="pro-tip">';
-                        if (section.hasPhotos) cardsHTML += `<div class="photo-upload" style="border:none; padding:0;"><h4>${section.photoTitle}</h4><div class="photo-hint">${section.photoHint}</div><label for="photos_${sectionId}" class="photo-upload-btn">📷 Add Photos</label><input type="file" id="photos_${sectionId}" accept="image/*" multiple data-section-id="${sectionId}"><div id="preview_${sectionId}" class="photo-preview"></div></div>`;
-                        if (section.hasNotes) cardsHTML += `<div class="notes-area" style="margin-top: 1.5rem;"><label style="font-weight: 700; font-size: 1.1em; color: var(--brand-green);">${section.notesTitle}</label><textarea id="notes_${sectionId}" name="notes_${sectionId}" placeholder="Example: Light switch in bathroom not working..." style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1em; font-family: 'Lato', sans-serif; min-height: 100px; margin-top: 0.5rem;"></textarea></div>`;
+                        cardsHTML += `<div class="pro-tip" style="background: var(--surface); border-color: var(--border);">`;
+                        if (section.hasPhotos) {
+                            cardsHTML += `<div class="photo-upload">
+                                <h4>${section.photoTitle}</h4>
+                                <div class="photo-hint">${section.photoHint}</div>
+                                <div class="photo-btn-group">
+                                    <label for="camera_${sectionId}" class="photo-upload-btn primary">📷 Use Camera</label>
+                                    <input type="file" id="camera_${sectionId}" accept="image/*" capture="environment" data-section-id="${sectionId}">
+                                    
+                                    <label for="attach_${sectionId}" class="photo-upload-btn">📎 Attach Files</label>
+                                    <input type="file" id="attach_${sectionId}" accept="image/*" multiple data-section-id="${sectionId}">
+                                </div>
+                                <div id="preview_${sectionId}" class="photo-preview"></div>
+                            </div>`;
+                        }
+                        if (section.hasNotes) {
+                            cardsHTML += `<div class="notes-area" style="margin-top: 1.5rem;">
+                                <label style="font-weight: 600; font-size: 1.05em; color: var(--primary-green);">${section.notesTitle}</label>
+                                <textarea id="notes_${sectionId}" name="notes_${sectionId}" placeholder="Example: Bathroom light switch not working, need electrician..."></textarea>
+                            </div>`;
+                        }
                         cardsHTML += '</div>';
                     }
                 }
@@ -651,13 +762,12 @@
             navTabsContainer.innerHTML = tabsHTML;
         }
 
-        // --- EVENT LISTENERS ---
         function setupEventListeners(totalCards) {
             navTabsContainer.addEventListener('click', e => {
                 if (e.target.closest('.nav-tab')) showCard(parseInt(e.target.closest('.nav-tab').dataset.index));
             });
             prevBtn.addEventListener('click', () => showCard(currentCardIndex - 1));
-            nextBtn.addEventListener('click', () => (currentCardIndex === totalCards - 1) ? handleFormSubmit() : showCard(currentCardIndex + 1));
+            nextBtn.addEventListener('click', () => (currentCardIndex === totalCards - 1) ? handleSubmission() : showCard(currentCardIndex + 1));
             
             document.querySelectorAll('input, textarea').forEach(el => el.addEventListener('input', saveDraft));
             document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', () => {
@@ -668,31 +778,62 @@
             document.querySelectorAll('input[type="file"]').forEach(input => input.addEventListener('change', handlePhotoUpload));
             
             document.getElementById('modal-go-back').addEventListener('click', () => submissionModal.style.display = 'none');
-            document.getElementById('modal-submit-anyway').addEventListener('click', () => {
+            document.getElementById('modal-confirm-action').addEventListener('click', () => {
                 submissionModal.style.display = 'none';
                 proceedWithSubmission();
             });
+            document.getElementById('error-modal-close').addEventListener('click', () => errorModal.style.display = 'none');
         }
         
-        // --- CARD NAVIGATION & UI UPDATES ---
+        function setupSwipeListeners() {
+            let touchstartX = 0;
+            let touchendX = 0;
+            const swipeThreshold = 50; // Minimum distance for a swipe
+
+            cardContainer.addEventListener('touchstart', function(event) {
+                touchstartX = event.changedTouches[0].screenX;
+            }, false);
+
+            cardContainer.addEventListener('touchend', function(event) {
+                touchendX = event.changedTouches[0].screenX;
+                handleSwipe();
+            }, false); 
+
+            function handleSwipe() {
+                if (touchendX < touchstartX - swipeThreshold) {
+                    const totalCards = document.querySelectorAll('.card').length;
+                    if(currentCardIndex < totalCards - 1) { showCard(currentCardIndex + 1); }
+                }
+                if (touchendX > touchstartX + swipeThreshold) {
+                     if(currentCardIndex > 0) { showCard(currentCardIndex - 1); }
+                }
+            }
+        }
+        
         function showCard(index) {
-            const cards = document.querySelectorAll('.card'); const tabs = document.querySelectorAll('.nav-tab');
+            const cards = document.querySelectorAll('.card');
+            const tabs = document.querySelectorAll('.nav-tab');
             if (index < 0 || index >= cards.length) return;
             currentCardIndex = index;
             
             cardContainer.style.height = (cardContainer.offsetHeight || 500) + 'px';
             
             cards.forEach((c, i) => c.classList.toggle('active', i === index));
-            tabs.forEach((t, i) => t.classList.toggle('active', i === index));
+            tabs.forEach((t, i) => {
+                t.classList.toggle('active', i === index)
+                if (i === index) {
+                    t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            });
             
             setTimeout(() => {
                 if (cards[index]) {
-                    cardContainer.style.height = cards[index].offsetHeight + 'px';
+                     cardContainer.style.height = cards[index].offsetHeight + 'px';
                 }
-            }, 50);
+            }, 500);
 
             prevBtn.disabled = index === 0;
-            nextBtn.textContent = index === cards.length - 1 ? 'Submit Report' : 'Next';
+            nextBtn.textContent = index === cards.length - 1 ? '✅ Submit Report' : 'Next →';
             nextBtn.id = index === cards.length - 1 ? 'submitBtn' : 'nextBtn';
         }
         
@@ -714,72 +855,100 @@
                 navTab.classList.toggle('completed', Array.from(checkboxes).every(cb => cb.checked));
             }
         }
+        
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const MAX_WIDTH = 1280;
+                const MAX_HEIGHT = 1280;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
 
-        // --- PHOTO HANDLING ---
-        function handlePhotoUpload(event) {
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Get the data URL with JPEG compression (0.7 quality)
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        resolve(dataUrl);
+                    };
+                    img.onerror = reject;
+                    img.src = event.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handlePhotoUpload(event) {
             const input = event.target;
             const sectionId = input.dataset.sectionId;
             const previewContainer = document.getElementById(`preview_${sectionId}`);
-            Array.from(input.files).forEach(file => {
-                if (file.size > 5 * 1024 * 1024) { alert(`File ${file.name} is too large (max 5MB).`); return; }
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const photoIndex = allPhotos[sectionId].push({ name: file.name, data: e.target.result }) - 1;
+            
+            for (const file of Array.from(input.files)) {
+                if (file.size > 10 * 1024 * 1024) { // Increased pre-compression limit
+                    alert(`❌ File ${file.name} is too large (max 10MB).`);
+                    continue;
+                }
+                try {
+                    const compressedDataUrl = await compressImage(file);
+                    const photoIndex = allPhotos[sectionId].push({ name: file.name, data: compressedDataUrl }) - 1;
+                    
                     const photoDiv = document.createElement('div');
                     photoDiv.className = 'photo-preview-item';
-                    photoDiv.innerHTML = `<img src="${e.target.result}" alt="${file.name}"><button type="button" class="remove-photo" data-section-id="${sectionId}" data-photo-index="${photoIndex}">&times;</button>`;
+                    photoDiv.innerHTML = `<img src="${compressedDataUrl}" alt="${file.name}"><button type="button" class="remove-photo" data-section-id="${sectionId}" data-photo-index="${photoIndex}">×</button>`;
                     previewContainer.appendChild(photoDiv);
+                    
                     photoDiv.querySelector('.remove-photo').addEventListener('click', (e) => {
                         allPhotos[e.target.dataset.sectionId][e.target.dataset.photoIndex] = null;
                         e.target.parentElement.remove();
                         saveDraft();
                     });
-                    saveDraft();
-                };
-                reader.readAsDataURL(file);
-            });
-            input.value = '';
+                } catch (error) {
+                    console.error("Could not compress image:", error);
+                    alert("Could not process image file. It might be corrupted.");
+                }
+            }
+            saveDraft();
+            input.value = ''; // Clear the input
         }
 
-        // --- AUTOSAVE / DRAFT HANDLING ---
         function saveDraft() {
             const formData = new FormData(document.getElementById('cleaningForm'));
             const data = Object.fromEntries(formData.entries());
             document.querySelectorAll('input[type="checkbox"]').forEach(cb => data[cb.id] = cb.checked);
-            localStorage.setItem('cleaningFormDraft', JSON.stringify({ data, photos: allPhotos }));
+            // We don't save photos in draft to avoid storage limits
+            localStorage.setItem('cleaningFormDraft', JSON.stringify({ data }));
         }
 
         function loadDraft() {
             const draft = localStorage.getItem('cleaningFormDraft');
             if (draft) {
-                if (confirm("Unsaved work found. Would you like to restore it?")) {
-                    const { data, photos } = JSON.parse(draft);
+                if (confirm("📋 You have unsaved work! Would you like to continue where you left off?")) {
+                    const { data } = JSON.parse(draft);
                     for (const key in data) {
                         const el = document.getElementById(key) || document.querySelector(`[name="${key}"]`);
                         if (el) {
                             if (el.type === 'checkbox') el.checked = data[key];
                             else el.value = data[key];
                         }
-                    }
-                    Object.assign(allPhotos, photos);
-                    for (const sectionId in allPhotos) {
-                         const previewContainer = document.getElementById(`preview_${sectionId}`);
-                         if(previewContainer) {
-                            previewContainer.innerHTML = '';
-                             allPhotos[sectionId].forEach((photoData, index) => {
-                                 if (photoData) {
-                                    const photoDiv = document.createElement('div');
-                                    photoDiv.className = 'photo-preview-item';
-                                    photoDiv.innerHTML = `<img src="${photoData.data}" alt="${photoData.name}"><button type="button" class="remove-photo" data-section-id="${sectionId}" data-photo-index="${index}">&times;</button>`;
-                                    previewContainer.appendChild(photoDiv);
-                                    photoDiv.querySelector('.remove-photo').addEventListener('click', (e) => {
-                                        allPhotos[e.target.dataset.sectionId][e.target.dataset.photoIndex] = null;
-                                        e.target.parentElement.remove();
-                                        saveDraft();
-                                    });
-                                 }
-                             });
-                         }
                     }
                     updateProgress();
                     document.querySelectorAll('.nav-tab').forEach(t => updateSectionCompletionStatus(t.dataset.index));
@@ -793,104 +962,102 @@
             }
         }
         
-        // --- SUBMISSION ---
-        function handleFormSubmit() {
+        function handleSubmission() {
+            if (!SCRIPT_URL || SCRIPT_URL.includes("...")) {
+                alert("ERROR: The SCRIPT_URL is not set correctly. Please follow the setup instructions to deploy your Google Apps Script and paste the full URL into this HTML file.");
+                return;
+            }
+
             const unchecked = document.querySelectorAll('input[type="checkbox"]:not(:checked)');
             if (unchecked.length > 0) {
-                document.getElementById('modal-message').textContent = `You have ${unchecked.length} unchecked item(s). Submit anyway?`;
+                document.getElementById('modal-title').textContent = '⚠️ Incomplete Items';
+                document.getElementById('modal-message').textContent = `You have ${unchecked.length} unchecked item(s). Are you sure you want to submit the report?`;
+                document.getElementById('modal-confirm-action').textContent = 'Submit As-Is';
                 submissionModal.style.display = 'flex';
             } else {
                 proceedWithSubmission();
             }
         }
-
+        
         async function proceedWithSubmission() {
             const submitBtn = document.getElementById('submitBtn') || document.getElementById('nextBtn');
             submitBtn.disabled = true;
             submitBtn.innerHTML = 'Submitting... <span class="loading-spinner"></span>';
             submitMessageDiv.style.display = 'none';
 
-            const WEB3FORMS_ACCESS_KEY = '3c99bd93-612a-4a55-b367-64e744f9d9f2';
-            
-            const formData = new FormData(document.getElementById('cleaningForm'));
-            const data = Object.fromEntries(formData.entries());
-            data.checklist = {};
-            document.querySelectorAll('input[type="checkbox"]').forEach(cb => data.checklist[cb.id] = cb.checked);
-
             try {
-                const response = await fetch("https://api.web3forms.com/submit", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "Accept": "application/json" },
-                    body: JSON.stringify({
-                        access_key: WEB3FORMS_ACCESS_KEY,
-                        subject: `Cleaning Report: ${data.unitName} by ${data.cleanerName}`,
-                        to: "cascadereservations@gmail.com",
-                        from_name: "Cascade Quality System",
-                        html: generateEmailBody(data) // Use the 'html' property
-                    })
+                const formData = new FormData(document.getElementById('cleaningForm'));
+                const data = Object.fromEntries(formData.entries());
+                
+                const now = new Date();
+                data.endTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+                let allNotes = [];
+                document.querySelectorAll('textarea[id^="notes_"]').forEach(textarea => {
+                    if (textarea.value.trim()) {
+                        const sectionIndex = parseInt(textarea.id.split('_')[2]);
+                        const sectionTitle = checklistData[sectionIndex - 1].title;
+                        allNotes.push(`[${sectionTitle}]: ${textarea.value.trim()}`);
+                    }
                 });
-                const result = await response.json();
-                if (result.success) {
-                    submitMessageDiv.className = 'submit-message success';
-                    submitMessageDiv.textContent = 'Report sent successfully!';
-                    localStorage.removeItem('cleaningFormDraft');
+                data.allNotes = allNotes.join('\n\n');
+
+                const checklistDetails = checklistData.map(section => ({
+                    title: section.title,
+                    icon: section.icon,
+                    items: section.items.map(item => ({
+                        text: item.text,
+                        checked: document.getElementById(item.id)?.checked || false
+                    }))
+                }));
+
+                const payload = {
+                    formData: data,
+                    photos: allPhotos,
+                    checklistDetails: checklistDetails
+                };
+                
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    body: JSON.stringify(payload),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        submitMessageDiv.className = 'submit-message success';
+                        submitMessageDiv.textContent = '✅ Report submitted! The email and spreadsheet have been updated.';
+                        localStorage.removeItem('cleaningFormDraft');
+                        
+                        setTimeout(() => {
+                            if (confirm('Report sent! Would you like to start a new cleaning checklist?')) {
+                                location.reload();
+                            }
+                        }, 2000);
+                    } else {
+                        throw new Error(result.message || 'The script reported an error.');
+                    }
                 } else {
-                    throw new Error(result.message);
+                    throw new Error(`Server responded with status: ${response.status}. This could be due to an error in the Google Apps Script or a deployment issue.`);
                 }
+
             } catch (error) {
-                submitMessageDiv.className = 'submit-message error';
-                submitMessageDiv.textContent = `Error: ${error.message}. Please try again.`;
+                console.error('Submission error:', error);
+                if (error.message.includes("Google Drive Folder ID")) {
+                    errorModal.style.display = 'flex';
+                } else {
+                    submitMessageDiv.className = 'submit-message error';
+                    submitMessageDiv.textContent = `❌ Submission Error: ${error.message}. Please check your Google Apps Script for other errors and ensure it has been deployed correctly.`;
+                }
             } finally {
-                submitMessageDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Report';
+                if (document.body.contains(submitBtn)) {
+                    submitMessageDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✅ Submit Report';
+                }
             }
-        }
-        
-        function generateEmailBody(data) {
-            let detailsHTML = '';
-            const allSections = [ {isInfoCard: true}, ...checklistData];
-
-            allSections.forEach((section, index) => {
-                if (section.isInfoCard) return;
-                let checkedCount = 0;
-                let itemsHTML = '<ul style="margin:0; padding-left: 20px;">';
-                section.items.forEach(item => {
-                    const isChecked = data.checklist[item.id];
-                    if (isChecked) checkedCount++;
-                    itemsHTML += `<li style="color:${isChecked ? 'green':'#aaa'};">${isChecked ? '✓' : '✗'} ${item.text}</li>`;
-                });
-                itemsHTML += '</ul>';
-
-                const notes = data[`notes_section_${index}`] || '';
-                const photoCount = allPhotos[`section_${index}`] ? allPhotos[`section_${index}`].filter(p=>p).length : 0;
-
-                detailsHTML += `
-                    <h3 style="margin-top:20px; margin-bottom:5px; color:#00332B;">${section.icon} ${section.title} (${checkedCount}/${section.items.length})</h3>
-                    ${itemsHTML}
-                    ${photoCount > 0 ? `<p style="margin:5px 0 0 20px; font-size:12px;"><em>${photoCount} photo(s) were uploaded for this section.</em></p>` : ''}
-                    ${notes ? `<p style="margin:5px 0 0 20px; font-size:12px; white-space:pre-wrap;"><strong>Notes:</strong> ${notes}</p>` : ''}
-                `;
-            });
-            const totalChecks = document.querySelectorAll('input[type="checkbox"]').length;
-            const totalChecked = Object.values(data.checklist).filter(Boolean).length;
-            const percentage = totalChecks > 0 ? Math.round((totalChecked / totalChecks) * 100) : 0;
-            
-            return `
-                <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
-                    <h1 style="color: #00332B; text-align:center;">Cascade Cleaning Report</h1>
-                    <table style="width:100%; margin-bottom:20px; border-collapse: collapse;">
-                        <tr><td style="padding:8px; background:#f4f4f4; border:1px solid #ddd;"><strong>Unit:</strong></td><td style="padding:8px; border:1px solid #ddd;">${data.unitName}</td></tr>
-                        <tr><td style="padding:8px; background:#f4f4f4; border:1px solid #ddd;"><strong>Cleaner:</strong></td><td style="padding:8px; border:1px solid #ddd;">${data.cleanerName}</td></tr>
-                        <tr><td style="padding:8px; background:#f4f4f4; border:1px solid #ddd;"><strong>Time:</strong></td><td style="padding:8px; border:1px solid #ddd;">${data.startTime} - ${data.endTime}</td></tr>
-                    </table>
-                    <h2 style="color: #00332B; border-bottom: 2px solid #B48A3C; padding-bottom: 5px;">Overall Completion: ${percentage}%</h2>
-                    ${detailsHTML}
-                    <p style="text-align:center; margin-top:30px; font-size:12px; color:#999;">Confidential: For Internal Cascade Use Only.</p>
-                </div>
-            `;
         }
     </script>
 </body>
 </html>
-

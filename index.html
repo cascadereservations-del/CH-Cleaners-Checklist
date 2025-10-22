@@ -15,9 +15,9 @@
     <style>
         :root {
             /* New color palette inspired by the Welcome Book */
-            --primary-green: #0A192F; /* Deep Navy */
-            --accent-gold: #B0C4DE; /* Accent Silver */
-            --light-gold-bg: #F4F6F8; /* Light Silver-Blue */ /* Main accent background */
+            --primary-green: #3D2B1F; /* Rich Dark Bronze */
+            --accent-gold: #C6A46E; /* Richer, softer gold */
+            --light-gold-bg: #F9F6F1; /* Lighter, more premium cream */ /* Main accent background */
             --background: #FCFBF9; /* Very light off-white */ /* Softer body background */
             --surface: #FFFFFF;
             --text-primary: #333333;
@@ -75,8 +75,7 @@
         .main-container {
             max-width: 900px;
             margin: 0 auto;
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(15px);
+            background: var(--surface);
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 10px 15px -3px var(--shadow), 0 4px 6px -2px var(--shadow);
@@ -84,7 +83,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #1E3B68 0%, #0A192F 100%);
+            background: linear-gradient(135deg, #4A3728 0%, #3D2B1F 100%);
             color: var(--surface);
             padding: 2.5rem 2rem;
             text-align: center;
@@ -179,7 +178,7 @@
         }
 
         .guide-card {
-            background: rgba(255, 255, 255, 0.5);
+            background: #FFFFFF;
             border-radius: 15px;
             padding: 1.5rem;
             border: 1px solid var(--border);
@@ -275,7 +274,7 @@
         }
 
         .section-description, .pro-tip {
-            background: rgba(244, 246, 248, 0.85);
+            background: var(--light-gold-bg);
             padding: 1.25rem;
             margin-bottom: 1.75rem;
             border-radius: 12px;
@@ -487,21 +486,21 @@
         .progress-track { height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; }
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #DCE4F0 0%, var(--accent-gold) 100%);
+            background: linear-gradient(90deg, var(--accent-gold) 0%, #B58E5F 100%);
             transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 8px;
         }
 
         .nav-btn {
-            background: linear-gradient(135deg, #1E3B68 0%, #0A192F 100%);
+            background: linear-gradient(135deg, #4A3728 0%, #3D2B1F 100%);
             color: var(--surface); border: none; padding: 0.9rem 2rem;
             font-size: 1em; border-radius: 100px; cursor: pointer;
             transition: all 0.3s ease; font-weight: 600;
             font-family: 'Raleway', sans-serif;
-            box-shadow: 0 4px 15px rgba(10, 25, 47, 0.3);
+            box-shadow: 0 4px 12px rgba(44, 95, 79, 0.3);
             flex-shrink: 0;
         }
-        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(10, 25, 47, 0.4); }
+        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(44, 95, 79, 0.4); }
         .nav-btn:disabled { background: linear-gradient(135deg, #ccc 0%, #bbb 100%); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
         #submitBtn { background: linear-gradient(135deg, var(--accent-gold) 0%, #a57e45 100%); }
 
@@ -511,7 +510,7 @@
         .submit-message.error { background: #fef0f1; color: var(--error); border: 1px solid var(--error); display: block; }
 
         .footer {
-            background: linear-gradient(135deg, #1E3B68 0%, #0A192F 100%);
+            background: linear-gradient(135deg, #4A3728 0%, #3D2B1F 100%);
             color: var(--light-gold-bg); text-align: center; padding: 2rem;
             font-size: 1em; word-wrap: break-word;
         }
@@ -707,7 +706,6 @@
                     { id: "check_4_5", text: "Clean things people touch a lot", detail: "Use disinfectant spray on: light switches, TV remote, AC remote, door handles (both sides), thermostat." },
                     { id: "check_5_2", text: "Make the bed perfectly (like in hotels)", detail: "Pull sheets tight with no wrinkles. Make hospital corners at the bottom (tuck in tightly). Make it look crisp and professional." },
                     { id: "check_5_6", text: "Fluff pillows and arrange them nicely", detail: "Shake pillows hard to make them puffy. Arrange them perfectly straight and even. This makes the bed look luxurious." },
-                    { id: "check_5_6_plant", text: "Check and water the plants", detail: "Check the soil of the indoor plants. If dry, water them lightly. Do not overwater. Wipe any dust off the leaves." },
                     { id: "check_5_7", text: "Check and refill the room fragrance", detail: "Look at the bottle of the room perfume. If it's almost empty, fill it up so the room smells nice for the new guest." },
                     { id: "check_5_8", text: "Arrange items and clean mirrors", detail: "Put everything back in its special spot: the TV remote, AC remote, plants, and tissue box. Make sure all mirrors are super clean with no fingerprints." }
                 ]
@@ -976,10 +974,9 @@
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
-                        console.log(`Compressing image: ${file.name} (from ${Math.round(file.size/1024)}KB to ${width}x${height} @ 75% quality)`);
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.75); /* Quality increased to 75% for clearer email res */
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
                         resolve(dataUrl);
                     };
                     img.onerror = reject;

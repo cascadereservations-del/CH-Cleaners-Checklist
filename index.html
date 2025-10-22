@@ -10,22 +10,22 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Cormorant+Garamond:wght@700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Cormorant+Garamond:wght@700&family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             /* New color palette inspired by the Welcome Book */
-            --primary-green: #46554D;
-            --accent-gold: #B48C4F;
-            --light-gold-bg: #F5EFE6; /* Main accent background */
-            --background: #F8F7F5; /* Softer body background */
+            --primary-green: #0A192F; /* Deep Navy */
+            --accent-gold: #B0C4DE; /* Accent Silver */
+            --light-gold-bg: #F4F6F8; /* Light Silver-Blue */ /* Main accent background */
+            --background: #FCFBF9; /* Very light off-white */ /* Softer body background */
             --surface: #FFFFFF;
             --text-primary: #333333;
             --text-secondary: #707070;
             --border: #EAE8E3;
             --success: #006B54;
             --error: #C1414D;
-            --shadow: rgba(44, 95, 79, 0.08);
+            --shadow: rgba(70, 85, 77, 0.1); /* Softer, warmer shadow */
 
             /* Dynamic font sizes using clamp() for fluid typography */
             --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
@@ -44,12 +44,13 @@
         }
 
         body {
-            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Raleway', -apple-system, BlinkMacSystemFont, sans-serif;
             background-color: var(--background);
             background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23EAE8E3' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
             color: var(--text-primary);
             font-size: var(--font-size-base);
-            line-height: 1.7;
+            line-height: 1.65;
+            letter-spacing: 0.02em;
             -webkit-font-smoothing: antialiased;
             padding: 1rem;
             padding-bottom: 120px;
@@ -74,7 +75,8 @@
         .main-container {
             max-width: 900px;
             margin: 0 auto;
-            background: var(--surface);
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(15px);
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 10px 15px -3px var(--shadow), 0 4px 6px -2px var(--shadow);
@@ -82,7 +84,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
+            background: linear-gradient(135deg, #1E3B68 0%, #0A192F 100%);
             color: var(--surface);
             padding: 2.5rem 2rem;
             text-align: center;
@@ -98,6 +100,7 @@
             top: -20px;
             right: -20px;
             transform: rotate(-15deg);
+            animation: subtle-rotate 15s linear infinite;
         }
 
         .header h1 {
@@ -118,7 +121,7 @@
             color: var(--light-gold-bg);
             font-weight: 500;
             opacity: 0.95;
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Raleway', sans-serif;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -146,7 +149,7 @@
             border: 1px solid var(--border);
             border-radius: 10px;
             font-size: 1em;
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Raleway', sans-serif;
             background: #FDFDFD;
             transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             font-weight: 500;
@@ -176,7 +179,7 @@
         }
 
         .guide-card {
-            background: #FFFFFF;
+            background: rgba(255, 255, 255, 0.5);
             border-radius: 15px;
             padding: 1.5rem;
             border: 1px solid var(--border);
@@ -188,8 +191,8 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.07);
         }
 
-        .guide-card.kit { border-left-color: #5F8B7D; }
-        .guide-card.agents { border-left-color: #D4A373; }
+        .guide-card.kit { border-left-color: var(--primary-green); }
+        .guide-card.agents { border-left-color: var(--accent-gold); }
 
         .guide-card-header {
             display: flex;
@@ -253,13 +256,13 @@
         .card {
             top: 0; left: 0; width: 100%;
             opacity: 0; visibility: hidden; position: absolute;
-            transform: translateX(30px);
-            transition: opacity 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), visibility 0.5s;
+            transform: scale(0.98) translateX(20px);
+            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.5s;
         }
 
         .card.active {
             opacity: 1; visibility: visible;
-            transform: translateX(0);
+            transform: scale(1) translateX(0);
             position: relative;
         }
         
@@ -272,13 +275,14 @@
         }
 
         .section-description, .pro-tip {
-            background: var(--light-gold-bg);
+            background: rgba(244, 246, 248, 0.85);
             padding: 1.25rem;
             margin-bottom: 1.75rem;
             border-radius: 12px;
             border-left: 4px solid var(--accent-gold);
             font-size: 0.95em;
-            line-height: 1.7;
+            line-height: 1.65;
+            letter-spacing: 0.02em;
         }
         .pro-tip { margin-top: 1.75rem; }
 
@@ -293,6 +297,9 @@
             transition: background 0.3s ease;
         }
         .checklist-item:hover {
+            transform: scale(1.01); /* Add subtle pop */
+            box-shadow: 0 4px 15px var(--shadow); /* Add soft shadow */
+            border-radius: 12px;
             background: rgba(180, 140, 79, 0.03);
             margin: 0 -1.25rem;
             padding-left: 1.25rem;
@@ -429,7 +436,7 @@
             color: var(--accent-gold);
             border: 2px solid var(--accent-gold);
             padding: 0.75rem 1.5rem;
-            border-radius: 30px; cursor: pointer; display: inline-block; font-weight: 600;
+            border-radius: 100px; cursor: pointer; display: inline-block; font-weight: 600;
             transition: all 0.3s ease;
         }
         .photo-upload-btn.primary {
@@ -480,21 +487,21 @@
         .progress-track { height: 8px; background: var(--border); border-radius: 8px; overflow: hidden; }
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--accent-gold) 0%, var(--primary-green) 100%);
+            background: linear-gradient(90deg, #DCE4F0 0%, var(--accent-gold) 100%);
             transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
             border-radius: 8px;
         }
 
         .nav-btn {
-            background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
+            background: linear-gradient(135deg, #1E3B68 0%, #0A192F 100%);
             color: var(--surface); border: none; padding: 0.9rem 2rem;
-            font-size: 1em; border-radius: 30px; cursor: pointer;
+            font-size: 1em; border-radius: 100px; cursor: pointer;
             transition: all 0.3s ease; font-weight: 600;
-            font-family: 'Montserrat', sans-serif;
-            box-shadow: 0 4px 12px rgba(44, 95, 79, 0.3);
+            font-family: 'Raleway', sans-serif;
+            box-shadow: 0 4px 15px rgba(10, 25, 47, 0.3);
             flex-shrink: 0;
         }
-        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(44, 95, 79, 0.4); }
+        .nav-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(10, 25, 47, 0.4); }
         .nav-btn:disabled { background: linear-gradient(135deg, #ccc 0%, #bbb 100%); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
         #submitBtn { background: linear-gradient(135deg, var(--accent-gold) 0%, #a57e45 100%); }
 
@@ -504,7 +511,7 @@
         .submit-message.error { background: #fef0f1; color: var(--error); border: 1px solid var(--error); display: block; }
 
         .footer {
-            background: linear-gradient(135deg, var(--primary-green) 0%, #2a3a32 100%);
+            background: linear-gradient(135deg, #1E3B68 0%, #0A192F 100%);
             color: var(--light-gold-bg); text-align: center; padding: 2rem;
             font-size: 1em; word-wrap: break-word;
         }
@@ -528,6 +535,12 @@
             animation: spin 1s linear infinite; display: inline-block;
             margin-left: 10px; vertical-align: middle;
         }
+        @keyframes subtle-rotate {
+            0% { transform: rotate(-15deg) scale(1); }
+            50% { transform: rotate(5deg) scale(1.05); }
+            100% { transform: rotate(-15deg) scale(1); }
+        }
+        
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .modal {
@@ -547,7 +560,7 @@
         }
         .modal-content p { margin-bottom: 1.75rem; color: var(--text-secondary); line-height: 1.6; }
         .modal-buttons { display: flex; justify-content: center; gap: 1rem; }
-        .modal-btn { padding: 0.9rem 1.75rem; border-radius: 30px; border: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .modal-btn { padding: 0.9rem 1.75rem; border-radius: 100px; border: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
         #modal-confirm-action, #error-modal-close {
             background: linear-gradient(135deg, var(--accent-gold) 0%, #a57e45 100%);
             color: white; box-shadow: 0 4px 12px rgba(180, 140, 79, 0.3);
@@ -561,7 +574,7 @@
 
         textarea {
             width: 100%; padding: 0.85rem 1rem; border: 1px solid var(--border);
-            border-radius: 10px; font-size: 1em; font-family: 'Montserrat', sans-serif;
+            border-radius: 10px; font-size: 1em; font-family: 'Raleway', sans-serif;
             min-height: 120px; margin-top: 0.5rem; resize: vertical;
             transition: all 0.2s ease;
         }
@@ -694,6 +707,7 @@
                     { id: "check_4_5", text: "Clean things people touch a lot", detail: "Use disinfectant spray on: light switches, TV remote, AC remote, door handles (both sides), thermostat." },
                     { id: "check_5_2", text: "Make the bed perfectly (like in hotels)", detail: "Pull sheets tight with no wrinkles. Make hospital corners at the bottom (tuck in tightly). Make it look crisp and professional." },
                     { id: "check_5_6", text: "Fluff pillows and arrange them nicely", detail: "Shake pillows hard to make them puffy. Arrange them perfectly straight and even. This makes the bed look luxurious." },
+                    { id: "check_5_6_plant", text: "Check and water the plants", detail: "Check the soil of the indoor plants. If dry, water them lightly. Do not overwater. Wipe any dust off the leaves." },
                     { id: "check_5_7", text: "Check and refill the room fragrance", detail: "Look at the bottle of the room perfume. If it's almost empty, fill it up so the room smells nice for the new guest." },
                     { id: "check_5_8", text: "Arrange items and clean mirrors", detail: "Put everything back in its special spot: the TV remote, AC remote, plants, and tissue box. Make sure all mirrors are super clean with no fingerprints." }
                 ]
@@ -871,12 +885,12 @@
 
             cardContainer.addEventListener('touchstart', function(event) {
                 touchstartX = event.changedTouches[0].screenX;
-            }, false);
+            }, { passive: true });
 
             cardContainer.addEventListener('touchend', function(event) {
                 touchendX = event.changedTouches[0].screenX;
                 handleSwipe();
-            }, false); 
+            }, { passive: true }); 
 
             function handleSwipe() {
                 if (touchendX < touchstartX - swipeThreshold) {
@@ -962,9 +976,10 @@
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
+                        console.log(`Compressing image: ${file.name} (from ${Math.round(file.size/1024)}KB to ${width}x${height} @ 75% quality)`);
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.75); /* Quality increased to 75% for clearer email res */
                         resolve(dataUrl);
                     };
                     img.onerror = reject;

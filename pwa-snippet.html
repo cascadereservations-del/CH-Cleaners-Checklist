@@ -1,0 +1,19 @@
+<!-- HEAD additions -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0ea5e9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CH Checklist">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+
+<!-- BODY additions -->
+<button id="installBtn" class="hidden" style="padding:10px 14px;border-radius:10px;border:0;background:#0ea5e9;color:#fff;font-weight:600">Install App</button>
+<div id="install-tip" class="hidden" style="border:1px dashed #999;padding:12px;border-radius:8px;margin-top:12px">
+  On iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b> to install.
+</div>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  }
+</script>
+<script src="install.js" defer></script>

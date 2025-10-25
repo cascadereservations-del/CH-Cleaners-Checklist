@@ -1,21 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<base href="/CH-Cleaners-Checklist/">
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0ea5e9">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-
-<base href="/CH-Cleaners-Checklist/">
-  <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#0ea5e9">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Clean Check">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
-
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, user-scalable=no" name="viewport"/>
 <meta content="default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co;" http-equiv="Content-Security-Policy"/>
@@ -646,42 +631,6 @@ textarea:focus {
 @media screen and (max-width: 480px) {
     .nav-btn { padding: 0.8rem 1.2rem; font-size: 0.9em;}
 }
-
-/* PWA Install button (Chrome only) */
-#installBtn { padding:10px 14px; border-radius:12px; border:0; cursor:pointer; background:#0ea5e9; color:#fff; font-weight:600; }
-#installBtn.hidden { display:none; }
-#install-tip { border:1px dashed #999; padding:12px; border-radius:8px; margin-top:12px; }
-
-
-/* A2HS UI */
-.a2hs-wrap{display:flex;align-items:center;gap:.5rem;margin:.625rem 0}
-.a2hs-btn{appearance:none;border:0;border-radius:999px;padding:.45rem .7rem;font:600 13px/1 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:#0ea5e9;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12)}
-.a2hs-btn:disabled{opacity:.55;cursor:not-allowed}
-.a2hs-btn:hover:enabled{filter:brightness(.98)}
-.a2hs-tip{font:500 13px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;color:#fff;background:rgba(255,255,255,.06);backdrop-filter:blur(4px);border:1px dashed rgba(255,255,255,.5);border-radius:14px;padding:.45rem .7rem}
-.a2hs-hide{display:none}
-
-/* Debug panel */
-.pwa-debug-toggle{position:fixed;right:.75rem;bottom:.75rem;border:0;border-radius:999px;background:#0ea5e9;color:#fff;width:40px;height:40px;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:9999;font-size:18px;cursor:pointer;opacity:.9}
-.pwa-debug{position:fixed;right:.75rem;bottom:3.25rem;width:280px;max-width:90vw;background:rgba(17,24,39,.92);color:#e5e7eb;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(6px);border-radius:12px;box-shadow:0 12px 28px rgba(0,0,0,.35);z-index:9999;overflow:hidden}
-.pwa-debug-head{padding:.5rem .75rem;font:700 13px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:rgba(255,255,255,.06)}
-.pwa-debug-body{padding:.5rem .75rem}
-.pwa-debug-list{margin:0;padding-left:1rem}
-.pwa-debug-list li{margin:.25rem 0;font:500 12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
-
-</style>
-<style>
-
-/* A2HS compact UI (override) */
-.a2hs-wrap{display:flex;align-items:center;gap:.5rem;margin:.5rem 0}
-.a2hs-wrap .a2hs-btn{appearance:none;border:0;border-radius:999px;padding:.35rem .6rem;font:600 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:#0ea5e9;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12)}
-.a2hs-wrap .a2hs-btn:disabled{opacity:.55;cursor:not-allowed}
-.a2hs-wrap .a2hs-btn:hover:enabled{filter:brightness(.98)}
-.a2hs-wrap .a2hs-tip{font:500 12px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;color:#fff;background:rgba(255,255,255,.06);backdrop-filter:blur(4px);border:1px dashed rgba(255,255,255,.5);border-radius:12px;padding:.35rem .6rem}
-.a2hs-hide{display:none}
-/* Hide any legacy tip if still present */
-#install-tip{display:none!important}
-
 </style>
 </head>
 <body>
@@ -689,11 +638,6 @@ textarea:focus {
 <header class="header">
 <h1>CASCADE HIDEAWAY</h1>
 <p class="subtitle">Cleaning and Turn-over Report</p>
-<div class="a2hs-wrap">
-  <button id="installBtn" class="a2hs-btn a2hs-hide" aria-label="Install app">Install app</button>
-  <div id="installTip" class="a2hs-tip a2hs-hide">On iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b>.</div>
-</div>
-<div style="margin-top:10px;"><button id="installBtn" class="hidden" aria-label="Install app">Install App</button></div>
 </header>
 <form id="cleaningForm">
 <div class="navigation-tabs"></div>
@@ -1425,30 +1369,9 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </div>
 </div>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(console.error);
-    }
-  </script>
-  <script src="install.js" defer></script>
-
-
-
-
-  <div class="pwa-debug-body">
-    <ul class="pwa-debug-list">
-      <li><b>HTTPS:</b> <span id="dbgHttps">—</span></li>
-      <li><b>Display Mode:</b> <span id="dbgDisplayMode">—</span></li>
-      <li><b>Manifest link:</b> <span id="dbgManifestLink">—</span></li>
-      <li><b>Manifest fetch:</b> <span id="dbgManifestFetch">—</span></li>
-      <li><b>SW registered:</b> <span id="dbgSW">—</span></li>
-      <li><b>SW controlled:</b> <span id="dbgSWCtrl">—</span></li>
-      <li><b>beforeinstallprompt:</b> <span id="dbgBIP">—</span></li>
-      <li><b>Platform:</b> <span id="dbgPlatform">—</span></li>
-    </ul>
-  </div>
-</div>
-
 </body>
 </html>
+
+
+
+

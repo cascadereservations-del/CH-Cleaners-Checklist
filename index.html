@@ -670,6 +670,19 @@ textarea:focus {
 .pwa-debug-list li{margin:.25rem 0;font:500 12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
 
 </style>
+<style>
+
+/* A2HS compact UI (override) */
+.a2hs-wrap{display:flex;align-items:center;gap:.5rem;margin:.5rem 0}
+.a2hs-wrap .a2hs-btn{appearance:none;border:0;border-radius:999px;padding:.35rem .6rem;font:600 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;background:#0ea5e9;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.a2hs-wrap .a2hs-btn:disabled{opacity:.55;cursor:not-allowed}
+.a2hs-wrap .a2hs-btn:hover:enabled{filter:brightness(.98)}
+.a2hs-wrap .a2hs-tip{font:500 12px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;color:#fff;background:rgba(255,255,255,.06);backdrop-filter:blur(4px);border:1px dashed rgba(255,255,255,.5);border-radius:12px;padding:.35rem .6rem}
+.a2hs-hide{display:none}
+/* Hide any legacy tip if still present */
+#install-tip{display:none!important}
+
+</style>
 </head>
 <body>
 <div class="main-container">
@@ -680,7 +693,7 @@ textarea:focus {
   <button id="installBtn" class="a2hs-btn a2hs-hide" aria-label="Install app">Install app</button>
   <div id="installTip" class="a2hs-tip a2hs-hide">On iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b>.</div>
 </div>
-<div style="margin-top:10px;"><button id="installBtn" class="hidden" aria-label="Install app">Install App</button><div id="install-tip" class="hidden">On iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b>.</div></div>
+<div style="margin-top:10px;"><button id="installBtn" class="hidden" aria-label="Install app">Install App</button></div>
 </header>
 <form id="cleaningForm">
 <div class="navigation-tabs"></div>
@@ -1421,9 +1434,8 @@ document.addEventListener('DOMContentLoaded', () => {
   <script src="install.js" defer></script>
 
 
-<button id="pwaDebugToggle" class="pwa-debug-toggle" type="button" aria-label="Toggle PWA debug">🐛</button>
-<div id="pwaDebug" class="pwa-debug a2hs-hide" role="region" aria-label="PWA Debug Panel">
-  <div class="pwa-debug-head">PWA Debug</div>
+
+
   <div class="pwa-debug-body">
     <ul class="pwa-debug-list">
       <li><b>HTTPS:</b> <span id="dbgHttps">—</span></li>

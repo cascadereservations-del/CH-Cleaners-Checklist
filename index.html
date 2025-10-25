@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<base href="/CH-Cleaners-Checklist/">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Clean Check">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, user-scalable=no" name="viewport"/>
 <meta content="default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co;" http-equiv="Content-Security-Policy"/>
@@ -631,6 +639,12 @@ textarea:focus {
 @media screen and (max-width: 480px) {
     .nav-btn { padding: 0.8rem 1.2rem; font-size: 0.9em;}
 }
+
+/* PWA Install button (Chrome only) */
+#installBtn { padding:10px 14px; border-radius:12px; border:0; cursor:pointer; background:#0ea5e9; color:#fff; font-weight:600; }
+#installBtn.hidden { display:none; }
+#install-tip { border:1px dashed #999; padding:12px; border-radius:8px; margin-top:12px; }
+
 </style>
 </head>
 <body>
@@ -638,6 +652,7 @@ textarea:focus {
 <header class="header">
 <h1>CASCADE HIDEAWAY</h1>
 <p class="subtitle">Cleaning and Turn-over Report</p>
+<div style="margin-top:10px;"><button id="installBtn" class="hidden" aria-label="Install app">Install App</button><div id="install-tip" class="hidden">On iPhone/iPad: tap <b>Share</b> → <b>Add to Home Screen</b>.</div></div>
 </header>
 <form id="cleaningForm">
 <div class="navigation-tabs"></div>
@@ -1369,8 +1384,13 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </div>
 </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(console.error);
+    }
+  </script>
+  <script src="install.js" defer></script>
+
 </body>
 </html>
-
-
-

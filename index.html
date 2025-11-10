@@ -5,39 +5,39 @@
 <meta content="width=device-width, initial-scale=1.0, user-scalable=no" name="viewport"/>
 <meta content="default-src 'self'; script-src 'self' 'unsafe-inline' https://script.google.com; connect-src 'self' https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://placehold.co;" http-equiv="Content-Security-Policy"/>
 <title>Cascade Hideaway - Cleaning and Turn-over Report</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#22333B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CH Checklist">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&amp;family=Cormorant+Garamond:wght@700&amp;family=Raleway:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <style>
 :root {
-    /* —— Earthen Luxe —— */
-    --earthen-darkest: #0A0908;  /* Deepest Slate */
-    --earthen-slate: #22333B;   /* Dark Slate Blue */
-    --earthen-ivory: #EAE0D5;   /* Ivory */
-    --earthen-gold: #C6AC8E;    /* Muted Gold */
-    --earthen-mocha: #5E503F;   /* Earthy Brown */
-
-    /* Map to existing variables */
+    --earthen-darkest: #0A0908;
+    --earthen-slate: #22333B;
+    --earthen-ivory: #EAE0D5;
+    --earthen-gold: #C6AC8E;
+    --earthen-mocha: #5E503F;
     --primary-green: var(--earthen-slate);
     --accent-gold: var(--earthen-gold);
     --light-gold-bg: var(--earthen-ivory);
-
     --background: var(--earthen-ivory);
     --surface: #FFFFFF;
     --text-primary: var(--earthen-darkest);
     --text-secondary: var(--earthen-mocha);
-    --border: #DCD4CA; /* Derived from ivory */
+    --border: #DCD4CA;
     --success: #006B54;
     --error: #C1414D;
-    --shadow: rgba(34, 51, 59, 0.12); /* Based on --earthen-slate */
-
-    /* Typography sizing kept from original */
-    /* Dynamic font sizes using clamp() for fluid typography */
+    --shadow: rgba(34, 51, 59, 0.12);
+    --disinfect: #2563eb;
+    --disinfect-bg: #dbeafe;
     --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
     --font-size-h1: clamp(2.2rem, 1.5rem + 3.5vw, 3.2rem);
     --font-size-h2: clamp(2rem, 1.5rem + 2.5vw, 2.8rem);
 }
-
 
 * {
     margin: 0;
@@ -132,8 +132,8 @@ body::after {
 .info-field-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2rem; /* Was 1.5rem, updated to 2rem */
-    margin-bottom: 3rem; /* Was 2rem, updated to 3rem for more space */
+    gap: 2rem;
+    margin-bottom: 3rem;
 }
 
 .info-field label {
@@ -168,7 +168,7 @@ body::after {
 .info-field input:focus {
     outline: none;
     border-color: var(--accent-gold);
-    box-shadow: 0 0 0 4px rgba(198, 172, 142, 0.15); /* Fixed to Earthen Luxe */
+    box-shadow: 0 0 0 4px rgba(198, 172, 142, 0.15);
     background: var(--surface);
 }
 
@@ -245,14 +245,15 @@ body::after {
 }
 .nav-tab:hover {
     background: rgba(198, 172, 142, 0.10);
-    color: var(--earthen-darkest); /* Fixed to Earthen Luxe */
+    color: var(--earthen-darkest);
 }
 .nav-tab.active {
-    color: var(--earthen-darkest); /* Fixed to Earthen Luxe */
-    border-bottom-color: var(--earthen-gold); /* Fixed to Earthen Luxe */
+    color: var(--earthen-darkest);
+    border-bottom-color: var(--earthen-gold);
     background: rgba(198, 172, 142, 0.12);
 }
 .nav-tab.completed { color: var(--success); }
+.nav-tab.weekly { background: rgba(147, 51, 234, 0.08); }
 .nav-tab .icon { margin-right: 0.5rem; font-size: 1.1em; }
 
 .card-container {
@@ -305,16 +306,61 @@ body::after {
     align-items: flex-start;
     gap: 1rem;
     transition: background 0.3s ease;
+    position: relative;
 }
+
+.checklist-item:nth-child(even) {
+    background: rgba(234, 224, 213, 0.15);
+    border-radius: 8px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.checklist-item:nth-child(odd) {
+    background: rgba(255, 255, 255, 0.5);
+}
+
 .checklist-item:hover {
     transform: scale(1.01);
     box-shadow: 0 4px 15px var(--shadow);
     border-radius: 12px;
-    background: rgba(198, 172, 142, 0.06);
+    background: rgba(198, 172, 142, 0.12);
     padding-left: 1.25rem;
     padding-right: 1.25rem;
 }
 .checklist-item:last-child { border-bottom: none; }
+
+.checklist-item.disinfect {
+    border-left: 3px solid var(--disinfect);
+}
+
+.checklist-item.disinfect .disinfect-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    font-size: 0.75em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    margin-left: 0.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+.checklist-item.biweekly {
+    background: linear-gradient(105deg, #fef9f3, #fef5e7) !important;
+    border-left: 3px solid var(--warning);
+}
+
+.checklist-item.biweekly::before {
+    content: '🔹';
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 1.3em;
+    opacity: 0.6;
+}
 
 .checklist-item input[type="checkbox"] {
     -webkit-appearance: none; appearance: none;
@@ -416,9 +462,9 @@ body::after {
     margin-bottom: 0.5rem;
 }
 .warning-box .content .instruction {
-    font-size: 1em; /* REVISION: Increased font size for better readability */
+    font-size: 1em;
     line-height: 1.6;
-    color: #8c2a32; /* REVISION: Softened red text color */
+    color: #8c2a32;
 }
 
 .photo-upload {
@@ -448,14 +494,14 @@ input[type="file"] { display: none; }
     transition: all 0.3s ease;
 }
 .photo-upload-btn.primary {
-    background: linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); /* Fixed to Earthen Luxe */
+    background: linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%);
     color: var(--surface);
-    border-color: var(--earthen-gold); /* Fixed to Earthen Luxe */
-    box-shadow: 0 4px 12px var(--shadow); /* Fixed to Earthen Luxe */
+    border-color: var(--earthen-gold);
+    box-shadow: 0 4px 12px var(--shadow);
 }
 .photo-upload-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px var(--shadow); /* Fixed to Earthen Luxe */
+    box-shadow: 0 6px 20px var(--shadow);
 }
 
 .photo-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
@@ -583,13 +629,13 @@ input[type="file"] { display: none; }
 .modal-buttons { display: flex; justify-content: center; gap: 1rem; }
 .modal-btn { padding: 0.9rem 1.75rem; border-radius: 100px; border: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
 #modal-confirm-action, #error-modal-close {
-    background: linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); /* Fixed to Earthen Luxe */
+    background: linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%);
     color: white;
-    box-shadow: 0 4px 12px var(--shadow); /* Fixed to Earthen Luxe */
+    box-shadow: 0 4px 12px var(--shadow);
 }
 #modal-confirm-action:hover, #error-modal-close:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px var(--shadow); /* Fixed to Earthen Luxe */
+    box-shadow: 0 6px 20px var(--shadow);
 }
 #modal-go-back { background: #f5f5f5; color: var(--text-primary); }
 #modal-go-back:hover { background: #e8e8e8; }
@@ -606,16 +652,37 @@ textarea {
 textarea:focus {
     outline: none;
     border-color: var(--accent-gold);
-    box-shadow: 0 0 0 4px rgba(198, 172, 142, 0.15); /* Fixed to Earthen Luxe */
+    box-shadow: 0 0 0 4px rgba(198, 172, 142, 0.15);
 }
-/* Removed duplicate textarea:focus rule */
 
-/* Glassy sticky footer and Save Draft button */
 .navigation-footer { background: rgba(255, 255, 255, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid rgba(220, 212, 202, 0.8); }
 .save-draft-btn { background:#fff; border:1px solid var(--border); border-radius:50%; width:44px; height:44px; font-size:1.25rem; cursor:pointer; box-shadow:0 2px 8px var(--shadow); display:flex; align-items:center; justify-content:center; transition:all .3s ease; position:relative; }
 .save-draft-btn:hover { transform: translateY(-2px); box-shadow:0 4px 12px var(--shadow); }
 .save-draft-btn .save-draft-tooltip { position:absolute; bottom:110%; left:50%; transform:translateX(-50%); background:var(--earthen-slate); color:#fff; padding:4px 10px; border-radius:6px; font-size:.8em; font-weight:600; opacity:0; visibility:hidden; transition:opacity .3s ease, visibility .3s ease; white-space:nowrap; }
 .save-draft-btn.saved .save-draft-tooltip { opacity:1; visibility:visible; }
+
+.admin-link {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--earthen-slate);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    text-decoration: none;
+    box-shadow: 0 4px 12px var(--shadow);
+    transition: all 0.3s ease;
+    z-index: 999;
+}
+.admin-link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px var(--shadow);
+}
 
 @media screen and (max-width: 768px) {
     body {
@@ -627,6 +694,13 @@ textarea:focus {
     .card-container { padding: 1.5rem; }
     .navigation-tabs { padding: 0.75rem 1rem 0; }
     .nav-tab .label { display: none; }
+    .admin-link {
+        bottom: 140px;
+        right: 15px;
+        width: 45px;
+        height: 45px;
+        font-size: 1.3em;
+    }
 }
 @media screen and (max-width: 480px) {
     .nav-btn { padding: 0.8rem 1.2rem; font-size: 0.9em;}
@@ -700,9 +774,11 @@ textarea:focus {
 </div>
 </div>
 
+<a href="admin.html" class="admin-link" title="Admin Dashboard">📊</a>
+
 <script>
-        // IMPORTANT: PASTE YOUR GOOGLE APPS SCRIPT URL HERE
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrhdpc-kFMKF7PLq46IPH6fPLLDeod-aHbb9Yk8qfJ3gsKqixBRY3XfpeNj4WMFpqA/exec"; 
+        const CALENDAR_ID = "cascadereservations@gmail.com"; // Google Calendar ID for tracking 
 
         const checklistData = [
             {
@@ -719,7 +795,7 @@ textarea:focus {
                     { id: "check_1_4", text: "Test if everything works (TV, WiFi, AC, lights, ref, microwave)", detail: "Turn on the TV and test the remote. Check if WiFi works on your phone. Turn on AC to feel if it's cooling. Flip every light switch. Check if the refrigerator is cold and the microwave powers on." },
                     { id: "check_1_5", text: "Look for broken things or water leaks", detail: "Check under sinks for drips. Look at walls for cracks or stains. Check furniture for damage. Look around the AC for water." },
                     { id: "check_1_7", text: "Search everywhere for items guests left behind", detail: "Important spots to check: inside drawers, under the bed, behind doors, between mattress and headboard, under couch cushions." },
-                    { id: "check_1_8", text: "Check all plants and water if the soil is dry", detail: "Gently press a finger into the soil. If it feels dry an inch down, give them some water. Don't overwater." }
+                    { id: "check_1_8", text: "Check all plants (Snake Plants) and water ONLY if soil is very dry", detail: "Gently press finger 1-2 inches into soil. Snake plants need water only 1-2 times per week when soil is completely dry. <strong>IMPORTANT:</strong> If NO guest is coming the next day, put all plants outside on the balcony for fresh air and sunlight. Bring them back inside before the next guest arrives.", disinfect: false }
                 ]
             },
             {
@@ -728,7 +804,7 @@ textarea:focus {
                 items: [
                     { id: "check_2_1", text: "Take out all trash and throw away any food or containers", detail: "Check every room (bedroom, bathroom, kitchen, balcony). Put everything in trash bags. This stops bad smells from spreading." },
                     { id: "check_2_4", text: "Take off all bed sheets and towels, start washing them", detail: "Remove all bedding and towels. If you see stains, spray them first. Put them in the washing machine NOW so it works while you clean." },
-                    { id: "check_3_1", text: "Spray cleaner inside toilet and all over shower/bathtub", detail: "Spray EVERYWHERE in the toilet (especially under the rim). Spray the shower walls from top to bottom. DON'T SCRUB YET - just spray and leave it!" },
+                    { id: "check_3_1", text: "Spray cleaner inside toilet and all over shower/bathtub", detail: "Spray EVERYWHERE in the toilet (especially under the rim). Spray the shower walls from top to bottom. DON'T SCRUB YET - just spray and leave it!", disinfect: false },
                     { id: "check_3_4", text: "Spray kitchen cleaner on stove and inside microwave", detail: "First, check if they look clean and have no bad smell. If they are clean, just wipe them with a clean cloth. If you see grease or dirt, spray them well and let it sit for 10-15 minutes before scrubbing." }
                 ]
             },
@@ -740,7 +816,7 @@ textarea:focus {
                 photoHint: "Stand at the doorway and take a photo showing the whole room. Make sure the bed looks perfect!",
                 items: [
                     { id: "check_4_1", text: "Wipe dust from top to bottom", detail: "Start high (ceiling fans, light fixtures) then middle (shelves, tables, picture frames) then low (baseboards). Clean windows and window sills too." },
-                    { id: "check_4_5", text: "Clean things people touch a lot", detail: "Use disinfectant spray on: light switches, TV remote, AC remote, door handles (both sides), thermostat." },
+                    { id: "check_4_5", text: "Clean and disinfect things people touch a lot<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Use disinfectant spray on: light switches, TV remote, AC remote, door handles (both sides), thermostat.", disinfect: true },
                     { id: "check_5_2", text: "Make the bed perfectly (like in hotels)", detail: "Pull sheets tight with no wrinkles. Make hospital corners at the bottom (tuck in tightly). Make it look crisp and professional." },
                     { id: "check_5_6", text: "Fluff pillows and arrange them nicely", detail: "Shake pillows hard to make them puffy. Arrange them perfectly straight and even. This makes the bed look luxurious." },
                     { id: "check_5_7", text: "Check and refill the room fragrance", detail: "Look at the bottle of the room perfume. If it's almost empty, fill it up so the room smells nice for the new guest." },
@@ -754,11 +830,11 @@ textarea:focus {
                 photoTitle: "📸 Take Photos of Finished Kitchen & Bathroom *REQUIRED*", photoRequired: true,
                 photoHint: "Show how clean and shiny everything looks - especially the sink, mirrors, and appliances.",
                 items: [
-                    { id: "check_7_4", text: "Scrub and clean the toilet, shower, and sink", detail: "Now scrub the toilet (remember, the cleaner has been sitting!). Scrub shower and tub, then rinse well with water. Clean the sink and make the faucet shine." },
+                    { id: "check_7_4", text: "Scrub, disinfect and clean the toilet, shower, and sink<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Now scrub the toilet (remember, the cleaner has been sitting!). Scrub shower and tub, then rinse well with water. Clean the sink and make the faucet shine.", disinfect: true },
                     { id: "check_7_2", text: "Clean mirrors and glass until there are NO streaks", detail: "Pro trick: After cleaning shower glass, use a squeegee (rubber wiper) to dry it completely. This stops water spots and looks professional." },
                     { id: "check_7_5", text: "Check toilet smell and clean the bathroom vent", detail: "Does the toilet area smell bad? If yes, report it. Also, look at the vent above the mirror. If you see dust, use a vacuum or broom to clean it all off." },
                     { id: "check_6_1", text: "Clean inside and outside of all kitchen appliances", detail: "Clean inside microwave (no oil or food). Wipe outside of fridge, rice cooker, kettle. Make the stovetop shiny." },
-                    { id: "check_6_4", text: "Clean and polish sink, faucet, and counters", detail: "Make the faucet SUPER shiny - this shows you did a detailed job. Wipe all counters including edges and backsplash." },
+                    { id: "check_6_4", text: "Clean, disinfect and polish sink, faucet, and counters<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Make the faucet SUPER shiny - this shows you did a detailed job. Wipe all counters including edges and backsplash.", disinfect: true },
                     { id: "check_6_5", text: "Check the dishwashing sponge", detail: "Is the sponge old, wet, or yucky? Put a brand new, dry one for the guest. Wash and dry the old one if it's still okay to be used next time." },
                     { id: "check_7_7", text: "Refill all bathroom and kitchen supplies", detail: "Fold towels neatly (in thirds). Check and refill: hand soap, body wash, shampoo, dish soap. Ensure guest amenities are complete: coffee packs (2), water bottles (2), and full toiletries." },
                 ]
@@ -773,7 +849,7 @@ textarea:focus {
                 notesTitle: "📝 Final Notes & Summary",
                 items: [
                     { id: "check_8_1", text: "Vacuum then mop all floors", detail: "Start from the far corner and work backward toward the exit. This way you don't step on clean floors." },
-                    { id: "check_balcony", text: "Clean the balcony table, chairs, and railing", detail: "Wipe down outdoor furniture so guests can enjoy the balcony too." },
+                    { id: "check_balcony", text: "Clean and disinfect the balcony table, chairs, and railing<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Wipe down outdoor furniture so guests can enjoy the balcony too.", disinfect: true },
                     { id: "check_9_1", text: "Walk through as if you're a guest - check for fingerprints and dust", detail: "Pretend you just arrived as a guest. Look for smudges on mirrors, glass, chrome, and door handles. Wipe them off." },
                     { id: "check_9_4", text: "Set up the room perfectly for guests", detail: "Set AC to 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight. <strong>Crucially, ensure the refrigerator is switched on and getting cold for the guest.</strong>" },
                     { id: "check_10_6", text: "Final power & safety check before leaving", detail: `What to do with power before you leave? It depends on when the next guest comes.<div class="scenario-box"><div class="icon">☀️</div><div class="content"><div class="title">IF a guest is coming TODAY (before 2 PM):</div><div class="instruction">Leave the <strong class="on">fridge</strong> and the <strong class="on">water heater</strong> ON. Turn <strong class="off">OFF</strong> all the lights. The aircon can be turned on later when the guest is very close to arriving.</div></div></div><div class="scenario-box"><div class="icon">🌙</div><div class="content"><div class="title">IF a guest is coming LATER or NO GUEST today:</div><div class="instruction">Walk around and turn <strong class="off">OFF</strong> everything. Then, go to the breaker box. Find the switch for the <strong class="off">Water Heater</strong> and flip it <strong class="off">OFF</strong>. Leave all other switches ON for the WiFi and cameras.</div></div></div>Finally, make sure all windows are closed and the front door is locked.` }
@@ -781,8 +857,30 @@ textarea:focus {
             }
         ];
 
+        const weeklyMaintenanceData = {
+            title: "🔧 Weekly Deep Maintenance", 
+            icon: "🧹",
+            description: `<strong>🎯 Saturday/Sunday Special Tasks:</strong> These deeper cleaning tasks ensure the unit stays in top condition.<br><br><strong>💡 Why weekly matters:</strong> Regular deep maintenance prevents buildup and keeps appliances running efficiently.`,
+            hasPhotos: true,
+            photoTitle: "📸 Take Photos of Deep Cleaned Items",
+            photoHint: "Document your weekly maintenance work - especially before/after of heavily cleaned items.",
+            hasNotes: true,
+            notesTitle: "📝 Weekly Maintenance Notes:",
+            items: [
+                { id: "weekly_1", text: "Dust-mite vacuum sofa and mattress", detail: "Sofa: Go over arms, back, cushions (both sides). Mattress: Vacuum both sides completely. This removes allergens.", disinfect: false },
+                { id: "weekly_2", text: "Empty vacuum dust collector and clean filter", detail: "Remove dust bin, empty completely. Wash or tap clean the vacuum filter. Let dry before reassembling.", disinfect: false },
+                { id: "weekly_3", text: "Deep clean refrigerator<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Remove shelves and drawers, wash with soapy water. Wipe interior walls and door seals. Vacuum back coils if accessible.", disinfect: true },
+                { id: "weekly_4", text: "Clean AC filters<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Turn off AC. Remove filters, wash with mild soap and water. Let dry completely (30+ mins) before reinstalling.", disinfect: true },
+                { id: "weekly_5", text: "Clean air purifier - vacuum filter and wipe exterior", detail: "Turn off unit. Use vacuum to remove dust from filter (don't wash). Wipe down exterior housing and vents.", disinfect: false },
+                { id: "weekly_6", text: "Descale iron steamer", detail: "Empty water tank. Run descaling solution (or 1:1 white vinegar + water). Steam cycle, then rinse thoroughly.", disinfect: false },
+                { id: "weekly_7", text: "Vacuum behind/under furniture", detail: "Move lightweight furniture safely. Vacuum corners, baseboards, and hard-to-reach areas.", disinfect: false },
+                { id: "weekly_8", text: "🔹 BIWEEKLY (Every 2 weeks): Liquid Sosa Treatment", detail: "✋ ONLY if NO guest is coming the next day: Pour liquid sosa down CR toilet/sink and kitchen sink drains. Leave overnight to prevent clogs. Flush with water in the morning before guest arrives.", disinfect: false, biweekly: true }
+            ]
+        };
+
         let allPhotos = {};
         let currentCardIndex = 0;
+        let isDirty = false;
 
         const cardContainer = document.querySelector('.card-container');
         const navTabsContainer = document.querySelector('.navigation-tabs');
@@ -792,15 +890,33 @@ textarea:focus {
         const errorModal = document.getElementById('errorModal');
         const submitMessageDiv = document.getElementById('submitMessage');
 
+        function isWeekend() {
+            const today = new Date().getDay();
+            return today === 0 || today === 6;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const initialCardData = { title: "Your Info", icon: "👤", isInfoCard: true };
-            const allSections = [initialCardData, ...checklistData];
+            let sectionsToUse = [...checklistData];
+            
+            if (isWeekend()) {
+                sectionsToUse.splice(sectionsToUse.length - 1, 0, weeklyMaintenanceData);
+            }
+            
+            const allSections = [initialCardData, ...sectionsToUse];
             generateHTML(allSections);
             setupEventListeners(allSections.length);
             setupSwipeListeners();
             showCard(0);
             updateProgress();
             loadDraft();
+            
+            window.addEventListener('beforeunload', (e) => {
+                if (isDirty) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
         });
         
         function generateHTML(sections) {
@@ -810,14 +926,13 @@ textarea:focus {
                 const sectionId = `section_${index}`;
                 if (!section.isInfoCard) allPhotos[sectionId] = [];
                 
-                tabsHTML += `<div class="nav-tab" data-index="${index}"><span class="icon">${section.icon}</span><span class="label">${section.title}</span></div>`;
+                const weeklyClass = section.title.includes('Weekly') ? 'weekly' : '';
+                tabsHTML += `<div class="nav-tab ${weeklyClass}" data-index="${index}"><span class="icon">${section.icon}</span><span class="label">${section.title}</span></div>`;
                 
                 cardsHTML += `<div class="card" id="${sectionId}" data-index="${index}">`;
                 cardsHTML += `<h2>${section.icon} ${section.title}</h2>`;
 
                 if (section.isInfoCard) {
-                    // FIX: Removed inline style to allow CSS class .info-field-grid to apply
-                    // This makes the layout responsive (grid on desktop, column on mobile)
                     cardsHTML += `<div class="info-field-grid">
                       <div class="info-field"><label for="unitName">Property Name</label><input type="text" id="unitName" name="unitName" value="Cascade Bria" readonly></div>
                       <div class="info-field"><label for="cleanerName">👤 Your Full Name *</label><input type="text" id="cleanerName" name="cleanerName" required placeholder="Select or type a name" list="cleaner-list"><datalist id="cleaner-list"><option value="Hazel Ann"></option><option value="Ate Kriss"></option><option value="Others"></option></datalist></div>
@@ -827,7 +942,10 @@ textarea:focus {
                 } else {
                     if (section.description) cardsHTML += `<div class="section-description">${section.description}</div>`;
                     section.items.forEach(item => {
-                        cardsHTML += `<div class="checklist-item">
+                        const disinfectClass = item.disinfect ? 'disinfect' : '';
+                        const biweeklyClass = item.biweekly ? 'biweekly' : '';
+                        const combinedClass = `${disinfectClass} ${biweeklyClass}`.trim();
+                        cardsHTML += `<div class="checklist-item ${combinedClass}">
                             <input type="checkbox" id="${item.id}" data-section-index="${index}">
                             <label for="${item.id}">${item.text}<div class="item-detail">${item.detail}</div></label>
                         </div>`;
@@ -874,12 +992,14 @@ textarea:focus {
             prevBtn.addEventListener('click', () => showCard(currentCardIndex - 1));
             nextBtn.addEventListener('click', () => (currentCardIndex === totalCards - 1) ? handleSubmission() : showCard(currentCardIndex + 1));
             
-            // Auto-save on input removed. Manual save button is now used.
             document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', () => {
                 updateProgress();
                 updateSectionCompletionStatus(cb.dataset.sectionIndex);
-                // saveDraft(); // Removed auto-save
+                isDirty = true;
             }));
+            document.querySelectorAll('input, textarea').forEach(input => {
+                input.addEventListener('input', () => isDirty = true);
+            });
             document.querySelectorAll('input[type="file"]').forEach(input => input.addEventListener('change', handlePhotoUpload));
             
             document.getElementById('modal-go-back').addEventListener('click', () => submissionModal.style.display = 'none');
@@ -936,7 +1056,7 @@ textarea:focus {
                 if (activeCard) {
                      cardContainer.style.height = activeCard.offsetHeight + 'px';
                 }
-            }, 500); // This timeout should match the CSS transition
+            }, 500);
 
             prevBtn.disabled = index === 0;
             nextBtn.textContent = index === cards.length - 1 ? '✅ Submit Report' : 'Next →';
@@ -944,8 +1064,6 @@ textarea:focus {
         }
         
         function updateProgress() {
-            // FIX: Changed selector to only target checkboxes inside checklist-items
-            // This prevents the 'URGENT' checkbox from being included in progress calculation
             const checkboxes = document.querySelectorAll('.checklist-item input[type="checkbox"]');
             const checked = document.querySelectorAll('.checklist-item input[type="checkbox"]:checked');
             
@@ -955,7 +1073,7 @@ textarea:focus {
             
             checkboxes.forEach(cb => {
                 const item = cb.closest('.checklist-item');
-                if (item) { // Added a check for safety, though selector should guarantee it
+                if (item) {
                     item.classList.toggle('checked', cb.checked);
                 }
             });
@@ -966,8 +1084,6 @@ textarea:focus {
             const navTab = document.querySelector(`.nav-tab[data-index='${sectionIndex}']`);
             if (!sectionCard || !navTab) return;
             
-            // FIX: Changed selector to only target checkboxes inside checklist-items
-            // This prevents the 'URGENT' checkbox from affecting section completion status
             const checkboxes = sectionCard.querySelectorAll('.checklist-item input[type="checkbox"]');
             
             if (checkboxes.length > 0) {
@@ -1037,29 +1153,22 @@ textarea:focus {
                     photoDiv.querySelector('.remove-photo').addEventListener('click', (e) => {
                         const sId = e.target.dataset.sectionId;
                         const pIdx = parseInt(e.target.dataset.photoIndex);
-                        // ENHANCEMENT: Switched from 'null' to 'splice' to be consistent with loadDraft
                         allPhotos[sId].splice(pIdx, 1); 
-                        loadDraftPhotosForSection(sId, previewContainer); // Re-render previews to fix indices
+                        loadDraftPhotosForSection(sId, previewContainer);
                     });
+                    isDirty = true;
                 } catch (error) {
                     console.error("Could not compress image:", error);
                     alert("Could not process image file. It might be corrupted.");
                 }
             }
-            // saveDraft(); // Removed auto-save
             input.value = '';
         }
 
-        function saveDraft() {
-          /* Now handled by save draft button */ 
-        }
-
-        
-        // ENHANCEMENT: Moved this function to be accessible by handlePhotoUpload
         const loadDraftPhotosForSection = (sectionId, previewContainer) => {
             previewContainer.innerHTML = '';
             (allPhotos[sectionId] || []).forEach((photo, photoIndex) => {
-                if (!photo) return; // Skip nulls
+                if (!photo) return;
                 const photoDiv = document.createElement('div');
                 photoDiv.className = 'photo-preview-item';
                 photoDiv.innerHTML = `<img src="${photo.data}" alt="${photo.name}"><button type="button" class="remove-photo" data-section-id="${sectionId}" data-photo-index="${photoIndex}">×</button>`;
@@ -1069,8 +1178,7 @@ textarea:focus {
                     const sId = e.target.dataset.sectionId;
                     const pIdx = parseInt(e.target.dataset.photoIndex);
                     allPhotos[sId].splice(pIdx, 1);
-                    loadDraftPhotosForSection(sId, previewContainer); // Re-render this section
-                    // saveDraft(); // Removed auto-save
+                    loadDraftPhotosForSection(sId, previewContainer);
                 });
             });
         };
@@ -1082,9 +1190,6 @@ textarea:focus {
                 const { form, photos } = draftData;
                 if (form) {
                     for (const key in form) {
-                        // FIX: Do not load 'elapsedTime' from draft.
-                        // This prevents a saved empty value from breaking the timer.
-                        // The timer will recalculate it on load.
                         if (key === 'elapsedTime') continue;
                         
                         const el = document.getElementById(key) || document.querySelector(`[name="${key}"]`);
@@ -1096,12 +1201,12 @@ textarea:focus {
                 }
                 
                 if (photos) {
-                    allPhotos = {}; // Clear default
+                    allPhotos = {};
                     for (const sectionId in photos) {
                         allPhotos[sectionId] = photos[sectionId] || [];
                         const previewContainer = document.getElementById(`preview_${sectionId}`);
                         if (previewContainer) {
-                            previewContainer.innerHTML = ''; // Clear existing
+                            previewContainer.innerHTML = '';
                             allPhotos[sectionId].forEach((photo, photoIndex) => {
                                 if (!photo) return;
                                 const photoDiv = document.createElement('div');
@@ -1112,9 +1217,8 @@ textarea:focus {
                                 photoDiv.querySelector('.remove-photo').addEventListener('click', (e) => {
                                     const sId = e.target.dataset.sectionId;
                                     const pIdx = parseInt(e.target.dataset.photoIndex);
-                                    allPhotos[sId].splice(pIdx, 1); // Remove from array
-                                    loadDraftPhotosForSection(sId, previewContainer); // Re-render this section's photos
-                                    // saveDraft(); // Removed auto-save
+                                    allPhotos[sId].splice(pIdx, 1);
+                                    loadDraftPhotosForSection(sId, previewContainer);
                                 });
                             });
                         }
@@ -1126,19 +1230,13 @@ textarea:focus {
                 if (!document.getElementById('startTime').value) {
                     setStartTime();
                 }
+                isDirty = false;
             };
-            
-            /* ENHANCEMENT: This function was moved outside loadDraft
-            const loadDraftPhotosForSection = (sectionId, previewContainer) => {
-                ...
-            };
-            */
 
             if (draft) {
                 try {
                     const draftData = JSON.parse(draft);
                     
-                    // Create a custom modal for this confirm
                     const modal = document.createElement('div');
                     modal.className = 'modal';
                     modal.id = 'draftModal';
@@ -1149,7 +1247,7 @@ textarea:focus {
                             <p id="modal-message">Would you like to continue where you left off?</p>
                             <div class="modal-buttons">
                                 <button class="modal-btn" id="draft-discard" type="button">Discard</button>
-                                <button class="modal-btn" id="draft-load" type="button" style="background:var(--sunset-deep); color:#fff;">Load Draft</button>
+                                <button class="modal-btn" id="draft-load" type="button" style="background:linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); color:#fff;">Load Draft</button>
                             </div>
                         </div>`;
                     document.body.appendChild(modal);
@@ -1183,7 +1281,6 @@ textarea:focus {
         
         function handleSubmission() {
             if (!SCRIPT_URL || SCRIPT_URL.includes("...")) {
-                // Using a modal instead of alert
                 const em = document.getElementById('errorModal');
                 if(em) {
                     document.getElementById('error-modal-title').textContent = '❌ SCRIPT_URL Not Set';
@@ -1195,34 +1292,33 @@ textarea:focus {
                 return;
             }
 
-            // Required photo check for sections flagged as required
             let missingRequiredPhotos = [];
-            checklistData.forEach((section, idx) => {
+            const allSectionsData = isWeekend() ? [...checklistData.slice(0, -1), weeklyMaintenanceData, checklistData[checklistData.length - 1]] : checklistData;
+            
+            allSectionsData.forEach((section, idx) => {
                 if (section.photoRequired) {
-                    const sectionId = `section_${idx+1}`; // +1 because 0 is the info card
+                    const sectionId = `section_${idx+1}`;
                     const photos = (allPhotos[sectionId] || []).filter(p => p !== null);
                     if (photos.length === 0) missingRequiredPhotos.push(section.title);
                 }
             });
+            
             if (missingRequiredPhotos.length > 0) {
                 document.getElementById('modal-title').textContent = '📸 Missing Required Photos';
-            document.getElementById('modal-message').innerHTML = `You must upload photos for: <strong>${missingRequiredPhotos.join(', ')}</strong>`;
-            document.getElementById('modal-confirm-action').style.display = 'none';
-            document.getElementById('modal-go-back').textContent = 'Go Back & Add Photos';
-            submissionModal.style.display = 'flex';
-            return;
-        }
+                document.getElementById('modal-message').innerHTML = `You must upload photos for: <strong>${missingRequiredPhotos.join(', ')}</strong>`;
+                document.getElementById('modal-confirm-action').style.display = 'none';
+                document.getElementById('modal-go-back').textContent = 'Go Back & Add Photos';
+                submissionModal.style.display = 'flex';
+                return;
+            }
 
-        // Reset modal to Incomplete Items path
-        document.getElementById('modal-confirm-action').style.display = 'inline-block';
-        document.getElementById('modal-go-back').textContent = 'Go Back & Review';
+            document.getElementById('modal-confirm-action').style.display = 'inline-block';
+            document.getElementById('modal-go-back').textContent = 'Go Back & Review';
 
-        // FIX: Changed selector to only target checkboxes inside checklist-items
-        // This prevents the 'URGENT' checkbox from being included in the count
-        const unchecked = document.querySelectorAll('.checklist-item input[type="checkbox"]:not(:checked)');
-        if (unchecked.length > 0) {
-            document.getElementById('modal-title').textContent = '⚠️ Incomplete Items';
-            document.getElementById('modal-message').textContent = `You have ${unchecked.length} unchecked item(s). Continue anyway?`;
+            const unchecked = document.querySelectorAll('.checklist-item input[type="checkbox"]:not(:checked)');
+            if (unchecked.length > 0) {
+                document.getElementById('modal-title').textContent = '⚠️ Incomplete Items';
+                document.getElementById('modal-message').textContent = `You have ${unchecked.length} unchecked item(s). Continue anyway?`;
                 document.getElementById('modal-confirm-action').textContent = 'Submit As‑Is';
                 submissionModal.style.display = 'flex';
             } else {
@@ -1241,18 +1337,19 @@ textarea:focus {
             const data = Object.fromEntries(formData.entries());
             const now = new Date();
             data.endTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            data.isWeekendCleaning = isWeekend();
 
-            // Collect notes (bugfix: correct section indexing) + URGENT prefix
             let allNotes = [];
             document.querySelectorAll('textarea[id^="notes_"]').forEach((ta) => {
               const value = (ta.value || '').trim();
               if (!value) return;
               
-              const sectionId = ta.id.replace('notes_',''); // e.g., 'section_1'
+              const sectionId = ta.id.replace('notes_','');
               const idParts = sectionId.split('_');
-              const idx = parseInt(idParts[idParts.length - 1]); // Get the last number
+              const idx = parseInt(idParts[idParts.length - 1]);
               
-              const sectionTitle = checklistData[idx-1].title; // -1 because info card at 0
+              const allSectionsData = isWeekend() ? [...checklistData.slice(0, -1), weeklyMaintenanceData, checklistData[checklistData.length - 1]] : checklistData;
+              const sectionTitle = allSectionsData[idx-1].title;
               
               const urgentEl = document.getElementById(ta.id.replace('notes_', 'urgent_'));
               
@@ -1261,21 +1358,29 @@ textarea:focus {
             });
             data.allNotes = allNotes.join('\n\n');
 
-            // Filter out null photos
             const finalPhotos = {};
             for (const key in allPhotos) {
                 finalPhotos[key] = (allPhotos[key] || []).filter(p => p !== null);
             }
 
-            const checklistDetails = checklistData.map((section) => ({
+            const allSectionsData = isWeekend() ? [...checklistData.slice(0, -1), weeklyMaintenanceData, checklistData[checklistData.length - 1]] : checklistData;
+            const checklistDetails = allSectionsData.map((section) => ({
               title: section.title,
               icon: section.icon,
               items: section.items.map((item) => ({ text: item.text, checked: !!document.getElementById(item.id)?.checked }))
             }));
 
-            const payload = { formData: data, photos: finalPhotos, checklistDetails };
+            // Prepare calendar event data
+            const calendarData = {
+              calendarId: CALENDAR_ID,
+              summary: `Cleaning Report - ${data.cleanerName}`,
+              description: `Cleaning completed by ${data.cleanerName}\nStart: ${data.startTime}\nEnd: ${data.endTime}\nCompletion Rate: ${Math.round((checklistDetails.reduce((sum, s) => sum + s.items.filter(i => i.checked).length, 0) / checklistDetails.reduce((sum, s) => sum + s.items.length, 0)) * 100)}%${data.allNotes ? '\n\nNotes:\n' + data.allNotes : ''}`,
+              startDateTime: new Date().toISOString(),
+              endDateTime: new Date(Date.now() + 3600000).toISOString() // 1 hour duration
+            };
 
-            // Fetch with 30s timeout
+            const payload = { formData: data, photos: finalPhotos, checklistDetails, calendarData };
+
             const controller = new AbortController();
             const to = setTimeout(() => controller.abort(), 30000);
             const resp = await fetch(SCRIPT_URL, { method:'POST', mode:'cors', body: JSON.stringify(payload), signal: controller.signal });
@@ -1288,8 +1393,8 @@ textarea:focus {
             submitMessageDiv.className = 'submit-message success';
             submitMessageDiv.textContent = '✅ Report submitted! The email and spreadsheet have been updated.';
             localStorage.removeItem('cleaningFormDraft');
+            isDirty = false;
 
-            // Success modal (non-blocking)
             const sm = document.getElementById('successModal');
             if (sm) {
               sm.style.display = 'flex';
@@ -1315,10 +1420,8 @@ textarea:focus {
             }
           }
         }
-        
-// Secondary wiring (safe to add even if original DOMContentLoaded exists)
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Live timer
   const st = document.getElementById('startTime');
   if (st) {
     const tick = () => {
@@ -1331,47 +1434,48 @@ document.addEventListener('DOMContentLoaded', () => {
         let diff = Math.max(0, now - start);
         const s = Math.floor((diff/1000)%60), mm = Math.floor((diff/60000)%60), hh = Math.floor(diff/3600000);
         el.value = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-      } catch(e) { /* no-op */ }
+      } catch(e) { }
     };
     setInterval(tick, 1000); st.addEventListener('input', () => setTimeout(()=>tick(), 50)); tick();
   }
 
-  // Manual Save Draft button
   const sdb = document.getElementById('saveDraftBtn');
   if (sdb) {
     sdb.addEventListener('click', () => {
       try {
         const fd = new FormData(document.getElementById('cleaningForm'));
         const data = Object.fromEntries(fd.entries());
-        // Also save photos in draft
         const photosToSave = {};
         for (const key in allPhotos) {
             photosToSave[key] = (allPhotos[key] || []).filter(p => p !== null);
         }
         localStorage.setItem('cleaningFormDraft', JSON.stringify({ form: data, photos: photosToSave }));
         sdb.classList.add('saved'); setTimeout(()=>sdb.classList.remove('saved'), 1400);
+        isDirty = false;
       } catch (e) { console.warn('Save draft failed', e); }
     });
   }
 
-  // Close error modal
   const emc = document.getElementById('error-modal-close');
   if (emc) emc.addEventListener('click', ()=>{ const em = document.getElementById('errorModal'); if (em) em.style.display='none'; });
 });
 </script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(console.error);
+  }
+</script>
+<script src="install.js" defer></script>
 
 <div class="modal" id="successModal" style="display:none;">
 <div class="modal-content">
 <h3 style="color:var(--success);">✅ Report Submitted!</h3>
 <p>Thank you! The Google Sheet and email report have been successfully updated.</p>
 <div class="modal-buttons">
-<button class="modal-btn" id="success-new-report-btn" style="background:var(--earthen-slate); color:#fff;" type="button">Start New Report</button>
+<button class="modal-btn" id="success-new-report-btn" style="background:linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); color:#fff;" type="button">Start New Report</button>
 </div>
 </div>
 </div>
 </body>
 </html>
-
-
-
-

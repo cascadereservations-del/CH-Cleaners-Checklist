@@ -34,6 +34,7 @@
     --shadow: rgba(34, 51, 59, 0.12);
     --disinfect: #2563eb;
     --disinfect-bg: #dbeafe;
+    --warning: #f59e0b;
     --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
     --font-size-h1: clamp(2.2rem, 1.5rem + 3.5vw, 3.2rem);
     --font-size-h2: clamp(2rem, 1.5rem + 2.5vw, 2.8rem);
@@ -661,29 +662,6 @@ textarea:focus {
 .save-draft-btn .save-draft-tooltip { position:absolute; bottom:110%; left:50%; transform:translateX(-50%); background:var(--earthen-slate); color:#fff; padding:4px 10px; border-radius:6px; font-size:.8em; font-weight:600; opacity:0; visibility:hidden; transition:opacity .3s ease, visibility .3s ease; white-space:nowrap; }
 .save-draft-btn.saved .save-draft-tooltip { opacity:1; visibility:visible; }
 
-.admin-link {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: var(--earthen-slate);
-    color: white;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5em;
-    text-decoration: none;
-    box-shadow: 0 4px 12px var(--shadow);
-    transition: all 0.3s ease;
-    z-index: 999;
-}
-.admin-link:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px var(--shadow);
-}
-
 @media screen and (max-width: 768px) {
     body {
         padding: 0.5rem;
@@ -694,17 +672,23 @@ textarea:focus {
     .card-container { padding: 1.5rem; }
     .navigation-tabs { padding: 0.75rem 1rem 0; }
     .nav-tab .label { display: none; }
-    .admin-link {
-        bottom: 140px;
-        right: 15px;
-        width: 45px;
-        height: 45px;
-        font-size: 1.3em;
-    }
 }
 @media screen and (max-width: 480px) {
     .nav-btn { padding: 0.8rem 1.2rem; font-size: 0.9em;}
 }
+
+/* === Inventory Modal Enhancements === */
+.inv-scroll{max-height:55vh; overflow:auto; border:1px solid var(--border); border-radius:12px; margin:1rem 0;}
+.inv-table{width:100%; border-collapse:collapse; font-size:0.95em;}
+.inv-table thead th{position:sticky; top:0; background:#faf8f4; border-bottom:1px solid var(--border); padding:0.75rem; text-align:left;}
+.inv-table td{padding:0.55rem 0.6rem; border-bottom:1px solid #eee; vertical-align:middle;}
+.inv-table td small{color:var(--text-secondary); font-weight:600;}
+.inv-qty{width:90px; padding:0.4rem 0.5rem; border:1px solid var(--border); border-radius:8px; font-weight:600;}
+.inv-unit{opacity:0.8; font-size:0.9em;}
+.inv-new{font-weight:700; color:var(--primary-green);}
+#inventoryModal .modal-content{max-width:760px; text-align:left;}
+#invError{background:#fef0f1; border:1px solid #fde2e4; padding:0.75rem 1rem; border-radius:10px; display:none;}
+#invLastUpdated{margin-left:8px; font-size:0.9em; color:var(--text-secondary);}
 </style>
 </head>
 <body>
@@ -774,11 +758,9 @@ textarea:focus {
 </div>
 </div>
 
-<a href="admin.html" class="admin-link" title="Admin Dashboard">📊</a>
-
 <script>
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrhdpc-kFMKF7PLq46IPH6fPLLDeod-aHbb9Yk8qfJ3gsKqixBRY3XfpeNj4WMFpqA/exec"; 
-        const CALENDAR_ID = "cascadereservations@gmail.com"; // Google Calendar ID for tracking 
+        const CALENDAR_ID = "cascadereservations@gmail.com"; 
 
         const checklistData = [
             {
@@ -867,14 +849,15 @@ textarea:focus {
             hasNotes: true,
             notesTitle: "📝 Weekly Maintenance Notes:",
             items: [
-                { id: "weekly_1", text: "Dust-mite vacuum sofa and mattress", detail: "Sofa: Go over arms, back, cushions (both sides). Mattress: Vacuum both sides completely. This removes allergens.", disinfect: false },
+                { id: "weekly_1", text: "Deep clean sofa and mattress by vacuuming with dust-mite vacuum", detail: "Sofa: Go over arms, back, cushions (both sides). Mattress: Vacuum both sides completely. This removes allergens and dust mites.", disinfect: false },
                 { id: "weekly_2", text: "Empty vacuum dust collector and clean filter", detail: "Remove dust bin, empty completely. Wash or tap clean the vacuum filter. Let dry before reassembling.", disinfect: false },
                 { id: "weekly_3", text: "Deep clean refrigerator<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Remove shelves and drawers, wash with soapy water. Wipe interior walls and door seals. Vacuum back coils if accessible.", disinfect: true },
                 { id: "weekly_4", text: "Clean AC filters<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Turn off AC. Remove filters, wash with mild soap and water. Let dry completely (30+ mins) before reinstalling.", disinfect: true },
                 { id: "weekly_5", text: "Clean air purifier - vacuum filter and wipe exterior", detail: "Turn off unit. Use vacuum to remove dust from filter (don't wash). Wipe down exterior housing and vents.", disinfect: false },
                 { id: "weekly_6", text: "Descale iron steamer", detail: "Empty water tank. Run descaling solution (or 1:1 white vinegar + water). Steam cycle, then rinse thoroughly.", disinfect: false },
                 { id: "weekly_7", text: "Vacuum behind/under furniture", detail: "Move lightweight furniture safely. Vacuum corners, baseboards, and hard-to-reach areas.", disinfect: false },
-                { id: "weekly_8", text: "🔹 BIWEEKLY (Every 2 weeks): Liquid Sosa Treatment", detail: "✋ ONLY if NO guest is coming the next day: Pour liquid sosa down CR toilet/sink and kitchen sink drains. Leave overnight to prevent clogs. Flush with water in the morning before guest arrives.", disinfect: false, biweekly: true }
+                { id: "weekly_8", text: "🔹 BIWEEKLY (2nd & 4th week): Change sofa cover and mattress protector", detail: "Remove sofa cover and mattress protector. Replace with clean ones. Wash the removed covers.", disinfect: false, biweekly: true },
+                { id: "weekly_9", text: "🔹 BIWEEKLY (2nd & 4th week): Liquid Sosa Treatment", detail: "✋ ONLY if NO guest is coming the next day: Pour liquid sosa down CR toilet/sink and kitchen sink drains. Leave overnight to prevent clogs. Flush with water in the morning before guest arrives.", disinfect: false, biweekly: true }
             ]
         };
 
@@ -1370,13 +1353,12 @@ textarea:focus {
               items: section.items.map((item) => ({ text: item.text, checked: !!document.getElementById(item.id)?.checked }))
             }));
 
-            // Prepare calendar event data
             const calendarData = {
               calendarId: CALENDAR_ID,
               summary: `Cleaning Report - ${data.cleanerName}`,
               description: `Cleaning completed by ${data.cleanerName}\nStart: ${data.startTime}\nEnd: ${data.endTime}\nCompletion Rate: ${Math.round((checklistDetails.reduce((sum, s) => sum + s.items.filter(i => i.checked).length, 0) / checklistDetails.reduce((sum, s) => sum + s.items.length, 0)) * 100)}%${data.allNotes ? '\n\nNotes:\n' + data.allNotes : ''}`,
               startDateTime: new Date().toISOString(),
-              endDateTime: new Date(Date.now() + 3600000).toISOString() // 1 hour duration
+              endDateTime: new Date(Date.now() + 3600000).toISOString()
             };
 
             const payload = { formData: data, photos: finalPhotos, checklistDetails, calendarData };
@@ -1468,6 +1450,37 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script src="install.js" defer></script>
 
+
+<div class="modal" id="inventoryModal" style="display:none;">
+  <div class="modal-content">
+    <h3>🧴 Update Consumables</h3>
+    <p style="margin-top:-0.35rem; color:var(--text-secondary);">
+      <strong>Stock Levels</strong><span id="invLastUpdated">• Last Updated: —</span>
+    </p>
+    <div id="invError"></div>
+    <div class="inv-scroll">
+      <table class="inv-table" id="invTable">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Current ROB</th>
+            <th>Consume</th>
+            <th>Unit</th>
+            <th>New ROB</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="modal-buttons" style="justify-content: space-between;">
+      <button class="modal-btn" id="invCancelBtn" type="button">Cancel</button>
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <button class="modal-btn" id="invPrefillBtn" type="button" title="Prefill suggested amounts">↻ Prefill</button>
+        <button class="modal-btn" id="invSaveBtn" type="button" style="background:linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); color:#fff;">Update Inventory</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal" id="successModal" style="display:none;">
 <div class="modal-content">
 <h3 style="color:var(--success);">✅ Report Submitted!</h3>
@@ -1477,5 +1490,207 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 </div>
 </div>
+
+<script>
+(() => {
+  const INVENTORY_API_URL = "https://script.google.com/macros/s/AKfycbxKpNS04OMGXtEW-XLPbRkw9P6n5Tek_SnvVQD02T06StFq7uVBlKljhyzJNMQ75x7U/exec";
+  const CONSUMABLES = [
+    { key: "hand_soap_ml",   name: "Hand soap",     unit: "ml",      default: 30 },
+    { key: "body_wash_ml",   name: "Body wash",     unit: "ml",      default: 30 },
+    { key: "shampoo_ml",     name: "Shampoo",       unit: "ml",      default: 30 },
+    { key: "dish_soap_ml",   name: "Dish soap",     unit: "ml",      default: 25 },
+    { key: "coffee_packs",   name: "Coffee packs",  unit: "pcs",     default: 2  },
+    { key: "coffee_sticks",  name: "Coffee sticks", unit: "pcs",     default: 2  },
+    { key: "water_bottles",  name: "Water bottles", unit: "bottles", default: 2  },
+    { key: "tea",            name: "Tea",           unit: "pcs",     default: 0  },
+    { key: "toiletries",     name: "Toiletries",    unit: "set",     default: 0  }
+  ];
+
+  let invCache = { items: {}, lastUpdated: null };
+  const el = (id) => document.getElementById(id);
+
+  function findCheckbox(id){ return document.getElementById(id); }
+
+  function openInventoryModal() {
+    const modal = el('inventoryModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    el('invError').style.display = 'none';
+    loadInventory().then(buildInvTable).catch(err => {
+      console.error('Inventory load error:', err);
+      el('invError').textContent = 'Unable to load inventory at the moment. Please try again.';
+      el('invError').style.display = 'block';
+      // Still render rows with defaults
+      buildInvTable({});
+    });
+  }
+
+  function closeInventoryModal(uncheckRefill=false) {
+    const modal = el('inventoryModal');
+    if (modal) modal.style.display = 'none';
+    if (uncheckRefill) {
+      const cb = findCheckbox('check_7_7');
+      if (cb) cb.checked = false;
+      if (typeof updateProgress === 'function') updateProgress();
+      if (typeof updateSectionCompletionStatus === 'function') {
+        const si = cb?.dataset?.sectionIndex;
+        if (si) updateSectionCompletionStatus(si);
+      }
+    }
+  }
+
+  function setLastUpdated(ts) {
+    const d = ts ? new Date(ts) : new Date();
+    const fmt = d.toLocaleString([], { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    el('invLastUpdated').textContent = '• Last Updated: ' + fmt;
+  }
+
+  async function loadInventory() {
+    // Try multiple endpoints for resilience
+    let resp;
+    try {
+      resp = await fetch(INVENTORY_API_URL + "?action=getConsumables", { method: "GET" });
+    } catch(_) {}
+    if (!resp || !resp.ok) {
+      try {
+        resp = await fetch(INVENTORY_API_URL + "?action=consumables", { method: "GET" });
+      } catch(_) {}
+    }
+    if (!resp || !resp.ok) {
+      // final attempt without action
+      resp = await fetch(INVENTORY_API_URL, { method: "GET" });
+    }
+    const data = await resp.json().catch(() => ({}));
+    // Normalize
+    const itemsArray = Array.isArray(data.items) ? data.items : (Array.isArray(data.consumables) ? data.consumables : []);
+    const byName = {};
+    itemsArray.forEach(it => {
+      const name = (it.name || it.item || it.title || "").toString().trim().toLowerCase();
+      if (!name) return;
+      byName[name] = {
+        stock: Number(it.stock ?? it.rob ?? it.quantity ?? 0),
+        unit: it.unit || it.uom || '',
+        id: it.id || null
+      };
+      if (it.lastUpdated) invCache.lastUpdated = it.lastUpdated;
+    });
+    invCache.items = byName;
+    setLastUpdated(data.lastUpdated || invCache.lastUpdated || Date.now());
+    return byName;
+  }
+
+  function getROB(name) {
+    const key = name.toLowerCase();
+    return invCache.items[key]?.stock ?? 0;
+  }
+
+  function buildInvTable() {
+    const tbody = el('invTable').querySelector('tbody');
+    tbody.innerHTML = '';
+    CONSUMABLES.forEach(row => {
+      const rob = getROB(row.name);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${row.name}</strong><br><small>(${row.default}${row.unit === 'ml' ? ' ml est.' : row.default ? ' '+row.unit+' est.' : ''})</small></td>
+        <td><span data-rob-name="${row.name}">${rob}</span></td>
+        <td><input type="number" min="0" step="${row.unit === 'ml' ? 5 : 1}" class="inv-qty" value="${row.default || 0}" data-consume-name="${row.name}"/></td>
+        <td><span class="inv-unit">${row.unit}</span></td>
+        <td class="inv-new" data-new-name="${row.name}">${Math.max(0, rob - (row.default || 0))}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // events
+    tbody.querySelectorAll('input[data-consume-name]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const name = inp.getAttribute('data-consume-name');
+        const robEl = tbody.querySelector(`[data-rob-name="${name}"]`);
+        const newEl = tbody.querySelector(`[data-new-name="${name}"]`);
+        const rob = Number(robEl?.textContent || 0);
+        const use = Math.max(0, Number(inp.value || 0));
+        newEl.textContent = String(Math.max(0, rob - use));
+      });
+    });
+  }
+
+  async function saveInventory() {
+    const cleaner = document.getElementById('cleanerName')?.value || '';
+    const unitName = document.getElementById('unitName')?.value || '';
+    const entries = [];
+    document.querySelectorAll('#invTable tbody input[data-consume-name]').forEach(inp => {
+      const name = inp.getAttribute('data-consume-name');
+      const qty = Number(inp.value || 0);
+      if (qty > 0) {
+        const rowDef = CONSUMABLES.find(c => c.name === name);
+        entries.push({
+          name,
+          delta: qty,                 // amount consumed
+          direction: "out",           // consumption
+          unit: rowDef?.unit || "",
+          source: "Checklist",
+          reason: "Refill all bathroom and kitchen supplies",
+          unitName,
+          by: cleaner
+        });
+      }
+    });
+    if (!entries.length) return;
+    const payload = { action: "logConsumption", timestamp: new Date().toISOString(), entries };
+
+    const res = await fetch(INVENTORY_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(err => ({ ok:false, err }));
+
+    if (!res || !res.ok) {
+      el('invError').textContent = "Update failed. Please check connection or permissions.";
+      el('invError').style.display = 'block';
+      return;
+    }
+    const data = await res.json().catch(()=>({}));
+    // optimistic update UI
+    document.querySelectorAll('#invTable tbody input[data-consume-name]').forEach(inp => {
+      const name = inp.getAttribute('data-consume-name');
+      const robEl = document.querySelector(`#invTable [data-rob-name="${name}"]`);
+      const newEl = document.querySelector(`#invTable [data-new-name="${name}"]`);
+      const newVal = Number(newEl?.textContent || 0);
+      if (robEl) robEl.textContent = String(newVal);
+      if (inp) inp.value = "0";
+    });
+    setLastUpdated(Date.now());
+    closeInventoryModal(false);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const cb = findCheckbox('check_7_7');
+    if (cb) {
+      cb.addEventListener('change', (e) => {
+        if (e.target.checked) openInventoryModal();
+      });
+    }
+    const cancelBtn = el('invCancelBtn');
+    const saveBtn   = el('invSaveBtn');
+    const prefillBtn= el('invPrefillBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => closeInventoryModal(true));
+    if (saveBtn)   saveBtn.addEventListener('click', () => saveInventory());
+    if (prefillBtn)prefillBtn.addEventListener('click', () => {
+      document.querySelectorAll('#invTable tbody input[data-consume-name]').forEach(inp => {
+        const name = inp.getAttribute('data-consume-name');
+        const def = CONSUMABLES.find(c => c.name === name)?.default || 0;
+        inp.value = String(def);
+        inp.dispatchEvent(new Event('input'));
+      });
+    });
+    // Close modal on outside click
+    const modal = el('inventoryModal');
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeInventoryModal(true);
+      });
+    }
+  });
+})();
+</script>
 </body>
 </html>

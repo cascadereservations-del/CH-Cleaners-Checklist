@@ -689,6 +689,38 @@ textarea:focus {
 #inventoryModal .modal-content{max-width:760px; text-align:left;}
 #invError{background:#fef0f1; border:1px solid #fde2e4; padding:0.75rem 1rem; border-radius:10px; display:none;}
 #invLastUpdated{margin-left:8px; font-size:0.9em; color:var(--text-secondary);}
+
+/* attention callout for post-submit reminder */
+.soft-callout{
+  position: relative;
+  border-radius: 14px;
+  padding: clamp(0.75rem, 0.5rem + 1vw, 1.25rem);
+  background: rgba(255,255,255,0.60);
+  border: 1px solid rgba(255,255,255,0.65);
+  box-shadow: 0 10px 30px rgba(34,51,59,0.12), inset 0 1px 0 rgba(255,255,255,0.35);
+  color: var(--text-primary);
+  font-size: clamp(0.95rem, 0.9rem + 0.25vw, 1.05rem);
+  backdrop-filter: saturate(135%) blur(8px);
+  -webkit-backdrop-filter: saturate(135%) blur(8px);
+}
+
+/* graceful fallback when blur is unsupported */
+@supports not ((-webkit-backdrop-filter: blur(0)) or (backdrop-filter: blur(0))){
+  .soft-callout{
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,245,240,0.92));
+  }
+}
+
+.soft-callout .title{
+  font-weight: 700;
+  font-size: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+  line-height: 1.25;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+@keyframes gentlePulse{0%{box-shadow:0 0 0 0 rgba(34,51,59,0.00)}70%{box-shadow:0 0 0 10px rgba(34,51,59,0.06)}100%{box-shadow:0 0 0 0 rgba(34,51,59,0.00)}}
+.pulse{animation:gentlePulse 2.8s ease-out infinite}
+
 </style>
 </head>
 <body>
@@ -1381,8 +1413,27 @@ textarea:focus {
             if (sm) {
               sm.style.display = 'flex';
               const nb = document.getElementById('success-new-report-btn');
-              if (nb) nb.onclick = () => location.reload();
+              if (nb) nb.onclick = resetAll;
             }
+ function resetAll(){
+   try{
+     const form=document.getElementById('cleaningForm');
+     localStorage.removeItem('cleaningFormDraft');
+     if (typeof isDirty!=='undefined') isDirty=false;
+     if (form) form.reset();
+     document.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
+     document.querySelectorAll('textarea, input[type="text"], input[type="number"], input[type="date"], input[type="time"]').forEach(el=>{el.value=''; el.dispatchEvent(new Event('input',{bubbles:true}));});
+     document.querySelectorAll('input[type="file"]').forEach(el=>{el.value='';});
+     // clear photo previews/lists if present
+     document.querySelectorAll('.photo-list, .photo-thumbs, [data-preview]').forEach(n=>n.innerHTML='');
+     if (typeof allPhotos!=='undefined' && allPhotos){ Object.keys(allPhotos).forEach(k=>allPhotos[k]=[]); }
+     if (typeof updateProgress==='function') updateProgress();
+     if (typeof showCard==='function') showCard(0);
+     const smodal=document.getElementById('successModal'); if (smodal) smodal.style.display='none';
+     window.scrollTo({top:0,behavior:'smooth'});
+   }catch(e){ console.error('Reset error:', e); location.reload(); } // fallback
+ }
+
           } catch (err) {
             console.error('Submission error:', err);
             if (err.name === 'AbortError') {
@@ -1485,7 +1536,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="modal-content">
 <h3 style="color:var(--success);">✅ Report Submitted!</h3>
 <p>Thank you! The Google Sheet and email report have been successfully updated.</p>
-<div class="modal-buttons">
+<div class="soft-callout pulse"><div class="title">Heads up — please update Consumables ✨</div><div class="body">After topping up the kitchen & bathroom supplies, kindly record it in the Inventory (Consumables) so everything stays accurate. You can open it below.</div></div><div class="modal-buttons">
+<button class="modal-btn" id="success-open-inventory-btn" onclick="window.open(\'https://script.google.com/macros/s/AKfycbxKpNS04OMGXtEW-XLPbRkw9P6n5Tek_SnvVQD02T06StFq7uVBlKljhyzJNMQ75x7U/exec\', \'_blank\');"  type="button">Open Inventory</button>
 <button class="modal-btn" id="success-new-report-btn" style="background:linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); color:#fff;" type="button">Start New Report</button>
 </div>
 </div>
@@ -1665,9 +1717,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('DOMContentLoaded', () => {
     const cb = findCheckbox('check_7_7');
     if (cb) {
-      cb.addEventListener('change', (e) => {
-        if (e.target.checked) openInventoryModal();
-      });
+      cb.addEventListener('change', (e) => { if (e.target.checked) { const irm = document.getElementById('inventoryReminderModal'); if (irm) irm.style.display = 'flex'; } });
     }
     const cancelBtn = el('invCancelBtn');
     const saveBtn   = el('invSaveBtn');
@@ -1689,8 +1739,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.target === modal) closeInventoryModal(true);
       });
     }
-  });
+  
+    const invLaterBtn = el('invRemindLaterBtn');
+    const invOpenBtn = el('invOpenLinkBtn');
+    if (invLaterBtn) invLaterBtn.addEventListener('click', () => { const m = el('inventoryReminderModal'); if (m) m.style.display = 'none'; });
+    if (invOpenBtn) invOpenBtn.addEventListener('click', () => { window.open(INVENTORY_API_URL, '_blank'); const m = el('inventoryReminderModal'); if (m) m.style.display = 'none'; });
+});
 })();
 </script>
+
+<div class="modal" id="inventoryReminderModal" style="display:none;">
+  <div class="modal-content">
+    <h3>🧴 Update Inventory – Consumables</h3>
+    <p>Please update the Consumables inventory after refilling supplies.</p>
+    <div class="modal-buttons">
+      <button class="modal-btn" id="invRemindLaterBtn" type="button">OK</button>
+      </div>
+  </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('invRemindLaterBtn');
+  if (btn) btn.addEventListener('click', ()=>{
+    const m = document.getElementById('inventoryReminderModal');
+    if (m) m.style.display = 'none';
+  });
+});
+</script>
 </body>
+
 </html>

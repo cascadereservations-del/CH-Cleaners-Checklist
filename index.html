@@ -796,6 +796,23 @@ textarea:focus {
 
         const checklistData = [
             {
+                title: "Record Meter Readings", icon: "⚡💧",
+                description: "<strong>🎯 What we're doing:</strong> Record the latest electric and water meter readings and document them with photos.<br><br><strong>💡 Why it matters:</strong> Accurate readings prevent billing issues and help detect leaks or abnormal usage early.",
+                customFields: [
+                    { id: "electricMeterReading", label: "Electric Meter Reading (kWh) *", type: "number", required: true, placeholder: "e.g., 12345.6" },
+                    { id: "waterMeterReading", label: "Water Meter Reading (m³) *", type: "number", required: true, placeholder: "e.g., 789.1" }
+                ],
+                hasPhotos: true,
+                photoTitle: "📸 Photos of Electric & Water Meters *REQUIRED*", photoRequired: true, minPhotos: 2,
+                photoHint: "Upload clear, front-facing photos showing the full meter face and readable digits for BOTH meters.",
+                hasNotes: true,
+                notesTitle: "📝 Notes about the readings (optional)",
+                items: [
+                    { id: "meter_verify_match", text: "Verify readings match the photos", detail: "Double-check digits before submitting. Report any damage, tampering, or unreadable meters." }
+                ]
+            },
+
+            {
                 title: "Get Ready & Check", icon: "🔍",
                 description: `<strong>🎯 What we're doing:</strong> Getting your tools ready and checking for problems FIRST.<br><br><strong>💡 Why it helps:</strong> Seeing everything clearly with lights and fresh air makes cleaning easier and stops you from cleaning over a problem.<div class="warning-box"><div class="icon">⚠️</div><div class="content"><div class="title">IMPORTANT: Found a Problem?</div><div class="instruction">If you see something broken, a bad stain, or find that something is missing, <strong>stop!</strong> Take a picture right away and report it to us. This is very important to get it fixed or to charge the last guest.</div></div></div>`,
                 hasPhotos: true,
@@ -965,6 +982,22 @@ textarea:focus {
                             <label for="${item.id}">${item.text}<div class="item-detail">${item.detail}</div></label>
                         </div>`;
                     });
+                    // Render custom fields for sections (e.g., meter readings)
+                    if (section.customFields && Array.isArray(section.customFields) && section.customFields.length) {
+                        cardsHTML += `<div class="info-field-grid">`;
+                        section.customFields.forEach(field => {
+                            const type = field.type || 'text';
+                            const requiredAttr = field.required ? 'required' : '';
+                            const stepAttr = type === 'number' ? ' step="any"' : '';
+                            const placeholder = field.placeholder ? `placeholder="${field.placeholder}"` : '';
+                            cardsHTML += `<div class="info-field">
+                                <label for="${field.id}">${field.label}</label>
+                                <input type="${type}" id="${field.id}" name="${field.id}" ${requiredAttr}${stepAttr} ${placeholder}>
+                            </div>`;
+                        });
+                        cardsHTML += `</div>`;
+                    }
+
                      if (section.hasPhotos || section.hasNotes) {
                         cardsHTML += `<div class="pro-tip" style="background: var(--surface); border-color: var(--border);">`;
                         if (section.hasPhotos) {
@@ -1295,6 +1328,9 @@ textarea:focus {
         }
         
         function handleSubmission() {
+            const theForm = document.getElementById('cleaningForm');
+            if (theForm && !theForm.reportValidity()) { return; }
+
             if (!SCRIPT_URL || SCRIPT_URL.includes("...")) {
                 const em = document.getElementById('errorModal');
                 if(em) {
@@ -1310,15 +1346,16 @@ textarea:focus {
             let missingRequiredPhotos = [];
             const allSectionsData = isWeekend() ? [...checklistData.slice(0, -1), weeklyMaintenanceData, checklistData[checklistData.length - 1]] : checklistData;
             
+            
             allSectionsData.forEach((section, idx) => {
                 if (section.photoRequired) {
                     const sectionId = `section_${idx+1}`;
                     const photos = (allPhotos[sectionId] || []).filter(p => p !== null);
-                    if (photos.length === 0) missingRequiredPhotos.push(section.title);
+                    const min = section.minPhotos || 1;
+                    if (photos.length < min) missingRequiredPhotos.push(section.title);
                 }
             });
-            
-            if (missingRequiredPhotos.length > 0) {
+    if (missingRequiredPhotos.length > 0) {
                 document.getElementById('modal-title').textContent = '📸 Missing Required Photos';
                 document.getElementById('modal-message').innerHTML = `You must upload photos for: <strong>${missingRequiredPhotos.join(', ')}</strong>`;
                 document.getElementById('modal-confirm-action').style.display = 'none';
@@ -1495,7 +1532,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
     navigator.serviceWorker.register('./sw.js').catch(console.error);
   }
 </script>

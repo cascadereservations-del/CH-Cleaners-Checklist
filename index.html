@@ -786,7 +786,7 @@ textarea:focus {
 
 
 /* === Alignment Fixes for checklist steps === */
-.checklist-item { align-items: center; padding-left: 1rem; padding-right: 1rem; }
+.checklist-item { align-items: flex-start; padding-left: 1rem; padding-right: 1rem;  }
 .checklist-item label { display: block; }
 .checklist-item .item-detail { margin-top: 0.35rem; }
 .checklist-item:hover { padding-left: 1rem !important; padding-right: 1rem !important; }
@@ -801,6 +801,61 @@ textarea:focus {
   display:inline-block; background:#f59e0b; color:#111827; font-weight:700; 
   font-size:0.75em; padding:0.2rem 0.5rem; border-radius:12px; margin-left:0.4rem; text-transform:uppercase;
 }
+
+/* ===== Mobile/Alignment Hotfixes (non-breaking) ===== */
+
+/* Ensure checklist text aligns from the top and wraps cleanly */
+.checklist-item { align-items: flex-start !important; }
+.checklist-item input[type="checkbox"] { margin-top: 0.2rem !important; }
+.checklist-item label { line-height: 1.55; word-break: break-word; overflow-wrap: anywhere; }
+
+/* Prevent hover padding shifts that can misalign on mobile */
+.checklist-item:hover { padding-left: 1rem !important; padding-right: 1rem !important; transform: none !important; box-shadow: none !important; }
+
+/* Footer controls: ensure clean layout on narrow screens */
+.navigation-footer { padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important; }
+.navigation-controls { flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .navigation-controls {
+    gap: 0.75rem !important;
+    align-items: stretch !important;
+  }
+  .save-draft-btn { order: 1; }
+  #prevBtn { order: 2; flex: 1 1 45%; }
+  #nextBtn { order: 3; flex: 1 1 45%; }
+  .progress-section { order: 4; width: 100% !important; }
+  .nav-btn { width: 100%; }
+}
+
+/* Tabs: keep labels visible but prevent overflow */
+.navigation-tabs { -webkit-overflow-scrolling: touch; }
+.nav-tab { min-width: 0; }
+.nav-tab .label { text-overflow: ellipsis; overflow: hidden; }
+
+/* Photo grid spacing tweaks for small screens */
+@media (max-width: 480px) {
+  .photo-preview { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important; }
+}
+
+/* Respect safe area and avoid body content being hidden by sticky footer */
+body { padding-bottom: calc(120px + env(safe-area-inset-bottom)) !important; }
+
+
+/* ===== Tab Title Wrapping (2-line clamp, no overflow) ===== */
+.navigation-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.nav-tab { max-width: 160px; flex: 0 0 auto; }
+.nav-tab .label {
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;            /* multi-line truncation */
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.25;
+  max-height: calc(1em * 2.5);     /* safe cap for 2 lines */
+}
+.nav-tab .icon { flex: 0 0 auto; margin-right: .5rem; }
+
 </style>
 </head>
 <body>

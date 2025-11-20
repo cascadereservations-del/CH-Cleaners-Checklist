@@ -721,6 +721,86 @@ textarea:focus {
 @keyframes gentlePulse{0%{box-shadow:0 0 0 0 rgba(34,51,59,0.00)}70%{box-shadow:0 0 0 10px rgba(34,51,59,0.06)}100%{box-shadow:0 0 0 0 rgba(34,51,59,0.00)}}
 .pulse{animation:gentlePulse 2.8s ease-out infinite}
 
+
+/* ENHANCEMENT: Auto-save status indicator */
+.auto-save-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.auto-save-status.visible { opacity: 1; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.auto-save-status.saving .status-dot { background: var(--warning); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ENHANCEMENT: Item emoji */
+.item-emoji { font-size: 1.2em; margin-right: 0.5rem; display: inline-block; min-width: 1.5em; }
+
+/* ENHANCEMENT: Photo loading state */
+.photo-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--light-gold-bg);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+.photo-loading .spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* ENHANCEMENT: Mobile touch targets */
+@media screen and (max-width: 768px) {
+  .checklist-item input[type="checkbox"] {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .checklist-item input[type="checkbox"]::before {
+    width: 0.85em;
+    height: 0.85em;
+  }
+  .nav-btn, .modal-btn, .photo-upload-btn {
+    min-height: 44px;
+    padding: 0.9rem 1.5rem;
+  }
+  .checklist-item {
+    padding: 1.5rem 1rem;
+    gap: 1.25rem;
+  }
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+
+/* === Alignment Fixes for checklist steps === */
+.checklist-item { align-items: center; padding-left: 1rem; padding-right: 1rem; }
+.checklist-item label { display: block; }
+.checklist-item .item-detail { margin-top: 0.35rem; }
+.checklist-item:hover { padding-left: 1rem !important; padding-right: 1rem !important; }
+.checklist-item:nth-child(even), .checklist-item:nth-child(odd) { padding-left: 1rem !important; padding-right: 1rem !important; }
+.nav-tab { display: flex; align-items: center; gap: 0.35rem; }
+
+.checklist-item.highlight { 
+  background: linear-gradient(135deg, #fff7ed, #fffbeb) !important; 
+  border-left: 4px solid #f59e0b !important; 
+}
+.highlight-badge {
+  display:inline-block; background:#f59e0b; color:#111827; font-weight:700; 
+  font-size:0.75em; padding:0.2rem 0.5rem; border-radius:12px; margin-left:0.4rem; text-transform:uppercase;
+}
 </style>
 </head>
 <body>
@@ -746,9 +826,12 @@ textarea:focus {
 </div>
 <div class="navigation-footer">
 <div class="navigation-controls">
-<button class="save-draft-btn" id="saveDraftBtn" title="Save Draft" type="button">💾<span class="save-draft-tooltip">Saved!</span></button>
+<!-- ENHANCEMENT: ARIA for save draft -->
+<button class="save-draft-btn" id="saveDraftBtn" aria-label="Save draft progress" title="Save Draft" type="button">💾<span class="save-draft-tooltip" role="tooltip">Saved!</span></button>
+<!-- ENHANCEMENT: Auto-save indicator -->
+<div id="autoSaveStatus" class="auto-save-status"><span class="status-dot"></span><span class="status-text">All changes saved</span></div>
 <button class="nav-btn" id="prevBtn" type="button">← Previous</button>
-<div class="progress-section">
+<div class="progress-section" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
 <div class="progress-label">
 <span>Progress</span>
 <span class="percentage">0%</span>
@@ -791,6 +874,77 @@ textarea:focus {
 </div>
 
 <script>
+// ENHANCEMENT: Input sanitization
+
+// === Name gating utilities ===
+function canProceedFromInfo() {
+  const el = document.getElementById('cleanerName');
+  return !!(el && el.value && el.value.trim().length > 0);
+}
+function ensureNameBeforeProceed() {
+  if (!canProceedFromInfo()) {
+    showErrorModal('Name required', 'Please enter your full name before proceeding to the next step.');
+    const el = document.getElementById('cleanerName');
+    if (el) el.focus();
+    return false;
+  }
+  return true;
+}
+
+// ENHANCEMENT: Custom error/info modal
+function showErrorModal(title, message, isError = true) {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h3 style="color: ${isError ? 'var(--error)' : 'var(--warning)'};">
+        ${isError ? '⚠️' : 'ℹ️'} ${title}
+      </h3>
+      <p>${message}</p>
+      <div class="modal-buttons">
+        <button class="modal-btn" onclick="this.closest('.modal').remove()" 
+          style="background: linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); color: #fff;">
+          OK
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+// ENHANCEMENT: Timer cleanup
+let elapsedTimer = null;
+function startElapsedTimer() {
+  if (elapsedTimer) clearInterval(elapsedTimer);
+  const stEl = document.getElementById('startTime');
+  const elEl = document.getElementById('elapsedTime');
+  const calc = () => {
+    if (!(stEl && elEl && stEl.value)) return;
+    const now = new Date();
+    const [sh, sm] = stEl.value.split(':').map(Number);
+    const start = new Date(now); start.setHours(sh||0, sm||0, 0, 0);
+    let diff = Math.max(0, now - start);
+    const h = Math.floor(diff/3600000); diff %= 3600000;
+    const m = Math.floor(diff/60000);
+    elEl.value = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  };
+  calc();
+  elapsedTimer = setInterval(calc, 30000);
+}
+function stopElapsedTimer() {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+}
+window.addEventListener('beforeunload', stopElapsedTimer);
+function sanitizeHTML(str) {
+  const temp = document.createElement('div');
+  temp.textContent = String(str ?? '');
+  return temp.innerHTML;
+}
+
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrhdpc-kFMKF7PLq46IPH6fPLLDeod-aHbb9Yk8qfJ3gsKqixBRY3XfpeNj4WMFpqA/exec"; 
         const CALENDAR_ID = "cascadereservations@gmail.com"; 
 
@@ -863,8 +1017,10 @@ textarea:focus {
                 items: [
                     { id: "check_7_4", text: "Scrub, disinfect and clean the toilet, shower, and sink<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Now scrub the toilet (remember, the cleaner has been sitting!). Scrub shower and tub, then rinse well with water. Clean the sink and make the faucet shine.", disinfect: true },
                     { id: "check_7_2", text: "Clean mirrors and glass until there are NO streaks", detail: "Pro trick: After cleaning shower glass, use a squeegee (rubber wiper) to dry it completely. This stops water spots and looks professional." },
-                    { id: "check_7_5", text: "Check toilet smell and clean the bathroom vent", detail: "Does the toilet area smell bad? If yes, report it. Also, look at the vent above the mirror. If you see dust, use a vacuum or broom to clean it all off." },
-                    { id: "check_6_1", text: "Clean inside and outside of all kitchen appliances", detail: "Clean inside microwave (no oil or food). Wipe outside of fridge, rice cooker, kettle. Make the stovetop shiny." },
+                    { id: "check_7_5",
+text: "Check toilet smell and clean the bathroom vent", detail: "Does the toilet area smell bad? If yes, report it. Also, look at the vent above the mirror. If you see dust, use a vacuum or broom to clean it all off." },
+                    { id: "check_7_6", text: "🔎 Check all spoons, plates, glass, cooking pans, and knives<span class='highlight-badge'>Important</span>", detail: "Ensure they are streak-free and clean. No burnt marks on pans. No damage or cracks in plates and glasses.", highlight: true },
+{ id: "check_6_1", text: "Clean inside and outside of all kitchen appliances", detail: "Clean inside microwave (no oil or food). Wipe outside of fridge, rice cooker, kettle. Make the stovetop shiny." },
                     { id: "check_6_4", text: "Clean, disinfect and polish sink, faucet, and counters<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Make the faucet SUPER shiny - this shows you did a detailed job. Wipe all counters including edges and backsplash.", disinfect: true },
                     { id: "check_6_5", text: "Check the dishwashing sponge", detail: "Is the sponge old, wet, or yucky? Put a brand new, dry one for the guest. Wash and dry the old one if it's still okay to be used next time." },
                     { id: "check_7_7", text: "Refill all bathroom and kitchen supplies", detail: "Fold towels neatly (in thirds). Check and refill: hand soap, body wash, shampoo, dish soap. Ensure guest amenities are complete: coffee packs (2), water bottles (2), and full toiletries." },
@@ -927,7 +1083,19 @@ textarea:focus {
             return today === 0 || today === 6;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', () => { try{ startElapsedTimer(); }catch(e){} 
+            // Disable Next on first card until name is filled
+            setTimeout(() => {
+              const cn = document.getElementById('cleanerName');
+              const btn = document.getElementById('nextBtn');
+              function updateNextDisabled(){
+                if (!btn) return;
+                btn.disabled = (currentCardIndex === 0) && !(cn && cn.value && cn.value.trim());
+              }
+              if (cn) cn.addEventListener('input', updateNextDisabled);
+              updateNextDisabled();
+            }, 0);
+        
             const initialCardData = { title: "Your Info", icon: "👤", isInfoCard: true };
             let sectionsToUse = [...checklistData];
             
@@ -952,6 +1120,49 @@ textarea:focus {
         });
         
         function generateHTML(sections) {
+
+// ENHANCEMENT: Emojis per item
+const itemEmojis = {
+  'meter_verify_match': '📊',
+  'check_0_1': '🧹',
+  'check_1_1': '🚪',
+  'check_1_4': '🔌',
+  'check_1_5': '🔍',
+  'check_1_7': '🔎',
+  'check_1_8': '🌱',
+  'check_2_1': '🗑️',
+  'check_2_4': '🛏️',
+  'check_3_1': '🚽',
+  'check_3_4': '🍳',
+  'check_4_1': '✨',
+  'check_4_5': '🦠',
+  'check_5_2': '🛏️',
+  'check_5_6': '💤',
+  'check_5_7': '🌸',
+  'check_5_8': '📺',
+  'check_7_4': '🧼',
+  'check_7_2': '🪟',
+  'check_7_5': '👃',
+  'check_6_1': '🍽️',
+  'check_6_4': '💧',
+  'check_6_5': '🧽',
+  'check_7_7': '🧴',
+  'check_8_1': '🧹',
+  'check_balcony': '🌿',
+  'check_9_1': '👀',
+  'check_9_4': '❄️',
+  'check_10_6': '⚡',
+  'weekly_1': '🛋️',
+  'weekly_2': '🔧',
+  'weekly_3': '🧊',
+  'weekly_4': '❄️',
+  'weekly_5': '💨',
+  'weekly_6': '👔',
+  'weekly_7': '🧹',
+  'weekly_8': '🛏️',
+  'weekly_9': '🧪'
+};
+
             let cardsHTML = '';
             let tabsHTML = '';
             sections.forEach((section, index) => {
@@ -977,10 +1188,15 @@ textarea:focus {
                         const disinfectClass = item.disinfect ? 'disinfect' : '';
                         const biweeklyClass = item.biweekly ? 'biweekly' : '';
                         const combinedClass = `${disinfectClass} ${biweeklyClass}`.trim();
-                        cardsHTML += `<div class="checklist-item ${combinedClass}">
-                            <input type="checkbox" id="${item.id}" data-section-index="${index}">
-                            <label for="${item.id}">${item.text}<div class="item-detail">${item.detail}</div></label>
-                        </div>`;
+                        // ENHANCEMENT: ARIA + emoji per item
+cardsHTML += `<div class="checklist-item ${combinedClass}">`
+ + `<input type="checkbox" id="${item.id}" data-section-index="${index}" aria-labelledby="${item.id}-label">`
+ + `<label id="${item.id}-label" for="${item.id}">`
+ + `<span class="item-emoji">${itemEmojis[item.id] || '📋'}</span>`
+ + `${item.text}`
+ + `<div class="item-detail">${item.detail}</div>`
+ + `</label>`
+ + `</div>`;
                     });
                     // Render custom fields for sections (e.g., meter readings)
                     if (section.customFields && Array.isArray(section.customFields) && section.customFields.length) {
@@ -1089,7 +1305,10 @@ textarea:focus {
             if (index < 0 || index >= cards.length) return;
             currentCardIndex = index;
             
-            cardContainer.style.height = (cardContainer.offsetHeight || 500) + 'px';
+            
+            // Gate: block navigation past main dashboard without name
+            if (index > 0 && !canProceedFromInfo()) { return; }
+    cardContainer.style.height = (cardContainer.offsetHeight || 500) + 'px';
             
             cards.forEach((c, i) => c.classList.toggle('active', i === index));
             tabs.forEach((t, i) => {
@@ -1107,8 +1326,8 @@ textarea:focus {
             }, 500);
 
             prevBtn.disabled = index === 0;
-            nextBtn.textContent = index === cards.length - 1 ? '✅ Submit Report' : 'Next →';
-            nextBtn.id = index === cards.length - 1 ? 'submitBtn' : 'nextBtn';
+            nextBtn.textContent = index === cards.length - 1 ? "✅ Submit Report" : "Next →";
+
         }
         
         function updateProgress() {
@@ -1117,6 +1336,8 @@ textarea:focus {
             
             const percentage = checkboxes.length > 0 ? Math.round((checked.length / checkboxes.length) * 100) : 0;
             document.querySelector('.percentage').textContent = `${percentage}%`;
+  // ENHANCEMENT: ARIA progress value
+  const ps = document.querySelector('.progress-section'); if (ps) ps.setAttribute('aria-valuenow', percentage);
             document.querySelector('.progress-fill').style.width = `${percentage}%`;
             
             checkboxes.forEach(cb => {
@@ -1183,10 +1404,16 @@ textarea:focus {
             const input = event.target;
             const sectionId = input.dataset.sectionId;
             const previewContainer = document.getElementById(`preview_${sectionId}`);
+  // ENHANCEMENT: loading indicator
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'photo-loading';
+  loadingDiv.innerHTML = '<div class=\"spinner\"></div><span>Compressing...</span>';
+  previewContainer.appendChild(loadingDiv);
+
             
             for (const file of Array.from(input.files)) {
                 if (file.size > 10 * 1024 * 1024) {
-                    alert(`❌ File ${file.name} is too large (max 10MB).`);
+                    showErrorModal('File Too Large', `${file.name} exceeds the 10MB limit. Please choose a smaller file.`); // ENHANCEMENT
                     continue;
                 }
                 try {
@@ -1207,11 +1434,14 @@ textarea:focus {
                     isDirty = true;
                 } catch (error) {
                     console.error("Could not compress image:", error);
-                    alert("Could not process image file. It might be corrupted.");
+                    showErrorModal('Image Processing Failed', 'Could not process image file. It might be corrupted.'); // ENHANCEMENT
                 }
             }
             input.value = '';
         }
+
+  // ENHANCEMENT: remove loading indicator
+  try { loadingDiv.remove(); } catch(_) {}
 
         const loadDraftPhotosForSection = (sectionId, previewContainer) => {
             previewContainer.innerHTML = '';
@@ -1406,7 +1636,7 @@ textarea:focus {
               const urgentEl = document.getElementById(ta.id.replace('notes_', 'urgent_'));
               
               const prefix = (urgentEl && urgentEl.checked) ? '[URGENT] ' : '';
-              allNotes.push(`[${sectionTitle}]: ${prefix}${value}`);
+              allNotes.push(`[${sanitizeHTML(sectionTitle)}]: ${sanitizeHTML(prefix + value)}`); // ENHANCEMENT: sanitized
             });
             data.allNotes = allNotes.join('\n\n');
 
@@ -1506,7 +1736,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el.value = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
       } catch(e) { }
     };
-    setInterval(tick, 1000); st.addEventListener('input', () => setTimeout(()=>tick(), 50)); tick();
+    startElapsedTimer(); // ENHANCEMENT: use managed timer st.addEventListener('input', () => setTimeout(()=>tick(), 50)); tick();
   }
 
   const sdb = document.getElementById('saveDraftBtn');
@@ -1529,6 +1759,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const emc = document.getElementById('error-modal-close');
   if (emc) emc.addEventListener('click', ()=>{ const em = document.getElementById('errorModal'); if (em) em.style.display='none'; });
 });
+
+// ENHANCEMENT: Auto-save indicator on save draft button
+(function() {
+  const sdb = document.getElementById('saveDraftBtn');
+  if (!sdb) return;
+  sdb.addEventListener('click', () => {
+    const status = document.getElementById('autoSaveStatus');
+    if (!status) return;
+    status.classList.add('visible', 'saving');
+    status.querySelector('.status-text').textContent = 'Saving...';
+    try {
+      // existing save code executes via other listeners; we only reflect UI state
+      setTimeout(() => {
+        status.classList.remove('saving');
+        status.querySelector('.status-text').textContent = 'Saved ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        setTimeout(() => status.classList.remove('visible'), 3000);
+      }, 200); // allow localStorage write to complete
+    } catch (e) {
+      status.querySelector('.status-text').textContent = 'Save failed';
+      status.querySelector('.status-dot').style.background = 'var(--error)';
+    }
+  }, { capture: false });
+})();
+
 </script>
 
 <script>
@@ -1574,7 +1828,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <h3 style="color:var(--success);">✅ Report Submitted!</h3>
 <p>Thank you! The Google Sheet and email report have been successfully updated.</p>
 <div class="soft-callout pulse"><div class="title">Heads up — please update Consumables ✨</div><div class="body">After topping up the kitchen & bathroom supplies, kindly record it in the Inventory (Consumables) so everything stays accurate. You can open it below.</div></div><div class="modal-buttons">
-<button class="modal-btn" id="success-open-inventory-btn" onclick="window.open(\'https://script.google.com/macros/s/AKfycbxKpNS04OMGXtEW-XLPbRkw9P6n5Tek_SnvVQD02T06StFq7uVBlKljhyzJNMQ75x7U/exec\', \'_blank\');"  type="button">Open Inventory</button>
+<button class="modal-btn" id="success-open-inventory-btn"  type="button">Open Inventory</button>
 <button class="modal-btn" id="success-new-report-btn" style="background:linear-gradient(135deg, var(--earthen-gold) 0%, #b39a7d 100%); color:#fff;" type="button">Start New Report</button>
 </div>
 </div>
@@ -1804,6 +2058,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if (m) m.style.display = 'none';
   });
 });
+</script>
+<script>
+(function(){
+  function onOpenInventoryClick(e){
+    const t = e.target;
+    if (t && t.id === 'success-open-inventory-btn') { window.open('https://script.google.com/macros/s/AKfycbxKpNS04OMGXtEW-XLPbRkw9P6n5Tek_SnvVQD02T06StFq7uVBlKljhyzJNMQ75x7U/exec', '_blank'); }
+  }
+  document.addEventListener('click', onOpenInventoryClick, false);
+})();
 </script>
 </body>
 

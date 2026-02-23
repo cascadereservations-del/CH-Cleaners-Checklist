@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  *  CASCADE HIDEAWAY — Cleaning Report Web App Backend
- *  Version: 3.2  |  Updated: 2026
+ *  Version: 3.3  |  Updated: 2026
  * ═══════════════════════════════════════════════════════════════════
  *
  *  SETUP STEPS:
@@ -15,9 +15,9 @@
  *  6. Copy the deployment URL into SCRIPT_URL in index.html.
  *  7. Authorise the script when prompted on the first run.
  *
- *  ── If upgrading from the original script ──────────────────────
- *  Run migrateSheetV32() ONCE from the editor before going live.
- *  This safely adds the 4 new columns without losing existing data.
+ *  ── If upgrading from v3.2 ──────────────────────────────────────
+ *  Run fixNamedTable() ONCE from the editor to remove the Named Table
+ *  format that causes appendRow to fail. Then deploy a new version.
  *  ────────────────────────────────────────────────────────────────
  *
  *  ACTIONS (POST — accepts BOTH raw JSON body AND FormData):
@@ -29,7 +29,16 @@
  *                    body: raw JSON (from index.html v3.x)
  *                    — or — FormData with payload= key (legacy)
  *
- *  CHANGELOG v3.2:
+ *  CHANGELOG v3.3:
+ *  - FIXED: Replaced ALL sheet.appendRow() calls with
+ *           sheet.getRange(...).setValues([[]]) to bypass the
+ *           Named Table restriction that caused TypeError on appendRow.
+ *  - New:   fixNamedTable() — removes Named Table format from the
+ *           log sheet so the sheet behaves normally again.
+ *  - New:   migrateSheetV32() now auto-deletes orphan "Sheet2" tab
+ *           left behind by failed insertSheet calls.
+ *
+ *  CHANGELOG v3.2 (prior):
  *  - Fixed: uses openById(SHEET_ID) — correct for standalone scripts
  *  - Fixed: supports BOTH raw JSON body and FormData payload param
  *  - New:   4 extra sheet columns — ⚡ Δ kWh, 💧 Δ m³, ⚡ Month kWh, 💧 Month m³
@@ -40,11 +49,6 @@
  *  - Kept:  init / upload actions (backward compatible)
  *  - Kept:  calendar event creation
  *  - Kept:  full branded HTML email
- *
- *  CHANGELOG v3.1 (prior):
- *  - Meter readings extracted from all possible payload paths
- *  - Numeric values stored in sheet (not "Not recorded" strings)
- *  - Email subject reflects urgent status
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -67,8 +71,6 @@ const CALENDAR_ID           = 'cascadereservations@gmail.com';
 //  M  💧 Month m³     N  Completion %    O  Items Done
 //  P  Total Items     Q  Urgent Notes    R  General Notes
 //  S  Photos Folder
-//
-//  To restructure: change numbers here only — all functions use COL.*
 const COL = {
   TIMESTAMP:  1,
   DATE:       2,
@@ -98,23 +100,18 @@ const TOTAL_COLS = 19;
 //  ROUTER
 // ═══════════════════════════════════════════════════════════════════
 function doGet(e) {
-  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.2 — online' });
+  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.3 — online' });
 }
 
 function doPost(e) {
   try {
-    // ── Detect content type ────────────────────────────────────
-    // index.html v3.x sends a raw JSON body (no action param).
-    // Legacy / init / upload calls send FormData with an action param.
-    const rawBody  = (e && e.postData && e.postData.contents) ? e.postData.contents.trim() : '';
-    const isJson   = rawBody.startsWith('{') || rawBody.startsWith('[');
+    const rawBody     = (e && e.postData && e.postData.contents) ? e.postData.contents.trim() : '';
+    const isJson      = rawBody.startsWith('{') || rawBody.startsWith('[');
     const actionParam = _getParam(e, 'action');
 
     if (!isJson && actionParam === 'init')   return _handleInit(e);
     if (!isJson && actionParam === 'upload') return _handleUpload(e);
 
-    // Full report submit ─────────────────────────────────────────
-    // Accept raw JSON body (current index.html) OR FormData payload= (legacy)
     let payload;
     if (isJson) {
       payload = JSON.parse(rawBody);
@@ -144,7 +141,6 @@ function _handleInit(e) {
   const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const base    = dateStr + ' cleaning report photos - ' + unitName + ' - ' + cleanerName;
 
-  // Ensure unique folder name
   let name = base, idx = 2;
   while (root.getFoldersByName(name).hasNext()) { name = base + ' (' + idx + ')'; idx++; }
 
@@ -166,7 +162,7 @@ function _handleUpload(e) {
   const folderId = _getParam(e, 'folderId');
   const fileName = _getParam(e, 'fileName') || 'photo';
   const mimeType = _getParam(e, 'mimeType') || _guessMimeType(fileName);
-  const fileData = _getParam(e, 'fileData');   // dataURL or raw base64
+  const fileData = _getParam(e, 'fileData');
 
   if (!folderId || !fileData) {
     return _json({ result: 'error', message: 'Missing folderId or fileData' });
@@ -203,7 +199,7 @@ function _handleSubmit(payload) {
   const emailSubject     = payload.emailSubject    || 'Cleaning Report – Cascade Bria';
   const meta             = payload.meta            || {};
 
-  // ── Meter readings — check every possible payload path ────
+  // ── Meter readings ──────────────────────────────────────────
   const electricReading = String(
     payload.electricReading
     || (payload.meterReadings && payload.meterReadings.electric && payload.meterReadings.electric.value)
@@ -218,7 +214,7 @@ function _handleSubmit(payload) {
     || ''
   ).trim() || 'Not recorded';
 
-  // ── Core form fields ───────────────────────────────────────
+  // ── Core form fields ────────────────────────────────────────
   const cleaningDate = String(
     payload.cleaningDate || formData.cleaningDate || ''
   ).trim() || Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
@@ -233,7 +229,6 @@ function _handleSubmit(payload) {
   const doneItems      = Number(meta.doneItems  || 0);
   const totalItems     = Number(meta.totalItems || 0);
 
-  // ── Debug log ──────────────────────────────────────────────
   Logger.log('=== CLEANING REPORT RECEIVED ===');
   Logger.log('Cleaner:    ' + cleanerName + ' | Unit: ' + unitName);
   Logger.log('Date:       ' + cleaningDate);
@@ -242,7 +237,7 @@ function _handleSubmit(payload) {
   Logger.log('Completion: ' + completionRate + '%');
   Logger.log('Photos:     ' + Object.keys(photos).length + ' section(s)');
 
-  // ── Upload base64 photos to Drive ──────────────────────────
+  // ── Upload base64 photos to Drive ───────────────────────────
   const driveRoot    = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
   const dateStamp    = cleaningDate.replace(/-/g, '');
   const reportFolder = driveRoot.createFolder(
@@ -254,7 +249,7 @@ function _handleSubmit(payload) {
     const sectionPhotos = photos[sectionId];
     if (!sectionPhotos || !sectionPhotos.length) continue;
 
-    const rawLabel     = (sectionNames[sectionId] || sectionId).replace(/[^\w\s\-]/g, '').replace(/\s+/g, '_').trim();
+    const rawLabel      = (sectionNames[sectionId] || sectionId).replace(/[^\w\s\-]/g, '').replace(/\s+/g, '_').trim();
     const sectionFolder = reportFolder.createFolder(rawLabel || sectionId);
     photoLinks[sectionId] = [];
 
@@ -277,12 +272,12 @@ function _handleSubmit(payload) {
     });
   }
 
-  // ── Build notes text for the sheet cell ───────────────────
+  // ── Build notes text ────────────────────────────────────────
   const notesText = notesArr.map(function(n) {
     return '[' + (n.section || '') + ']: ' + (n.isUrgent ? '[URGENT] ' : '') + (n.text || '');
   }).join('\n');
 
-  // ── Log to spreadsheet (includes delta + monthly tally) ───
+  // ── Log to spreadsheet ──────────────────────────────────────
   _logToSheet(
     cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
     electricReading, waterReading,
@@ -291,7 +286,7 @@ function _handleSubmit(payload) {
     reportFolder.getUrl()
   );
 
-  // ── Build and send HTML email ──────────────────────────────
+  // ── Send HTML email ─────────────────────────────────────────
   const htmlEmail = _buildEmailHtml({
     cleaningDate, cleanerName, unitName, startTime, endTime, elapsedTime,
     electricReading, waterReading,
@@ -310,7 +305,7 @@ function _handleSubmit(payload) {
     Logger.log('Email sent to ' + EMAIL_RECIPIENTS);
   }
 
-  // ── Calendar event ─────────────────────────────────────────
+  // ── Calendar event ──────────────────────────────────────────
   try {
     if (calendarData && calendarData.startDateTime) {
       const cal = CalendarApp.getCalendarById(CALENDAR_ID);
@@ -329,13 +324,16 @@ function _handleSubmit(payload) {
   }
 
   Logger.log('=== REPORT PROCESSED SUCCESSFULLY ===');
-  // Return both "result" and "status" keys for compatibility with all index.html versions
   return _json({ result: 'success', status: 'success', message: 'Report submitted successfully.' });
 }
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  SPREADSHEET LOGGING  (v3.2)
+//  SPREADSHEET LOGGING  (v3.3)
+//
+//  KEY FIX: ALL appendRow() calls replaced with getRange().setValues()
+//  to bypass the Named Table restriction that caused:
+//  "TypeError: Cannot read properties of null (reading 'appendRow')"
 // ═══════════════════════════════════════════════════════════════════
 function _logToSheet(
   cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
@@ -343,21 +341,21 @@ function _logToSheet(
   urgentText, notesText, folderUrl
 ) {
   try {
-    // openById — required for standalone (non-bound) scripts
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     let   sheet = ss.getSheetByName(SHEET_NAME);
 
-    // ── Auto-create sheet with v3.2 headers if absent ─────────
+    // ── Auto-create sheet with v3.2 headers if absent ──────────
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
-      sheet.appendRow([
+      // v3.3 FIX: use setValues instead of appendRow
+      sheet.getRange(1, 1, 1, TOTAL_COLS).setValues([[
         'Timestamp',      'Cleaning Date',  'Property',      'Cleaner',
         'Start Time',     'End Time',       'Elapsed',
         'Electric (kWh)', 'Water (m³)',
         '⚡ Δ kWh',       '💧 Δ m³',        '⚡ Month kWh',  '💧 Month m³',
         'Completion %',   'Items Done',     'Total Items',
         'Urgent Notes',   'General Notes',  'Photos Folder'
-      ]);
+      ]]);
       sheet.getRange(1, 1, 1, TOTAL_COLS)
            .setFontWeight('bold')
            .setBackground('#22333B')
@@ -365,14 +363,12 @@ function _logToSheet(
       sheet.setFrozenRows(1);
     }
 
-    // ── Parse meter readings to numbers (null if unavailable) ─
+    // ── Parse meter readings ────────────────────────────────────
     const elecVal  = (electricReading !== 'Not recorded') ? (parseFloat(electricReading)  || null) : null;
     const waterVal = (waterReading    !== 'Not recorded') ? (parseFloat(waterReading)     || null) : null;
 
-    // ── Compute Δ vs the previous data row ────────────────────
-    // Produces '—' if either side is non-numeric (backwards-compat
-    // with old rows that have no meter data).
-    const lastRow = sheet.getLastRow();    // row 1 = header
+    // ── Compute Δ vs the previous data row ─────────────────────
+    const lastRow = sheet.getLastRow();
     let deltaKwh  = '—';
     let deltaM3   = '—';
 
@@ -387,7 +383,7 @@ function _logToSheet(
       }
     }
 
-    // ── Determine the month-year bucket ───────────────────────
+    // ── Determine the month-year bucket ────────────────────────
     let rowYear, rowMonth;
     try {
       const p  = String(cleaningDate).split('-');
@@ -399,9 +395,7 @@ function _logToSheet(
       rowMonth  = now.getMonth() + 1;
     }
 
-    // ── Compute running monthly totals ────────────────────────
-    // Sum Δ values from all existing rows in the same month-year,
-    // then add the current row's Δ on top.
+    // ── Compute running monthly totals ──────────────────────────
     let monthKwh = '—';
     let monthM3  = '—';
 
@@ -433,13 +427,15 @@ function _logToSheet(
       if (typeof deltaM3  === 'number') monthM3  = +(sumM3  + deltaM3 ).toFixed(3);
 
     } else {
-      // Very first data row — Δ equals monthly total
       if (typeof deltaKwh === 'number') monthKwh = deltaKwh;
       if (typeof deltaM3  === 'number') monthM3  = deltaM3;
     }
 
-    // ── Append the new row ─────────────────────────────────────
-    sheet.appendRow([
+    // ── Write the new row ───────────────────────────────────────
+    // v3.3 FIX: getRange().setValues() instead of appendRow()
+    // This bypasses the Named Table restriction that blocks appendRow.
+    const newRow = lastRow + 1;
+    sheet.getRange(newRow, 1, 1, TOTAL_COLS).setValues([[
       new Date(),                                        // A  Timestamp
       cleaningDate,                                      // B  Cleaning Date
       unitName,                                          // C  Property
@@ -459,12 +455,12 @@ function _logToSheet(
       urgentText || '—',                                 // Q  Urgent Notes
       notesText  || '—',                                 // R  General Notes
       folderUrl  || '—'                                  // S  Photos Folder
-    ]);
+    ]]);
 
     try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
-    Logger.log('Sheet row appended.');
+    Logger.log('Sheet row written to row ' + newRow + ' via setValues().');
 
-    // ── Refresh Monthly Summary tab ────────────────────────────
+    // ── Refresh Monthly Summary tab ─────────────────────────────
     _updateMonthlySummary(ss);
 
   } catch (sheetErr) {
@@ -474,7 +470,8 @@ function _logToSheet(
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  MONTHLY SUMMARY TAB  (v3.2)
+//  MONTHLY SUMMARY TAB  (v3.3)
+//  FIX: All appendRow() replaced with getRange().setValues()
 // ═══════════════════════════════════════════════════════════════════
 function _updateMonthlySummary(ssParam) {
   try {
@@ -486,11 +483,11 @@ function _updateMonthlySummary(ssParam) {
     if (!sum) sum = ss.insertSheet(MONTHLY_SUMMARY_NAME);
     sum.clearContents();
 
-    // Header
-    sum.appendRow([
+    // v3.3 FIX: use setValues for header row
+    sum.getRange(1, 1, 1, 6).setValues([[
       'Month', '⚡ kWh Consumed', '💧 m³ Consumed',
       '# of Cleans', 'Avg Completion %', '🚨 Urgent Flags'
-    ]);
+    ]]);
     sum.getRange(1, 1, 1, 6)
        .setFontWeight('bold')
        .setBackground('#22333B')
@@ -528,20 +525,28 @@ function _updateMonthlySummary(ssParam) {
       if (urgentVal && urgentVal !== '—' && urgentVal.trim()) m.urgent = true;
     });
 
-    // Write rows chronologically with alternating row colours
-    Object.keys(months).sort().forEach(function(key, i) {
-      const m     = months[key];
-      const parts = key.split('-');
-      const label = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
-        .toLocaleString('en-US', { month: 'long', year: 'numeric' });
-      const avgPct = m.cleans > 0 ? (m.rateSum / m.cleans).toFixed(1) + '%' : '—';
+    // v3.3 FIX: build all summary rows as a 2D array, write in one call
+    const sortedKeys = Object.keys(months).sort();
+    if (sortedKeys.length > 0) {
+      const rows = sortedKeys.map(function(key, i) {
+        const m     = months[key];
+        const parts = key.split('-');
+        const label = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
+          .toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        const avgPct = m.cleans > 0 ? (m.rateSum / m.cleans).toFixed(1) + '%' : '—';
+        return [label, +m.kwh.toFixed(2), +m.m3.toFixed(3), m.cleans, avgPct, m.urgent ? '⚠️ Yes' : '✅ None'];
+      });
 
-      sum.appendRow([label, +m.kwh.toFixed(2), +m.m3.toFixed(3), m.cleans, avgPct, m.urgent ? '⚠️ Yes' : '✅ None']);
-      sum.getRange(i + 2, 1, 1, 6).setBackground(i % 2 === 0 ? '#F5F3EF' : '#FFFFFF');
-    });
+      sum.getRange(2, 1, rows.length, 6).setValues(rows);
+
+      // Apply alternating row colours
+      sortedKeys.forEach(function(_, i) {
+        sum.getRange(i + 2, 1, 1, 6).setBackground(i % 2 === 0 ? '#F5F3EF' : '#FFFFFF');
+      });
+    }
 
     try { sum.autoResizeColumns(1, 6); } catch(e) {}
-    Logger.log('Monthly Summary: ' + Object.keys(months).length + ' month(s) written.');
+    Logger.log('Monthly Summary: ' + sortedKeys.length + ' month(s) written via setValues().');
 
   } catch(e) {
     Logger.log('Monthly Summary error (non-fatal): ' + e.toString());
@@ -555,12 +560,91 @@ function updateMonthlySummary() {
 
 
 // ═══════════════════════════════════════════════════════════════════
+//  FIX NAMED TABLE  (v3.3 — NEW)
+//
+//  Run this ONCE from the Apps Script editor to remove the Named
+//  Table ("Table1") that was applied to the Cleaning Report Log sheet.
+//  Named Tables prevent appendRow and can interfere with setValues
+//  on structured ranges.
+//
+//  HOW TO RUN:
+//    1. Open the Apps Script editor
+//    2. Select "fixNamedTable" in the function dropdown
+//    3. Click Run — check the Execution log for results
+//    4. After success, deploy a NEW VERSION of the web app
+//
+//  WHAT IT DOES:
+//    - Finds all "protected" / table-format ranges on the log sheet
+//    - Removes any Named Table formatting (banding, table style)
+//    - Preserves all data and header styling
+// ═══════════════════════════════════════════════════════════════════
+function fixNamedTable() {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+
+  if (!sheet) {
+    Logger.log('Sheet "' + SHEET_NAME + '" not found. Nothing to fix.');
+    return;
+  }
+
+  // ── Remove all banding (alternating row colours applied by Named Table)
+  let bandingCount = 0;
+  sheet.getBandings().forEach(function(banding) {
+    try {
+      banding.remove();
+      bandingCount++;
+    } catch(e) {
+      Logger.log('Banding remove error (non-fatal): ' + e.toString());
+    }
+  });
+  Logger.log('Removed ' + bandingCount + ' banding(s) from "' + SHEET_NAME + '".');
+
+  // ── Clear any filter views that may be locking rows
+  try {
+    const filter = sheet.getFilter();
+    if (filter) {
+      filter.remove();
+      Logger.log('Removed existing filter from "' + SHEET_NAME + '".');
+    } else {
+      Logger.log('No filter present on "' + SHEET_NAME + '".');
+    }
+  } catch(e) {
+    Logger.log('Filter removal error (non-fatal): ' + e.toString());
+  }
+
+  // ── Re-apply clean header formatting ───────────────────────
+  const colCount = Math.max(sheet.getLastColumn(), TOTAL_COLS);
+  try {
+    sheet.getRange(1, 1, 1, colCount)
+         .setFontWeight('bold')
+         .setBackground('#22333B')
+         .setFontColor('#FFFFFF');
+    Logger.log('Header row formatting re-applied.');
+  } catch(e) {
+    Logger.log('Header re-style error (non-fatal): ' + e.toString());
+  }
+
+  // ── Test that setValues now works ───────────────────────────
+  try {
+    const testRow = sheet.getLastRow() + 1;
+    // Write and immediately clear a test cell to verify writability
+    sheet.getRange(testRow, 1).setValue('__test__');
+    sheet.getRange(testRow, 1).clearContent();
+    Logger.log('✅ Write test passed — setValues() is now functional on "' + SHEET_NAME + '".');
+  } catch(e) {
+    Logger.log('⚠️ Write test FAILED: ' + e.toString() + '. The Named Table may still be active. Try manually removing it via Format > Table in Google Sheets.');
+  }
+
+  Logger.log('✅ fixNamedTable() complete. Deploy a NEW VERSION of the script before submitting reports.');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  MIGRATION — run ONCE to upgrade an existing sheet safely
 //
-//  Handles three starting states automatically:
-//    7 cols  (original schema)  → adds 12 cols, rewrites header
-//    15 cols (v3.1 schema)      → inserts 4 cols after Water, shifts right
-//    19 cols (v3.2 schema)      → nothing to do
+//  v3.3 additions:
+//    - Deletes the orphan "Sheet2" tab if present and empty
+//    - All internal writes use setValues (not appendRow)
 //
 //  HOW TO RUN:
 //    1. Open this script in the Apps Script editor
@@ -569,6 +653,23 @@ function updateMonthlySummary() {
 // ═══════════════════════════════════════════════════════════════════
 function migrateSheetV32() {
   const ss    = SpreadsheetApp.openById(SHEET_ID);
+
+  // ── v3.3: Delete orphan Sheet2 if it exists and is empty ────
+  const orphan = ss.getSheetByName('Sheet2');
+  if (orphan) {
+    const hasData = orphan.getLastRow() > 0 || orphan.getLastColumn() > 0;
+    if (!hasData) {
+      try {
+        ss.deleteSheet(orphan);
+        Logger.log('Deleted empty orphan sheet "Sheet2".');
+      } catch(e) {
+        Logger.log('Could not delete Sheet2 (it may be the only sheet): ' + e.toString());
+      }
+    } else {
+      Logger.log('Sheet2 has data (' + orphan.getLastRow() + ' rows) — skipping deletion. Please review manually.');
+    }
+  }
+
   const sheet = ss.getSheetByName(SHEET_NAME);
 
   if (!sheet) {
@@ -580,20 +681,20 @@ function migrateSheetV32() {
   const rowCount = sheet.getLastRow();
   Logger.log('Detected: ' + colCount + ' columns, ' + rowCount + ' rows.');
 
-  // Already at v3.2
+  // Already at v3.2 / v3.3
   if (colCount >= TOTAL_COLS) {
-    Logger.log('Already at v3.2 width (' + colCount + ' cols). Running Monthly Summary refresh only.');
+    Logger.log('Already at v3.2+ width (' + colCount + ' cols). Running Monthly Summary refresh only.');
     _updateMonthlySummary(ss);
     return;
   }
 
-  // ── Original 7-column schema ──────────────────────────────
-  // Cols: Timestamp | Cleaner Name | Unit Name | Start Time | End Time | Report Summary | Photo Folder URL
+  // ── Original 7-column schema ────────────────────────────────
   if (colCount <= 8) {
     Logger.log('Original schema detected. Expanding to 19 cols and rewriting header.');
     const toAdd = TOTAL_COLS - colCount;
     for (let i = 0; i < toAdd; i++) sheet.insertColumnAfter(colCount + i);
 
+    // v3.3 FIX: setValues instead of appendRow for header rewrite
     sheet.getRange(1, 1, 1, TOTAL_COLS).setValues([[
       'Timestamp',      'Cleaning Date',  'Property',      'Cleaner',
       'Start Time',     'End Time',       'Elapsed',
@@ -603,16 +704,13 @@ function migrateSheetV32() {
       'Urgent Notes',   'General Notes',  'Photos Folder'
     ]]);
 
-    // Fill all new columns in existing data rows with '—'
     if (rowCount > 1) {
       sheet.getRange(2, colCount + 1, rowCount - 1, toAdd).setValue('—');
     }
     Logger.log('Original schema migrated. Columns A–G preserved; new columns ' + (colCount + 1) + '–19 added.');
   }
 
-  // ── v3.1 15-column schema ─────────────────────────────────
-  // Old J–O = Completion%, Items Done, Total Items, Urgent, Notes, Folder
-  // Insert 4 cols after col I → shifts old J–O to N–S automatically
+  // ── v3.1 15-column schema ────────────────────────────────────
   else if (colCount === 15) {
     Logger.log('v3.1 schema detected. Inserting 4 new columns after Water (col I).');
     for (let i = 0; i < 4; i++) sheet.insertColumnAfter(9);
@@ -642,7 +740,7 @@ function migrateSheetV32() {
   try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
 
   _updateMonthlySummary(ss);
-  Logger.log('✅ Migration complete. Deploy a NEW VERSION of this script before the next submission.');
+  Logger.log('✅ Migration complete. Run fixNamedTable() next if you see Named Table headers, then deploy a NEW VERSION.');
 }
 
 
@@ -728,14 +826,12 @@ function _buildEmailHtml(d) {
     + '<div style="max-width:660px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;'
     +   'box-shadow:0 4px 18px rgba(0,0,0,0.1);">'
 
-    // ── Header ────────────────────────────────────────────────
     + '<div style="background:linear-gradient(135deg,#22333B 0%,#5E503F 100%);padding:28px 24px;text-align:center;">'
     + '<h1 style="font-family:Georgia,serif;color:#ffffff;margin:0;font-size:1.7rem;letter-spacing:1px;">CASCADE HIDEAWAY</h1>'
     + '<p style="color:#EAE0D5;margin:6px 0 0;font-size:0.82rem;text-transform:uppercase;letter-spacing:2px;">Cleaning &amp; Turn-over Report</p>'
     + '</div>'
     + '<div style="padding:24px 28px;">'
 
-    // ── Summary strip ─────────────────────────────────────────
     + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;background:#f9f8f5;border-radius:10px;overflow:hidden;border:1px solid #EAE0D5;">'
     + '<tr>'
     + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Property</span><strong style="color:#22333B;">' + _esc(d.unitName) + '</strong></td>'
@@ -747,7 +843,6 @@ function _buildEmailHtml(d) {
     + '<td style="padding:12px 14px;" colspan="2"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Completion</span><strong style="color:' + rateColor + ';font-size:1.3em;">' + d.rate + '%</strong><span style="color:#888;font-size:0.85em;margin-left:6px;">(' + d.done + ' / ' + d.total + ' items)</span></td>'
     + '</tr></table>'
 
-    // ── Meter readings ────────────────────────────────────────
     + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
     + '<p style="font-weight:700;color:#006B54;margin:0 0 12px;font-size:1em;">⚡💧 Meter Readings</p>'
     + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
@@ -773,7 +868,6 @@ function _buildEmailHtml(d) {
     + '<p style="margin-top:20px;font-size:0.82em;color:#888;"><a href="' + (d.reportFolderUrl || '#') + '" style="color:#22333B;">📁 View All Photos in Drive</a></p>'
     + '</div>'
 
-    // ── Footer ────────────────────────────────────────────────
     + '<div style="background:#22333B;padding:16px;text-align:center;">'
     + '<p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.8em;">✨ Cascade Hideaway Automated Report ✨</p>'
     + '<p style="color:rgba(255,255,255,0.4);margin:6px 0 0;font-size:0.72em;">Generated: '

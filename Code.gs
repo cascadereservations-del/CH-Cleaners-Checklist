@@ -1,49 +1,64 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
- *  CASCADE HIDEAWAY — Cleaning Report Apps Script
+ *  CASCADE HIDEAWAY — Cleaning Report Web App Backend
  *  Version: 3.2  |  Updated: 2026
  * ═══════════════════════════════════════════════════════════════════
  *
  *  SETUP STEPS:
- *  1. Paste this entire file into your Apps Script editor.
- *  2. Set DRIVE_FOLDER_ID below to your Google Drive folder ID.
- *  3. Set RECIPIENT_EMAIL to where reports should be sent.
- *  4. Deploy → New deployment → Web app:
+ *  1. Paste this entire file into your standalone Apps Script editor.
+ *  2. Confirm SHEET_ID matches your Google Sheet.
+ *  3. Confirm ROOT_PHOTOS_FOLDER_ID matches your Drive folder.
+ *  4. Set EMAIL_RECIPIENTS.
+ *  5. Deploy → New deployment → Web app:
  *       Execute as: Me
  *       Who has access: Anyone
- *  5. Copy the deployment URL into SCRIPT_URL in index.html.
- *  6. On the first run, authorise the script when prompted.
+ *  6. Copy the deployment URL into SCRIPT_URL in index.html.
+ *  7. Authorise the script when prompted on the first run.
+ *
+ *  ── If upgrading from the original script ──────────────────────
+ *  Run migrateSheetV32() ONCE from the editor before going live.
+ *  This safely adds the 4 new columns without losing existing data.
+ *  ────────────────────────────────────────────────────────────────
+ *
+ *  ACTIONS (POST — accepts BOTH raw JSON body AND FormData):
+ *    action=init   → create dated subfolder in ROOT_PHOTOS_FOLDER_ID
+ *                    params: unitName, cleanerName
+ *    action=upload → save one photo (dataURL) into that subfolder
+ *                    params: folderId, fileName, mimeType, fileData
+ *    (default)     → full cleaning report → Sheet + Drive + Email
+ *                    body: raw JSON (from index.html v3.x)
+ *                    — or — FormData with payload= key (legacy)
  *
  *  CHANGELOG v3.2:
- *  - New: Added ⚡ Δ kWh and 💧 Δ m³ delta columns (J, K)
- *  - New: Added ⚡ Month kWh and 💧 Month m³ running totals (L, M)
- *  - New: "Monthly Summary" sheet auto-refreshes on every submission
- *  - New: COL constant map for maintainable column references
- *  - Improved: Header expanded to 19 columns; autoResizeColumns updated
- *  - Maintained: Full backward compatibility — old rows without meter
- *                readings show "—" in delta columns, no errors thrown
+ *  - Fixed: uses openById(SHEET_ID) — correct for standalone scripts
+ *  - Fixed: supports BOTH raw JSON body and FormData payload param
+ *  - New:   4 extra sheet columns — ⚡ Δ kWh, 💧 Δ m³, ⚡ Month kWh, 💧 Month m³
+ *  - New:   "Monthly Summary" sheet auto-refreshes on every submit
+ *  - New:   COL constant map — maintainable column references
+ *  - New:   migrateSheetV32() — safe in-place column insertion
+ *  - New:   testSubmit() writes a real test row + sends test email
+ *  - Kept:  init / upload actions (backward compatible)
+ *  - Kept:  calendar event creation
+ *  - Kept:  full branded HTML email
  *
- *  CHANGELOG v3.1:
- *  - Fixed: Meter readings now reliably extracted from ALL payload paths
- *  - Fixed: meterReadings.electric.value / meterReadings.water.value path added
- *  - Fixed: Meter readings now appear in BOTH dedicated block AND checklist
- *  - Improved: Spreadsheet now logs numeric values (not "Not recorded" fallback)
- *  - Improved: Email subject reflects urgent status
- *  - Improved: Better calendar event description
+ *  CHANGELOG v3.1 (prior):
+ *  - Meter readings extracted from all possible payload paths
+ *  - Numeric values stored in sheet (not "Not recorded" strings)
+ *  - Email subject reflects urgent status
  * ═══════════════════════════════════════════════════════════════════
  */
 
 // ─── CONFIGURATION ────────────────────────────────────────────────
-const DRIVE_FOLDER_ID  = 'YOUR_DRIVE_FOLDER_ID_HERE';   // ← REPLACE THIS
-const RECIPIENT_EMAIL  = 'cascadereservations@gmail.com';
-const SHEET_NAME       = 'Cleaning Reports';
-const CALENDAR_ID      = 'cascadereservations@gmail.com';
+const SHEET_ID              = '1fyc-XslpoVoPF27zYcxTcZfqk-rDGbLDGtJeRI0KH4I';
+const SHEET_NAME            = 'Cleaning Report Log';
+const MONTHLY_SUMMARY_NAME  = 'Monthly Summary';
+const ROOT_PHOTOS_FOLDER_ID = '1TFeTSTJ15lZys3zMRTpplrHCioFQ4QCu';
+const EMAIL_RECIPIENTS      = 'cascadereservations@gmail.com';
+const CALENDAR_ID           = 'cascadereservations@gmail.com';
 // ──────────────────────────────────────────────────────────────────
 
 
-// ─── COLUMN MAP (v3.2) ────────────────────────────────────────────
-// Update this object if you ever insert/remove columns.
-// All other functions reference COL.* — never raw numbers.
+// ─── COLUMN MAP  (v3.2 — 19 columns) ─────────────────────────────
 //
 //  A  Timestamp       B  Cleaning Date   C  Property
 //  D  Cleaner         E  Start Time      F  End Time
@@ -52,323 +67,361 @@ const CALENDAR_ID      = 'cascadereservations@gmail.com';
 //  M  💧 Month m³     N  Completion %    O  Items Done
 //  P  Total Items     Q  Urgent Notes    R  General Notes
 //  S  Photos Folder
+//
+//  To restructure: change numbers here only — all functions use COL.*
 const COL = {
-  TIMESTAMP:  1,   // A
-  DATE:       2,   // B
-  PROPERTY:   3,   // C
-  CLEANER:    4,   // D
-  START:      5,   // E
-  END:        6,   // F
-  ELAPSED:    7,   // G
-  ELECTRIC:   8,   // H
-  WATER:      9,   // I
-  DELTA_KWH: 10,   // J
-  DELTA_M3:  11,   // K
-  MONTH_KWH: 12,   // L
-  MONTH_M3:  13,   // M
-  RATE:      14,   // N
-  DONE:      15,   // O
-  TOTAL:     16,   // P
-  URGENT:    17,   // Q
-  NOTES:     18,   // R
-  FOLDER:    19    // S
+  TIMESTAMP:  1,
+  DATE:       2,
+  PROPERTY:   3,
+  CLEANER:    4,
+  START:      5,
+  END:        6,
+  ELAPSED:    7,
+  ELECTRIC:   8,
+  WATER:      9,
+  DELTA_KWH: 10,
+  DELTA_M3:  11,
+  MONTH_KWH: 12,
+  MONTH_M3:  13,
+  RATE:      14,
+  DONE:      15,
+  TOTAL:     16,
+  URGENT:    17,
+  NOTES:     18,
+  FOLDER:    19
 };
 const TOTAL_COLS = 19;
 // ──────────────────────────────────────────────────────────────────
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  MAIN ENTRY POINT
+//  ROUTER
 // ═══════════════════════════════════════════════════════════════════
+function doGet(e) {
+  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.2 — online' });
+}
+
 function doPost(e) {
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      throw new Error('No POST data received');
+    // ── Detect content type ────────────────────────────────────
+    // index.html v3.x sends a raw JSON body (no action param).
+    // Legacy / init / upload calls send FormData with an action param.
+    const rawBody  = (e && e.postData && e.postData.contents) ? e.postData.contents.trim() : '';
+    const isJson   = rawBody.startsWith('{') || rawBody.startsWith('[');
+    const actionParam = _getParam(e, 'action');
+
+    if (!isJson && actionParam === 'init')   return _handleInit(e);
+    if (!isJson && actionParam === 'upload') return _handleUpload(e);
+
+    // Full report submit ─────────────────────────────────────────
+    // Accept raw JSON body (current index.html) OR FormData payload= (legacy)
+    let payload;
+    if (isJson) {
+      payload = JSON.parse(rawBody);
+    } else {
+      const payloadStr = _getParam(e, 'payload');
+      if (!payloadStr) return _json({ result: 'error', message: 'No payload received' });
+      payload = JSON.parse(payloadStr);
     }
 
-    const payload = JSON.parse(e.postData.contents);
+    return _handleSubmit(payload);
 
-    // ── 1. Validate config ────────────────────────────────────
-    if (!DRIVE_FOLDER_ID || DRIVE_FOLDER_ID === 'YOUR_DRIVE_FOLDER_ID_HERE') {
-      throw new Error('DRIVE_FOLDER_ID is not configured. Please set it in Code.gs and redeploy.');
-    }
+  } catch (err) {
+    Logger.log('FATAL ERROR: ' + err.toString() + '\n' + (err.stack || ''));
+    return _json({ result: 'error', message: String(err.message || err), stack: err.stack || '' });
+  }
+}
 
-    // ── 2. Extract all fields ─────────────────────────────────
-    const formData         = payload.formData        || {};
-    const photos           = payload.photos          || {};
-    const sectionNames     = payload.sectionNames    || {};
-    const checklistDetails = payload.checklistDetails || [];
-    const calendarData     = payload.calendarData    || {};
-    const notesArr         = payload.allNotes        || payload.notesArr || [];
-    const urgentText       = payload.urgentItems     || payload.urgentText || '';
-    const emailSubject     = payload.emailSubject    || 'Cleaning Report – Cascade Bria';
-    const meta             = payload.meta            || {};
 
-    // ── 3. Meter readings — read from ALL possible locations ──
-    //       Priority order:
-    //         1. payload.electricReading      (top-level, set by index.html v3.1)
-    //         2. payload.meterReadings.electric.value (structured object)
-    //         3. formData.electricMeterReading (inside formData object)
-    //         4. 'Not recorded' fallback
-    const electricReading = String(
-      payload.electricReading
-      || (payload.meterReadings && payload.meterReadings.electric && payload.meterReadings.electric.value)
-      || formData.electricMeterReading
-      || formData['electricMeterReading']
-      || ''
-    ).trim() || 'Not recorded';
+// ═══════════════════════════════════════════════════════════════════
+//  ACTION: INIT — create dated photo subfolder in Drive
+// ═══════════════════════════════════════════════════════════════════
+function _handleInit(e) {
+  const unitName    = _sanitizeName(_getParam(e, 'unitName')    || 'Unknown Unit');
+  const cleanerName = _sanitizeName(_getParam(e, 'cleanerName') || 'Unknown Cleaner');
 
-    const waterReading = String(
-      payload.waterReading
-      || (payload.meterReadings && payload.meterReadings.water && payload.meterReadings.water.value)
-      || formData.waterMeterReading
-      || formData['waterMeterReading']
-      || ''
-    ).trim() || 'Not recorded';
+  const root    = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
+  const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const base    = dateStr + ' cleaning report photos - ' + unitName + ' - ' + cleanerName;
 
-    // ── 4. Other core fields ──────────────────────────────────
-    const cleaningDate = String(
-      payload.cleaningDate
-      || formData.cleaningDate
-      || ''
-    ).trim() || formatDate(new Date());
+  // Ensure unique folder name
+  let name = base, idx = 2;
+  while (root.getFoldersByName(name).hasNext()) { name = base + ' (' + idx + ')'; idx++; }
 
-    const cleanerName  = formData.cleanerName  || '—';
-    const unitName     = formData.unitName     || 'Cascade Bria';
-    const startTime    = formData.startTime    || '—';
-    const endTime      = formData.endTime      || '—';
-    const elapsedTime  = formData.elapsedTime  || '—';
+  const folder = root.createFolder(name);
+  Logger.log('Init: created folder "' + folder.getName() + '"');
+  return _json({
+    result:     'success',
+    folderId:   folder.getId(),
+    folderUrl:  folder.getUrl(),
+    folderName: folder.getName()
+  });
+}
 
-    // ── 5. Compute completion rate ────────────────────────────
-    const completionRate = Number(
-      payload.completionRate
-      || meta.rate
-      || meta.completionRate
-      || 0
-    );
-    const doneItems  = meta.doneItems  || 0;
-    const totalItems = meta.totalItems || 0;
 
-    // ── 6. Log everything for debugging ──────────────────────
-    Logger.log('=== CLEANING REPORT RECEIVED ===');
-    Logger.log('Cleaner:          ' + cleanerName);
-    Logger.log('Unit:             ' + unitName);
-    Logger.log('Date:             ' + cleaningDate);
-    Logger.log('Start Time:       ' + startTime);
-    Logger.log('End Time:         ' + endTime);
-    Logger.log('Electric Reading: ' + electricReading + ' kWh');
-    Logger.log('Water Reading:    ' + waterReading + ' m³');
-    Logger.log('Completion:       ' + completionRate + '%');
-    Logger.log('Subject:          ' + emailSubject);
-    Logger.log('Urgent text:      ' + (urgentText ? urgentText.substring(0, 100) : 'none'));
-    Logger.log('Photo sections:   ' + Object.keys(photos).join(', '));
-    Logger.log('FormData keys:    ' + Object.keys(formData).join(', '));
+// ═══════════════════════════════════════════════════════════════════
+//  ACTION: UPLOAD — save one photo into an existing Drive subfolder
+// ═══════════════════════════════════════════════════════════════════
+function _handleUpload(e) {
+  const folderId = _getParam(e, 'folderId');
+  const fileName = _getParam(e, 'fileName') || 'photo';
+  const mimeType = _getParam(e, 'mimeType') || _guessMimeType(fileName);
+  const fileData = _getParam(e, 'fileData');   // dataURL or raw base64
 
-    // ── 7. Upload photos to Google Drive ─────────────────────
-    const driveFolder  = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-    const dateStamp    = cleaningDate.replace(/-/g, '');
-    const reportFolder = driveFolder.createFolder(
-      dateStamp + '_' + cleanerName.replace(/\s+/g, '_')
-    );
+  if (!folderId || !fileData) {
+    return _json({ result: 'error', message: 'Missing folderId or fileData' });
+  }
 
-    const photoLinks = {};
+  const base64 = fileData.includes(',') ? fileData.split(',')[1] : fileData;
+  const bytes  = Utilities.base64Decode(base64);
+  const blob   = Utilities.newBlob(bytes, mimeType, fileName);
+  const folder = DriveApp.getFolderById(folderId);
+  const file   = folder.createFile(blob);
 
-    for (const sectionId in photos) {
-      const sectionPhotos = photos[sectionId];
-      if (!sectionPhotos || !sectionPhotos.length) continue;
+  Logger.log('Upload: saved "' + file.getName() + '" to folder ' + folderId);
+  return _json({
+    result:   'success',
+    fileId:   file.getId(),
+    fileUrl:  file.getUrl(),
+    fileName: file.getName()
+  });
+}
 
-      const sectionLabel = (sectionNames[sectionId] || sectionId)
-        .replace(/[^\w\s\-]/g, '').replace(/\s+/g, '_').trim();
 
-      const sectionFolder = reportFolder.createFolder(sectionLabel || sectionId);
-      photoLinks[sectionId] = [];
+// ═══════════════════════════════════════════════════════════════════
+//  ACTION: SUBMIT — full report → Sheet + Photos + Email + Calendar
+// ═══════════════════════════════════════════════════════════════════
+function _handleSubmit(payload) {
 
-      sectionPhotos.forEach(function(photo, i) {
-        if (!photo || !photo.data) return;
-        try {
-          const base64 = photo.data.replace(/^data:image\/\w+;base64,/, '');
-          const bytes  = Utilities.base64Decode(base64);
-          const blob   = Utilities.newBlob(bytes, 'image/jpeg', 'photo_' + (i + 1) + '.jpg');
-          const file   = sectionFolder.createFile(blob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          photoLinks[sectionId].push({
-            name: photo.name || ('Photo ' + (i + 1)),
-            url:  file.getUrl(),
-            sectionLabel: sectionNames[sectionId] || sectionId
-          });
-        } catch (photoErr) {
-          Logger.log('Photo upload error (section ' + sectionId + ', photo ' + i + '): ' + photoErr.toString());
-        }
-      });
-    }
+  const formData         = payload.formData        || {};
+  const photos           = payload.photos          || {};
+  const sectionNames     = payload.sectionNames    || {};
+  const checklistDetails = payload.checklistDetails || [];
+  const calendarData     = payload.calendarData    || {};
+  const notesArr         = payload.allNotes        || payload.notesArr || [];
+  const urgentText       = payload.urgentItems     || payload.urgentText || '';
+  const emailSubject     = payload.emailSubject    || 'Cleaning Report – Cascade Bria';
+  const meta             = payload.meta            || {};
 
-    // ── 8. Log to spreadsheet ─────────────────────────────────
-    logToSheet(
-      cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
-      electricReading, waterReading,
-      completionRate,
-      doneItems, totalItems,
-      urgentText,
-      notesArr.map(function(n) {
-        var prefix = n.isUrgent ? '[URGENT] ' : '';
-        return '[' + (n.section || '') + ']: ' + prefix + (n.text || '');
-      }).join('\n'),
-      reportFolder.getUrl()
-    );
+  // ── Meter readings — check every possible payload path ────
+  const electricReading = String(
+    payload.electricReading
+    || (payload.meterReadings && payload.meterReadings.electric && payload.meterReadings.electric.value)
+    || formData.electricMeterReading
+    || ''
+  ).trim() || 'Not recorded';
 
-    // ── 9. Build and send email ───────────────────────────────
-    const htmlEmail = buildEmailHtml({
-      cleaningDate:     cleaningDate,
-      cleanerName:      cleanerName,
-      unitName:         unitName,
-      startTime:        startTime,
-      endTime:          endTime,
-      elapsedTime:      elapsedTime,
-      electricReading:  electricReading,
-      waterReading:     waterReading,
-      rate:             completionRate,
-      done:             doneItems,
-      total:            totalItems,
-      urgentText:       urgentText,
-      notesArr:         notesArr,
-      photoLinks:       photoLinks,
-      sectionNames:     sectionNames,
-      checklistDetails: checklistDetails,
-      reportFolderUrl:  reportFolder.getUrl()
+  const waterReading = String(
+    payload.waterReading
+    || (payload.meterReadings && payload.meterReadings.water && payload.meterReadings.water.value)
+    || formData.waterMeterReading
+    || ''
+  ).trim() || 'Not recorded';
+
+  // ── Core form fields ───────────────────────────────────────
+  const cleaningDate = String(
+    payload.cleaningDate || formData.cleaningDate || ''
+  ).trim() || Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+
+  const cleanerName  = formData.cleanerName  || payload.cleanerName  || '—';
+  const unitName     = formData.unitName     || payload.unitName     || 'Cascade Bria';
+  const startTime    = formData.startTime    || '—';
+  const endTime      = formData.endTime      || '—';
+  const elapsedTime  = formData.elapsedTime  || '—';
+
+  const completionRate = Number(payload.completionRate || meta.rate || 0);
+  const doneItems      = Number(meta.doneItems  || 0);
+  const totalItems     = Number(meta.totalItems || 0);
+
+  // ── Debug log ──────────────────────────────────────────────
+  Logger.log('=== CLEANING REPORT RECEIVED ===');
+  Logger.log('Cleaner:    ' + cleanerName + ' | Unit: ' + unitName);
+  Logger.log('Date:       ' + cleaningDate);
+  Logger.log('Electric:   ' + electricReading + ' kWh');
+  Logger.log('Water:      ' + waterReading + ' m³');
+  Logger.log('Completion: ' + completionRate + '%');
+  Logger.log('Photos:     ' + Object.keys(photos).length + ' section(s)');
+
+  // ── Upload base64 photos to Drive ──────────────────────────
+  const driveRoot    = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
+  const dateStamp    = cleaningDate.replace(/-/g, '');
+  const reportFolder = driveRoot.createFolder(
+    dateStamp + '_' + _sanitizeName(cleanerName).replace(/\s+/g, '_')
+  );
+
+  const photoLinks = {};
+  for (const sectionId in photos) {
+    const sectionPhotos = photos[sectionId];
+    if (!sectionPhotos || !sectionPhotos.length) continue;
+
+    const rawLabel     = (sectionNames[sectionId] || sectionId).replace(/[^\w\s\-]/g, '').replace(/\s+/g, '_').trim();
+    const sectionFolder = reportFolder.createFolder(rawLabel || sectionId);
+    photoLinks[sectionId] = [];
+
+    sectionPhotos.forEach(function(photo, i) {
+      if (!photo || !photo.data) return;
+      try {
+        const base64 = photo.data.replace(/^data:image\/\w+;base64,/, '');
+        const bytes  = Utilities.base64Decode(base64);
+        const blob   = Utilities.newBlob(bytes, 'image/jpeg', 'photo_' + (i + 1) + '.jpg');
+        const file   = sectionFolder.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        photoLinks[sectionId].push({
+          name:         photo.name || ('Photo ' + (i + 1)),
+          url:          file.getUrl(),
+          sectionLabel: sectionNames[sectionId] || sectionId
+        });
+      } catch (photoErr) {
+        Logger.log('Photo error (' + sectionId + ' #' + i + '): ' + photoErr.toString());
+      }
     });
+  }
 
+  // ── Build notes text for the sheet cell ───────────────────
+  const notesText = notesArr.map(function(n) {
+    return '[' + (n.section || '') + ']: ' + (n.isUrgent ? '[URGENT] ' : '') + (n.text || '');
+  }).join('\n');
+
+  // ── Log to spreadsheet (includes delta + monthly tally) ───
+  _logToSheet(
+    cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
+    electricReading, waterReading,
+    completionRate, doneItems, totalItems,
+    urgentText, notesText,
+    reportFolder.getUrl()
+  );
+
+  // ── Build and send HTML email ──────────────────────────────
+  const htmlEmail = _buildEmailHtml({
+    cleaningDate, cleanerName, unitName, startTime, endTime, elapsedTime,
+    electricReading, waterReading,
+    rate: completionRate, done: doneItems, total: totalItems,
+    urgentText, notesArr, photoLinks, sectionNames, checklistDetails,
+    reportFolderUrl: reportFolder.getUrl()
+  });
+
+  if (EMAIL_RECIPIENTS && EMAIL_RECIPIENTS.trim()) {
     MailApp.sendEmail({
-      to:       RECIPIENT_EMAIL,
+      to:       EMAIL_RECIPIENTS,
       subject:  emailSubject,
       htmlBody: htmlEmail,
       name:     'Cascade Hideaway'
     });
-
-    Logger.log('Email sent to ' + RECIPIENT_EMAIL);
-
-    // ── 10. Add calendar event ────────────────────────────────
-    try {
-      if (calendarData && calendarData.startDateTime) {
-        const cal = CalendarApp.getCalendarById(CALENDAR_ID);
-        if (cal) {
-          cal.createEvent(
-            calendarData.summary || '🧹 Cleaning Report',
-            new Date(calendarData.startDateTime),
-            new Date(calendarData.endDateTime || calendarData.startDateTime),
-            { description: calendarData.description || '' }
-          );
-          Logger.log('Calendar event created: ' + (calendarData.summary || 'Cleaning Report'));
-        }
-      }
-    } catch (calErr) {
-      Logger.log('Calendar error (non-fatal): ' + calErr.toString());
-    }
-
-    Logger.log('=== REPORT PROCESSED SUCCESSFULLY ===');
-    return jsonResponse({ status: 'success', message: 'Report submitted successfully.' });
-
-  } catch (err) {
-    Logger.log('FATAL ERROR: ' + err.toString() + '\n' + (err.stack || ''));
-    return jsonResponse({ status: 'error', message: err.toString() });
+    Logger.log('Email sent to ' + EMAIL_RECIPIENTS);
   }
+
+  // ── Calendar event ─────────────────────────────────────────
+  try {
+    if (calendarData && calendarData.startDateTime) {
+      const cal = CalendarApp.getCalendarById(CALENDAR_ID);
+      if (cal) {
+        cal.createEvent(
+          calendarData.summary || '🧹 Cleaning Report',
+          new Date(calendarData.startDateTime),
+          new Date(calendarData.endDateTime || calendarData.startDateTime),
+          { description: calendarData.description || '' }
+        );
+        Logger.log('Calendar event: ' + (calendarData.summary || 'Cleaning Report'));
+      }
+    }
+  } catch (calErr) {
+    Logger.log('Calendar error (non-fatal): ' + calErr.toString());
+  }
+
+  Logger.log('=== REPORT PROCESSED SUCCESSFULLY ===');
+  // Return both "result" and "status" keys for compatibility with all index.html versions
+  return _json({ result: 'success', status: 'success', message: 'Report submitted successfully.' });
 }
 
 
 // ═══════════════════════════════════════════════════════════════════
 //  SPREADSHEET LOGGING  (v3.2)
 // ═══════════════════════════════════════════════════════════════════
-function logToSheet(
+function _logToSheet(
   cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
   electricReading, waterReading, rate, done, total,
   urgentText, notesText, folderUrl
 ) {
   try {
-    const ss  = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(SHEET_NAME);
+    // openById — required for standalone (non-bound) scripts
+    const ss    = SpreadsheetApp.openById(SHEET_ID);
+    let   sheet = ss.getSheetByName(SHEET_NAME);
 
-    // ── Create sheet + header if it doesn't exist ─────────────
+    // ── Auto-create sheet with v3.2 headers if absent ─────────
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
       sheet.appendRow([
-        'Timestamp',     'Cleaning Date',  'Property',       'Cleaner',
-        'Start Time',    'End Time',       'Elapsed',
-        'Electric (kWh)','Water (m³)',
-        '⚡ Δ kWh',      '💧 Δ m³',        '⚡ Month kWh',   '💧 Month m³',
-        'Completion %',  'Items Done',     'Total Items',
-        'Urgent Notes',  'General Notes',  'Photos Folder'
+        'Timestamp',      'Cleaning Date',  'Property',      'Cleaner',
+        'Start Time',     'End Time',       'Elapsed',
+        'Electric (kWh)', 'Water (m³)',
+        '⚡ Δ kWh',       '💧 Δ m³',        '⚡ Month kWh',  '💧 Month m³',
+        'Completion %',   'Items Done',     'Total Items',
+        'Urgent Notes',   'General Notes',  'Photos Folder'
       ]);
-      const hdr = sheet.getRange(1, 1, 1, TOTAL_COLS);
-      hdr.setFontWeight('bold')
-         .setBackground('#22333B')
-         .setFontColor('#FFFFFF');
+      sheet.getRange(1, 1, 1, TOTAL_COLS)
+           .setFontWeight('bold')
+           .setBackground('#22333B')
+           .setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
     }
 
-    // ── Parse current meter values to numbers (or null) ───────
-    const elecVal  = (electricReading !== 'Not recorded')
-      ? (parseFloat(electricReading) || null)
-      : null;
-    const waterVal = (waterReading !== 'Not recorded')
-      ? (parseFloat(waterReading) || null)
-      : null;
+    // ── Parse meter readings to numbers (null if unavailable) ─
+    const elecVal  = (electricReading !== 'Not recorded') ? (parseFloat(electricReading)  || null) : null;
+    const waterVal = (waterReading    !== 'Not recorded') ? (parseFloat(waterReading)     || null) : null;
 
-    // ── Compute Δ from the previous data row ──────────────────
-    // Falls back to '—' if either side is non-numeric.
-    const lastRow = sheet.getLastRow();   // row 1 = header
+    // ── Compute Δ vs the previous data row ────────────────────
+    // Produces '—' if either side is non-numeric (backwards-compat
+    // with old rows that have no meter data).
+    const lastRow = sheet.getLastRow();    // row 1 = header
     let deltaKwh  = '—';
     let deltaM3   = '—';
 
     if (lastRow >= 2) {
       const prevElec  = sheet.getRange(lastRow, COL.ELECTRIC).getValue();
       const prevWater = sheet.getRange(lastRow, COL.WATER).getValue();
-
       if (elecVal  !== null && typeof prevElec  === 'number') {
-        // toFixed(2) then *1 strips trailing zeros and keeps it a number
-        deltaKwh = +(Math.max(0, elecVal  - prevElec).toFixed(2));
+        deltaKwh = +(Math.max(0, elecVal  - prevElec ).toFixed(2));
       }
       if (waterVal !== null && typeof prevWater === 'number') {
         deltaM3  = +(Math.max(0, waterVal - prevWater).toFixed(3));
       }
     }
 
-    // ── Compute running monthly totals ────────────────────────
-    // Determine the month-year bucket for this new row.
+    // ── Determine the month-year bucket ───────────────────────
     let rowYear, rowMonth;
     try {
-      const parts = String(cleaningDate).split('-');
-      rowYear  = parseInt(parts[0]);
-      rowMonth = parseInt(parts[1]);
-    } catch(parseErr) {
+      const p  = String(cleaningDate).split('-');
+      rowYear  = parseInt(p[0]);
+      rowMonth = parseInt(p[1]);
+    } catch(_) {
       const now = new Date();
       rowYear   = now.getFullYear();
       rowMonth  = now.getMonth() + 1;
     }
 
+    // ── Compute running monthly totals ────────────────────────
+    // Sum Δ values from all existing rows in the same month-year,
+    // then add the current row's Δ on top.
     let monthKwh = '—';
     let monthM3  = '—';
 
-    // Sum Δ values from existing rows that share the same month-year,
-    // then add the current row's delta on top.
     if (lastRow >= 2) {
       const allData = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
       let sumKwh = 0, sumM3 = 0;
 
       allData.forEach(function(row) {
-        const cellDate = row[COL.DATE      - 1];   // col B (0-indexed)
-        const dKwh     = row[COL.DELTA_KWH - 1];   // col J
-        const dM3      = row[COL.DELTA_M3  - 1];   // col K
+        const cellDate = row[COL.DATE      - 1];
+        const dKwh     = row[COL.DELTA_KWH - 1];
+        const dM3      = row[COL.DELTA_M3  - 1];
 
         let yr, mo;
-        if (cellDate instanceof Date) {
+        if (cellDate instanceof Date && !isNaN(cellDate)) {
           yr = cellDate.getFullYear();
           mo = cellDate.getMonth() + 1;
         } else if (typeof cellDate === 'string' && cellDate.includes('-')) {
           const p = cellDate.split('-');
-          yr = parseInt(p[0]);
-          mo = parseInt(p[1]);
-        } else {
-          return;   // skip rows with unparseable dates
-        }
+          yr = parseInt(p[0]); mo = parseInt(p[1]);
+        } else { return; }
 
         if (yr === rowYear && mo === rowMonth) {
           if (typeof dKwh === 'number') sumKwh += dKwh;
@@ -377,44 +430,42 @@ function logToSheet(
       });
 
       if (typeof deltaKwh === 'number') monthKwh = +(sumKwh + deltaKwh).toFixed(2);
-      if (typeof deltaM3  === 'number') monthM3  = +(sumM3  + deltaM3).toFixed(3);
+      if (typeof deltaM3  === 'number') monthM3  = +(sumM3  + deltaM3 ).toFixed(3);
 
     } else {
-      // First ever data row — the delta IS the monthly total
+      // Very first data row — Δ equals monthly total
       if (typeof deltaKwh === 'number') monthKwh = deltaKwh;
       if (typeof deltaM3  === 'number') monthM3  = deltaM3;
     }
 
     // ── Append the new row ─────────────────────────────────────
     sheet.appendRow([
-      new Date(),                                          // A  Timestamp
-      cleaningDate,                                        // B  Cleaning Date
-      unitName,                                            // C  Property
-      cleanerName,                                         // D  Cleaner
-      startTime,                                           // E  Start Time
-      endTime,                                             // F  End Time
-      elapsedTime,                                         // G  Elapsed
-      elecVal  !== null ? elecVal  : electricReading,      // H  Electric (kWh)
-      waterVal !== null ? waterVal : waterReading,         // I  Water (m³)
-      deltaKwh,                                            // J  ⚡ Δ kWh
-      deltaM3,                                             // K  💧 Δ m³
-      monthKwh,                                            // L  ⚡ Month kWh
-      monthM3,                                             // M  💧 Month m³
-      rate + '%',                                          // N  Completion %
-      done,                                                // O  Items Done
-      total,                                               // P  Total Items
-      urgentText || '—',                                   // Q  Urgent Notes
-      notesText  || '—',                                   // R  General Notes
-      folderUrl  || '—'                                    // S  Photos Folder
+      new Date(),                                        // A  Timestamp
+      cleaningDate,                                      // B  Cleaning Date
+      unitName,                                          // C  Property
+      cleanerName,                                       // D  Cleaner
+      startTime,                                         // E  Start Time
+      endTime,                                           // F  End Time
+      elapsedTime,                                       // G  Elapsed
+      elecVal  !== null ? elecVal  : electricReading,    // H  Electric (kWh)
+      waterVal !== null ? waterVal : waterReading,       // I  Water (m³)
+      deltaKwh,                                          // J  ⚡ Δ kWh
+      deltaM3,                                           // K  💧 Δ m³
+      monthKwh,                                          // L  ⚡ Month kWh
+      monthM3,                                           // M  💧 Month m³
+      rate + '%',                                        // N  Completion %
+      done,                                              // O  Items Done
+      total,                                             // P  Total Items
+      urgentText || '—',                                 // Q  Urgent Notes
+      notesText  || '—',                                 // R  General Notes
+      folderUrl  || '—'                                  // S  Photos Folder
     ]);
 
-    // ── Auto-resize all columns ────────────────────────────────
     try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
-
-    Logger.log('Sheet row added to "' + SHEET_NAME + '"');
+    Logger.log('Sheet row appended.');
 
     // ── Refresh Monthly Summary tab ────────────────────────────
-    updateMonthlySummary();
+    _updateMonthlySummary(ss);
 
   } catch (sheetErr) {
     Logger.log('Sheet error (non-fatal): ' + sheetErr.toString());
@@ -425,321 +476,309 @@ function logToSheet(
 // ═══════════════════════════════════════════════════════════════════
 //  MONTHLY SUMMARY TAB  (v3.2)
 // ═══════════════════════════════════════════════════════════════════
-function updateMonthlySummary() {
+function _updateMonthlySummary(ssParam) {
   try {
-    const ss  = SpreadsheetApp.getActiveSpreadsheet();
+    const ss  = ssParam || SpreadsheetApp.openById(SHEET_ID);
     const src = ss.getSheetByName(SHEET_NAME);
     if (!src) return;
 
-    const SUMMARY_NAME = 'Monthly Summary';
-    let sum = ss.getSheetByName(SUMMARY_NAME);
-    if (!sum) {
-      sum = ss.insertSheet(SUMMARY_NAME);
-    }
+    let sum = ss.getSheetByName(MONTHLY_SUMMARY_NAME);
+    if (!sum) sum = ss.insertSheet(MONTHLY_SUMMARY_NAME);
     sum.clearContents();
 
-    // ── Header ─────────────────────────────────────────────────
+    // Header
     sum.appendRow([
-      'Month',
-      '⚡ kWh Consumed',
-      '💧 m³ Consumed',
-      '# of Cleans',
-      'Avg Completion %',
-      '🚨 Urgent Flags'
+      'Month', '⚡ kWh Consumed', '💧 m³ Consumed',
+      '# of Cleans', 'Avg Completion %', '🚨 Urgent Flags'
     ]);
-    const hdr = sum.getRange(1, 1, 1, 6);
-    hdr.setFontWeight('bold')
+    sum.getRange(1, 1, 1, 6)
+       .setFontWeight('bold')
        .setBackground('#22333B')
        .setFontColor('#FFFFFF');
     sum.setFrozenRows(1);
 
-    // ── Pull all data rows from Cleaning Reports ───────────────
     const lastRow = src.getLastRow();
-    if (lastRow < 2) {
-      Logger.log('Monthly Summary: no data rows yet.');
-      return;
-    }
+    if (lastRow < 2) return;
 
     const data = src.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
 
-    // ── Aggregate by YYYY-MM key ───────────────────────────────
-    // Structure: { 'YYYY-MM': { kwh, m3, cleans, rateSum, urgent } }
+    // Aggregate by YYYY-MM
     const months = {};
-
     data.forEach(function(row) {
-      const cellDate  = row[COL.DATE     - 1];    // B
-      const dKwh      = row[COL.DELTA_KWH - 1];   // J
-      const dM3       = row[COL.DELTA_M3  - 1];   // K
+      const cellDate  = row[COL.DATE      - 1];
+      const dKwh      = row[COL.DELTA_KWH - 1];
+      const dM3       = row[COL.DELTA_M3  - 1];
       const rateRaw   = String(row[COL.RATE   - 1] || '0').replace('%', '');
-      const urgentVal = String(row[COL.URGENT - 1] || '');
+      const urgentVal = String(row[COL.URGENT  - 1] || '');
 
-      // Parse date into year + month
       let yr, mo;
       if (cellDate instanceof Date && !isNaN(cellDate)) {
-        yr = cellDate.getFullYear();
-        mo = cellDate.getMonth() + 1;
+        yr = cellDate.getFullYear(); mo = cellDate.getMonth() + 1;
       } else if (typeof cellDate === 'string' && cellDate.includes('-')) {
-        const p = cellDate.split('-');
-        yr = parseInt(p[0]);
-        mo = parseInt(p[1]);
-      } else {
-        return;   // skip unparseable rows
-      }
+        const p = cellDate.split('-'); yr = parseInt(p[0]); mo = parseInt(p[1]);
+      } else { return; }
 
       const key = yr + '-' + String(mo).padStart(2, '0');
-
-      if (!months[key]) {
-        months[key] = { kwh: 0, m3: 0, cleans: 0, rateSum: 0, urgent: false };
-      }
-
+      if (!months[key]) months[key] = { kwh: 0, m3: 0, cleans: 0, rateSum: 0, urgent: false };
       const m = months[key];
       if (typeof dKwh === 'number') m.kwh += dKwh;
       if (typeof dM3  === 'number') m.m3  += dM3;
       m.cleans++;
       m.rateSum += parseFloat(rateRaw) || 0;
-      if (urgentVal && urgentVal !== '—' && urgentVal.trim() !== '') {
-        m.urgent = true;
-      }
+      if (urgentVal && urgentVal !== '—' && urgentVal.trim()) m.urgent = true;
     });
 
-    // ── Write rows in chronological order ─────────────────────
-    Object.keys(months).sort().forEach(function(key) {
-      const m      = months[key];
-      const parts  = key.split('-');
-      const label  = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
+    // Write rows chronologically with alternating row colours
+    Object.keys(months).sort().forEach(function(key, i) {
+      const m     = months[key];
+      const parts = key.split('-');
+      const label = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
         .toLocaleString('en-US', { month: 'long', year: 'numeric' });
-      const avgPct = m.cleans > 0
-        ? (m.rateSum / m.cleans).toFixed(1) + '%'
-        : '—';
+      const avgPct = m.cleans > 0 ? (m.rateSum / m.cleans).toFixed(1) + '%' : '—';
 
-      sum.appendRow([
-        label,                                     // Month
-        +m.kwh.toFixed(2),                         // ⚡ kWh Consumed
-        +m.m3.toFixed(3),                          // 💧 m³ Consumed
-        m.cleans,                                  // # of Cleans
-        avgPct,                                    // Avg Completion %
-        m.urgent ? '⚠️ Yes' : '✅ None'           // 🚨 Urgent Flags
-      ]);
+      sum.appendRow([label, +m.kwh.toFixed(2), +m.m3.toFixed(3), m.cleans, avgPct, m.urgent ? '⚠️ Yes' : '✅ None']);
+      sum.getRange(i + 2, 1, 1, 6).setBackground(i % 2 === 0 ? '#F5F3EF' : '#FFFFFF');
     });
-
-    // ── Style: alternating row colours ────────────────────────
-    const dataRows = Object.keys(months).length;
-    if (dataRows > 0) {
-      for (let r = 2; r <= dataRows + 1; r++) {
-        const bg = (r % 2 === 0) ? '#F5F3EF' : '#FFFFFF';
-        sum.getRange(r, 1, 1, 6).setBackground(bg);
-      }
-    }
 
     try { sum.autoResizeColumns(1, 6); } catch(e) {}
+    Logger.log('Monthly Summary: ' + Object.keys(months).length + ' month(s) written.');
 
-    Logger.log('Monthly Summary refreshed — ' + dataRows + ' month(s).');
-
-  } catch(summaryErr) {
-    Logger.log('Monthly Summary error (non-fatal): ' + summaryErr.toString());
+  } catch(e) {
+    Logger.log('Monthly Summary error (non-fatal): ' + e.toString());
   }
+}
+
+// Public wrapper — run from the editor at any time to force a rebuild
+function updateMonthlySummary() {
+  _updateMonthlySummary(null);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  MIGRATION — run ONCE to upgrade an existing sheet safely
+//
+//  Handles three starting states automatically:
+//    7 cols  (original schema)  → adds 12 cols, rewrites header
+//    15 cols (v3.1 schema)      → inserts 4 cols after Water, shifts right
+//    19 cols (v3.2 schema)      → nothing to do
+//
+//  HOW TO RUN:
+//    1. Open this script in the Apps Script editor
+//    2. Select "migrateSheetV32" in the function dropdown
+//    3. Click Run — check the Execution log for results
+// ═══════════════════════════════════════════════════════════════════
+function migrateSheetV32() {
+  const ss    = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+
+  if (!sheet) {
+    Logger.log('Sheet "' + SHEET_NAME + '" not found — will be created on first submission.');
+    return;
+  }
+
+  const colCount = sheet.getLastColumn();
+  const rowCount = sheet.getLastRow();
+  Logger.log('Detected: ' + colCount + ' columns, ' + rowCount + ' rows.');
+
+  // Already at v3.2
+  if (colCount >= TOTAL_COLS) {
+    Logger.log('Already at v3.2 width (' + colCount + ' cols). Running Monthly Summary refresh only.');
+    _updateMonthlySummary(ss);
+    return;
+  }
+
+  // ── Original 7-column schema ──────────────────────────────
+  // Cols: Timestamp | Cleaner Name | Unit Name | Start Time | End Time | Report Summary | Photo Folder URL
+  if (colCount <= 8) {
+    Logger.log('Original schema detected. Expanding to 19 cols and rewriting header.');
+    const toAdd = TOTAL_COLS - colCount;
+    for (let i = 0; i < toAdd; i++) sheet.insertColumnAfter(colCount + i);
+
+    sheet.getRange(1, 1, 1, TOTAL_COLS).setValues([[
+      'Timestamp',      'Cleaning Date',  'Property',      'Cleaner',
+      'Start Time',     'End Time',       'Elapsed',
+      'Electric (kWh)', 'Water (m³)',
+      '⚡ Δ kWh',       '💧 Δ m³',        '⚡ Month kWh',  '💧 Month m³',
+      'Completion %',   'Items Done',     'Total Items',
+      'Urgent Notes',   'General Notes',  'Photos Folder'
+    ]]);
+
+    // Fill all new columns in existing data rows with '—'
+    if (rowCount > 1) {
+      sheet.getRange(2, colCount + 1, rowCount - 1, toAdd).setValue('—');
+    }
+    Logger.log('Original schema migrated. Columns A–G preserved; new columns ' + (colCount + 1) + '–19 added.');
+  }
+
+  // ── v3.1 15-column schema ─────────────────────────────────
+  // Old J–O = Completion%, Items Done, Total Items, Urgent, Notes, Folder
+  // Insert 4 cols after col I → shifts old J–O to N–S automatically
+  else if (colCount === 15) {
+    Logger.log('v3.1 schema detected. Inserting 4 new columns after Water (col I).');
+    for (let i = 0; i < 4; i++) sheet.insertColumnAfter(9);
+
+    sheet.getRange(1, COL.DELTA_KWH).setValue('⚡ Δ kWh');
+    sheet.getRange(1, COL.DELTA_M3 ).setValue('💧 Δ m³');
+    sheet.getRange(1, COL.MONTH_KWH).setValue('⚡ Month kWh');
+    sheet.getRange(1, COL.MONTH_M3 ).setValue('💧 Month m³');
+
+    if (rowCount > 1) {
+      sheet.getRange(2, COL.DELTA_KWH, rowCount - 1, 4).setValue('—');
+    }
+    Logger.log('v3.1 schema migrated. 4 new columns inserted after col I; old J–O shifted to N–S.');
+  }
+
+  else {
+    Logger.log('Unexpected column count: ' + colCount + '. Please inspect the sheet manually.');
+    return;
+  }
+
+  // Re-style header row
+  sheet.getRange(1, 1, 1, TOTAL_COLS)
+       .setFontWeight('bold')
+       .setBackground('#22333B')
+       .setFontColor('#FFFFFF');
+
+  try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
+
+  _updateMonthlySummary(ss);
+  Logger.log('✅ Migration complete. Deploy a NEW VERSION of this script before the next submission.');
 }
 
 
 // ═══════════════════════════════════════════════════════════════════
 //  EMAIL HTML BUILDER
 // ═══════════════════════════════════════════════════════════════════
-function buildEmailHtml(d) {
-  var rateColor = d.rate === 100 ? '#006B54' : d.rate >= 80 ? '#e07b00' : '#C1414D';
-  var dateStr   = d.cleaningDate ? formatReadableDate(d.cleaningDate) : d.cleaningDate;
+function _buildEmailHtml(d) {
+  const rateColor = d.rate === 100 ? '#006B54' : d.rate >= 80 ? '#e07b00' : '#C1414D';
+  const dateStr   = d.cleaningDate ? _formatReadableDate(d.cleaningDate) : d.cleaningDate;
 
-  // ── Urgent block ──────────────────────────────────────────────
-  var urgentBlock = '';
+  // Urgent block
+  let urgentBlock = '';
   if (d.urgentText) {
-    var urgentLines = d.urgentText.split('\n').filter(function(l) { return l.trim(); });
-    urgentBlock = '<div style="background:#fef0f1;border:2px solid #C1414D;border-radius:12px;'
-      + 'padding:1rem 1.25rem;margin-bottom:1.5rem;">'
+    const lines = d.urgentText.split('\n').filter(function(l) { return l.trim(); });
+    urgentBlock =
+      '<div style="background:#fef0f1;border:2px solid #C1414D;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">'
       + '<p style="font-weight:700;color:#C1414D;font-size:1.05em;margin:0 0 0.75rem;">🚨 URGENT — Action Required</p>'
-      + urgentLines.map(function(line) {
-          return '<div style="padding:0.35rem 0;border-bottom:1px solid #fde2e4;color:#5E503F;">'
-            + esc(line) + '</div>';
+      + lines.map(function(l) {
+          return '<div style="padding:0.35rem 0;border-bottom:1px solid #fde2e4;color:#5E503F;">' + _esc(l) + '</div>';
         }).join('')
       + '</div>';
   }
 
-  // ── Notes block ───────────────────────────────────────────────
-  var notesBlock = '';
-  var regularNotes = (d.notesArr || []).filter(function(n) { return !n.isUrgent; });
+  // Notes block
+  let notesBlock = '';
+  const regularNotes = (d.notesArr || []).filter(function(n) { return !n.isUrgent; });
   if (regularNotes.length) {
-    notesBlock = '<div style="background:#f9f8f5;border:1px solid #DCD4CA;border-radius:10px;'
-      + 'padding:1rem 1.25rem;margin-bottom:1.5rem;">'
+    notesBlock =
+      '<div style="background:#f9f8f5;border:1px solid #DCD4CA;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;">'
       + '<p style="font-weight:700;color:#22333B;margin:0 0 0.6rem;">📝 Notes</p>'
       + regularNotes.map(function(n) {
           return '<div style="padding:0.35rem 0;border-bottom:1px solid #eee;">'
-            + '<strong style="color:#22333B;">[' + esc(n.section || '') + ']:</strong> '
-            + '<span style="color:#5E503F;">' + esc(n.text || '') + '</span></div>';
+            + '<strong style="color:#22333B;">[' + _esc(n.section || '') + ']:</strong> '
+            + '<span style="color:#5E503F;">' + _esc(n.text || '') + '</span></div>';
         }).join('')
       + '</div>';
   }
 
-  // ── Photos block ──────────────────────────────────────────────
-  var photosBlock = '';
-  var hasSomePhotos = false;
-  for (var sid in d.photoLinks) {
-    var links = d.photoLinks[sid];
+  // Photos block
+  let photosBlock = '';
+  let hasPhotos   = false;
+  for (const sid in d.photoLinks) {
+    const links = d.photoLinks[sid];
     if (!links || !links.length) continue;
-    hasSomePhotos = true;
-    var label = (d.sectionNames[sid] || sid).replace(/[⚡💧🔍🛏️💧✨🧹👤📋⏳]/g, '').trim();
-    photosBlock += '<div style="margin-bottom:1.25rem;">'
-      + '<p style="font-weight:700;color:#22333B;font-size:0.82em;text-transform:uppercase;'
-      +    'letter-spacing:1px;margin:0 0 0.4rem;border-bottom:2px solid #EAE0D5;padding-bottom:0.3rem;">'
-      + '📂 ' + esc(label) + '</p>'
+    hasPhotos = true;
+    const label = (d.sectionNames[sid] || sid).replace(/[⚡💧🔍🛏️✨🧹👤📋⏳]/g, '').trim();
+    photosBlock +=
+      '<div style="margin-bottom:1.25rem;">'
+      + '<p style="font-weight:700;color:#22333B;font-size:0.82em;text-transform:uppercase;letter-spacing:1px;'
+      +   'margin:0 0 0.4rem;border-bottom:2px solid #EAE0D5;padding-bottom:0.3rem;">📂 ' + _esc(label) + '</p>'
       + '<ul style="list-style:none;padding:0;margin:0;">';
     links.forEach(function(photo, i) {
-      photosBlock += '<li style="margin-bottom:6px;">'
-        + '<a href="' + photo.url + '" style="color:#22333B;font-weight:600;text-decoration:underline;">'
-        + '📷 Photo ' + (i + 1) + ' — ' + esc(photo.name) + '</a></li>';
+      photosBlock += '<li style="margin-bottom:6px;"><a href="' + photo.url
+        + '" style="color:#22333B;font-weight:600;text-decoration:underline;">📷 Photo '
+        + (i + 1) + ' — ' + _esc(photo.name) + '</a></li>';
     });
     photosBlock += '</ul></div>';
   }
-  if (!hasSomePhotos) {
-    photosBlock = '<p style="color:#888;font-size:0.9em;">No photos were attached to this report.</p>';
-  }
+  if (!hasPhotos) photosBlock = '<p style="color:#888;font-size:0.9em;">No photos were attached.</p>';
 
-  // ── Checklist block ───────────────────────────────────────────
-  var checklistBlock = '';
+  // Checklist block
+  let checklistBlock = '';
   (d.checklistDetails || []).forEach(function(section) {
-    checklistBlock += '<h4 style="margin:1.2rem 0 0.4rem;color:#1e4739;font-size:0.95em;'
-      + 'border-bottom:1px solid #EAE0D5;padding-bottom:3px;">'
-      + esc(section.icon || '') + ' ' + esc(section.title) + '</h4>'
+    checklistBlock +=
+      '<h4 style="margin:1.2rem 0 0.4rem;color:#1e4739;font-size:0.95em;border-bottom:1px solid #EAE0D5;padding-bottom:3px;">'
+      + _esc(section.icon || '') + ' ' + _esc(section.title) + '</h4>'
       + '<ul style="list-style:none;padding-left:8px;margin:0;">';
     (section.items || []).forEach(function(item) {
-      var isUrgent = (item.text || '').indexOf('[URGENT]') !== -1;
-      var rowStyle = isUrgent
+      const urgent = (item.text || '').indexOf('[URGENT]') !== -1;
+      const s = urgent
         ? 'margin-bottom:4px;background:#fff5f5;padding:2px 6px;border-radius:4px;'
         : 'margin-bottom:4px;';
-      checklistBlock += '<li style="' + rowStyle + '">'
+      checklistBlock += '<li style="' + s + '">'
         + (item.checked ? '✅' : '<span style="color:#C1414D;">☐</span>')
-        + ' <span style="color:#333;">' + esc(item.text || '') + '</span></li>';
+        + ' <span style="color:#333;">' + _esc(item.text || '') + '</span></li>';
     });
     checklistBlock += '</ul>';
   });
 
-  // ── Full email HTML ───────────────────────────────────────────
   return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
     + '<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>'
     + '<body style="font-family:Arial,Helvetica,sans-serif;background:#f5f4f0;margin:0;padding:16px;">'
     + '<div style="max-width:660px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;'
-    +             'box-shadow:0 4px 18px rgba(0,0,0,0.1);">'
+    +   'box-shadow:0 4px 18px rgba(0,0,0,0.1);">'
 
-    // Header
+    // ── Header ────────────────────────────────────────────────
     + '<div style="background:linear-gradient(135deg,#22333B 0%,#5E503F 100%);padding:28px 24px;text-align:center;">'
     + '<h1 style="font-family:Georgia,serif;color:#ffffff;margin:0;font-size:1.7rem;letter-spacing:1px;">CASCADE HIDEAWAY</h1>'
     + '<p style="color:#EAE0D5;margin:6px 0 0;font-size:0.82rem;text-transform:uppercase;letter-spacing:2px;">Cleaning &amp; Turn-over Report</p>'
     + '</div>'
-
     + '<div style="padding:24px 28px;">'
 
-    // Summary table
-    + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;background:#f9f8f5;'
-    +         'border-radius:10px;overflow:hidden;border:1px solid #EAE0D5;">'
+    // ── Summary strip ─────────────────────────────────────────
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;background:#f9f8f5;border-radius:10px;overflow:hidden;border:1px solid #EAE0D5;">'
     + '<tr>'
-    + '  <td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;">'
-    + '    <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +          'text-transform:uppercase;letter-spacing:1px;">Property</span>'
-    + '    <strong style="color:#22333B;font-size:1em;">' + esc(d.unitName) + '</strong>'
-    + '  </td>'
-    + '  <td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;">'
-    + '    <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +          'text-transform:uppercase;letter-spacing:1px;">Cleaning Date</span>'
-    + '    <strong style="color:#22333B;font-size:1em;">' + esc(dateStr) + '</strong>'
-    + '  </td>'
-    + '</tr>'
-    + '<tr>'
-    + '  <td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;">'
-    + '    <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +          'text-transform:uppercase;letter-spacing:1px;">Cleaner</span>'
-    + '    <strong style="color:#22333B;font-size:1em;">' + esc(d.cleanerName) + '</strong>'
-    + '  </td>'
-    + '  <td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;">'
-    + '    <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +          'text-transform:uppercase;letter-spacing:1px;">Time</span>'
-    + '    <strong style="color:#22333B;font-size:1em;">'
-    +          esc(d.startTime) + ' → ' + esc(d.endTime)
-    +          (d.elapsedTime && d.elapsedTime !== '—' ? ' (' + esc(d.elapsedTime) + ')' : '')
-    +       '</strong>'
-    + '  </td>'
-    + '</tr>'
-    + '<tr>'
-    + '  <td style="padding:12px 14px;" colspan="2">'
-    + '    <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +          'text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Completion</span>'
-    + '    <strong style="color:' + rateColor + ';font-size:1.3em;">' + d.rate + '%</strong>'
-    + '    <span style="color:#888;font-size:0.85em;margin-left:6px;">'
-    +          '(' + d.done + ' / ' + d.total + ' items)'
-    +       '</span>'
-    + '  </td>'
-    + '</tr>'
-    + '</table>'
+    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Property</span><strong style="color:#22333B;">' + _esc(d.unitName) + '</strong></td>'
+    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Cleaning Date</span><strong style="color:#22333B;">' + _esc(dateStr) + '</strong></td>'
+    + '</tr><tr>'
+    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Cleaner</span><strong style="color:#22333B;">' + _esc(d.cleanerName) + '</strong></td>'
+    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Time</span><strong style="color:#22333B;">' + _esc(d.startTime) + ' → ' + _esc(d.endTime) + (d.elapsedTime && d.elapsedTime !== '—' ? ' (' + _esc(d.elapsedTime) + ')' : '') + '</strong></td>'
+    + '</tr><tr>'
+    + '<td style="padding:12px 14px;" colspan="2"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Completion</span><strong style="color:' + rateColor + ';font-size:1.3em;">' + d.rate + '%</strong><span style="color:#888;font-size:0.85em;margin-left:6px;">(' + d.done + ' / ' + d.total + ' items)</span></td>'
+    + '</tr></table>'
 
-    // Meter Readings
-    + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;'
-    +             'border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
-    + '  <p style="font-weight:700;color:#006B54;margin:0 0 12px;font-size:1em;">⚡💧 Meter Readings</p>'
-    + '  <table width="100%" cellpadding="0" cellspacing="0">'
-    + '  <tr>'
-    + '    <td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;'
-    +                'text-align:center;vertical-align:middle;">'
-    + '      <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +              'text-transform:uppercase;letter-spacing:1px;">⚡ Electric</span>'
-    + '      <span style="display:block;font-size:1.6em;font-weight:700;color:'
-    +              (d.electricReading === 'Not recorded' ? '#C1414D' : '#22333B')
-    +              ';margin-top:4px;">' + esc(d.electricReading) + '</span>'
-    + '      <span style="font-size:0.8em;color:#888;">kWh</span>'
-    + '    </td>'
-    + '    <td width="4%"></td>'
-    + '    <td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;'
-    +                'text-align:center;vertical-align:middle;">'
-    + '      <span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
-    +              'text-transform:uppercase;letter-spacing:1px;">💧 Water</span>'
-    + '      <span style="display:block;font-size:1.6em;font-weight:700;color:'
-    +              (d.waterReading === 'Not recorded' ? '#C1414D' : '#22333B')
-    +              ';margin-top:4px;">' + esc(d.waterReading) + '</span>'
-    + '      <span style="font-size:0.8em;color:#888;">m³</span>'
-    + '    </td>'
-    + '  </tr>'
-    + '  </table>'
-    + '</div>'
+    // ── Meter readings ────────────────────────────────────────
+    + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
+    + '<p style="font-weight:700;color:#006B54;margin:0 0 12px;font-size:1em;">⚡💧 Meter Readings</p>'
+    + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+    + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;">'
+    + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">⚡ Electric</span>'
+    + '<span style="display:block;font-size:1.6em;font-weight:700;color:' + (d.electricReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">' + _esc(d.electricReading) + '</span>'
+    + '<span style="font-size:0.8em;color:#888;">kWh</span></td>'
+    + '<td width="4%"></td>'
+    + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;">'
+    + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">💧 Water</span>'
+    + '<span style="display:block;font-size:1.6em;font-weight:700;color:' + (d.waterReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">' + _esc(d.waterReading) + '</span>'
+    + '<span style="font-size:0.8em;color:#888;">m³</span></td>'
+    + '</tr></table></div>'
 
-    // Urgent alerts
-    + urgentBlock
+    + urgentBlock + notesBlock
 
-    // Notes
-    + notesBlock
-
-    // Photos
-    + '<h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:16px;'
-    +     'margin:20px 0 12px;font-size:1.05em;">📸 Photos by Section</h3>'
+    + '<h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:16px;margin:20px 0 12px;font-size:1.05em;">📸 Photos by Section</h3>'
     + photosBlock
 
-    // Full checklist
-    + '<h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:16px;'
-    +     'margin:20px 0 6px;font-size:1.05em;">📋 Full Checklist Details</h3>'
+    + '<h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:16px;margin:20px 0 6px;font-size:1.05em;">📋 Full Checklist Details</h3>'
     + checklistBlock
 
-    // Report folder link
-    + '<p style="margin-top:20px;font-size:0.82em;color:#888;">'
-    + '  <a href="' + (d.reportFolderUrl || '#') + '" style="color:#22333B;">'
-    +       '📁 View All Photos in Drive</a>'
-    + '</p>'
-
+    + '<p style="margin-top:20px;font-size:0.82em;color:#888;"><a href="' + (d.reportFolderUrl || '#') + '" style="color:#22333B;">📁 View All Photos in Drive</a></p>'
     + '</div>'
 
-    // Footer
+    // ── Footer ────────────────────────────────────────────────
     + '<div style="background:#22333B;padding:16px;text-align:center;">'
-    + '  <p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.8em;">'
-    +       '✨ Cascade Hideaway Automated Report ✨</p>'
-    + '  <p style="color:rgba(255,255,255,0.4);margin:6px 0 0;font-size:0.72em;">'
-    +       'Generated: '
-    +       Utilities.formatDate(new Date(), 'Asia/Manila', "MMMM d, yyyy 'at' h:mm a z")
-    + '  </p>'
-    + '</div>'
-
+    + '<p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.8em;">✨ Cascade Hideaway Automated Report ✨</p>'
+    + '<p style="color:rgba(255,255,255,0.4);margin:6px 0 0;font-size:0.72em;">Generated: '
+    + Utilities.formatDate(new Date(), 'Asia/Manila', "MMMM d, yyyy 'at' h:mm a z")
+    + '</p></div>'
     + '</div></body></html>';
 }
 
@@ -747,29 +786,40 @@ function buildEmailHtml(d) {
 // ═══════════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════════
-function esc(str) {
-  return String(str || '—')
-    .replace(/&/g,  '&amp;')
-    .replace(/</g,  '&lt;')
-    .replace(/>/g,  '&gt;')
-    .replace(/"/g,  '&quot;');
+function _getParam(e, name) {
+  if (e && e.parameter  && name in e.parameter)  return e.parameter[name];
+  if (e && e.parameters && name in e.parameters && e.parameters[name].length)
+    return e.parameters[name][0];
+  return '';
 }
 
-function formatDate(d) {
-  return Utilities.formatDate(d, 'Asia/Manila', 'yyyy-MM-dd');
+function _guessMimeType(name) {
+  const n = (name || '').toLowerCase();
+  if (n.endsWith('.png'))  return 'image/png';
+  if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
+  if (n.endsWith('.webp')) return 'image/webp';
+  return 'application/octet-stream';
 }
 
-function formatReadableDate(iso) {
+function _sanitizeName(s) {
+  return String(s || '').replace(/[\\/:*?"<>|]/g, '').trim();
+}
+
+function _formatReadableDate(iso) {
   try {
-    var parts = iso.split('-');
-    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const p = iso.split('-');
+    const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
     return Utilities.formatDate(d, 'Asia/Manila', 'EEEE, MMMM d, yyyy');
-  } catch(e) {
-    return iso;
-  }
+  } catch(e) { return iso; }
 }
 
-function jsonResponse(obj) {
+function _esc(s) {
+  return String(s || '—').replace(/[&<>"']/g, function(c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+function _json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
@@ -777,90 +827,21 @@ function jsonResponse(obj) {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  MANUAL TRIGGER — run once to backfill headers if you already
-//  have a "Cleaning Reports" sheet from v3.1 with only 15 columns.
-//
-//  HOW TO USE:
-//    1. Open Apps Script editor
-//    2. Select this function from the dropdown
-//    3. Click Run → it adds the 4 new column headers in place
-//    4. Existing data rows will show "—" in the new columns (expected)
-//    5. Run updateMonthlySummary() next to build the summary tab
+//  TEST — writes a real row to the sheet + sends test email
+//  Select "testSubmit" and click Run from the editor
 // ═══════════════════════════════════════════════════════════════════
-function migrateHeadersV32() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) { Logger.log('Sheet "' + SHEET_NAME + '" not found.'); return; }
-
-  const lastCol = sheet.getLastColumn();
-  Logger.log('Current column count: ' + lastCol);
-
-  if (lastCol >= TOTAL_COLS) {
-    Logger.log('Headers already at v3.2 width (' + lastCol + ' cols). Nothing to do.');
-    return;
-  }
-
-  // Current v3.1 layout has 15 cols:
-  //   A-I same, J=Completion%, K=Items Done, L=Total Items,
-  //   M=Urgent Notes, N=General Notes, O=Photos Folder
-  //
-  // We need to INSERT 4 new cols after col I (Water) and shift J-O right.
-  // insertColumnAfter inserts a single blank column to the right of the given col.
-  // Insert from right-to-left so indices don't shift as we go.
-
-  if (lastCol === 15) {
-    // Insert 4 blank columns after column I (index 9) — do it 4 times
-    for (var i = 0; i < 4; i++) {
-      sheet.insertColumnAfter(9);
-    }
-
-    // Now write the new headers into J, K, L, M
-    sheet.getRange(1, COL.DELTA_KWH).setValue('⚡ Δ kWh');
-    sheet.getRange(1, COL.DELTA_M3 ).setValue('💧 Δ m³');
-    sheet.getRange(1, COL.MONTH_KWH).setValue('⚡ Month kWh');
-    sheet.getRange(1, COL.MONTH_M3 ).setValue('💧 Month m³');
-
-    // Re-style the full header row
-    const hdr = sheet.getRange(1, 1, 1, TOTAL_COLS);
-    hdr.setFontWeight('bold')
-       .setBackground('#22333B')
-       .setFontColor('#FFFFFF');
-
-    // Fill existing data rows with '—' for the 4 new cols
-    const dataRows = sheet.getLastRow() - 1;
-    if (dataRows > 0) {
-      const blankRange = sheet.getRange(2, COL.DELTA_KWH, dataRows, 4);
-      blankRange.setValue('—');
-    }
-
-    try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
-    Logger.log('Migration complete. 4 new columns inserted. Existing rows filled with "—".');
-
-    // Build the Monthly Summary tab (will only have data if Δ cols are numeric — they won't be yet)
-    updateMonthlySummary();
-    Logger.log('Run updateMonthlySummary() again after new submissions to see monthly data.');
-
-  } else {
-    Logger.log('Unexpected column count: ' + lastCol + '. Inspect sheet manually before migrating.');
-  }
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-//  TEST FUNCTION — run manually from Apps Script editor
-//  Verifies: meter readings appear in BOTH email blocks
-// ═══════════════════════════════════════════════════════════════════
-function testReport() {
-  var mockPayload = {
-    electricReading: '12345.6',
-    waterReading:    '789.1',
-    cleaningDate:    '2026-02-23',
-    completionRate:  100,
-    emailSubject:    '🧹 TEST Cleaning Report: Cascade Bria — Test Cleaner (2026-02-23)',
+function testSubmit() {
+  const today = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+  const result = _handleSubmit({
+    electricReading:  '12345.6',
+    waterReading:     '789.1',
+    cleaningDate:     today,
+    completionRate:   100,
+    emailSubject:     '🧹 TEST Report — Cascade Bria — ' + today,
     formData: {
       unitName:             'Cascade Bria',
       cleanerName:          'Test Cleaner',
-      cleaningDate:         '2026-02-23',
+      cleaningDate:         today,
       startTime:            '09:00',
       endTime:              '12:30',
       elapsedTime:          '03:30:00',
@@ -871,66 +852,21 @@ function testReport() {
       electric: { value: '12345.6', unit: 'kWh' },
       water:    { value: '789.1',   unit: 'm³'  }
     },
-    photos: {},
-    sectionNames: {
-      'section_1': '⚡💧 Record Meter Readings',
-      'section_2': '🔍 Get Ready & Check'
-    },
+    photos:          {},
+    sectionNames:    {},
     checklistDetails: [
       {
-        title: 'Record Meter Readings', icon: '⚡💧',
+        title: 'Test Section', icon: '🧪',
         items: [
-          { text: '⚡ Electric Meter Reading: 12345.6 kWh', checked: true },
-          { text: '💧 Water Meter Reading: 789.1 m³',      checked: true },
-          { text: 'Verify readings match the photos',       checked: true }
-        ]
-      },
-      {
-        title: 'Get Ready & Check', icon: '🔍',
-        items: [
-          { text: 'Gather all cleaning supplies',        checked: true },
-          { text: 'Open windows and turn on lights',     checked: true }
+          { text: 'Test item 1', checked: true },
+          { text: 'Test item 2', checked: true }
         ]
       }
     ],
     allNotes:    [],
     urgentItems: '',
-    meta: { rate: 100, doneItems: 5, totalItems: 5 }
-  };
-
-  Logger.log('--- TEST MODE ---');
-  Logger.log('Electric: ' + mockPayload.electricReading);
-  Logger.log('Water:    ' + mockPayload.waterReading);
-
-  var html = buildEmailHtml({
-    cleaningDate:     mockPayload.cleaningDate,
-    cleanerName:      mockPayload.formData.cleanerName,
-    unitName:         mockPayload.formData.unitName,
-    startTime:        mockPayload.formData.startTime,
-    endTime:          mockPayload.formData.endTime,
-    elapsedTime:      mockPayload.formData.elapsedTime,
-    electricReading:  mockPayload.electricReading,
-    waterReading:     mockPayload.waterReading,
-    rate:             mockPayload.meta.rate,
-    done:             mockPayload.meta.doneItems,
-    total:            mockPayload.meta.totalItems,
-    urgentText:       '',
-    notesArr:         [],
-    photoLinks:       {},
-    sectionNames:     mockPayload.sectionNames,
-    checklistDetails: mockPayload.checklistDetails,
-    reportFolderUrl:  ''
+    meta: { rate: 100, doneItems: 2, totalItems: 2 }
   });
-
-  MailApp.sendEmail({
-    to:       RECIPIENT_EMAIL,
-    subject:  mockPayload.emailSubject,
-    htmlBody: html,
-    name:     'Cascade Hideaway (TEST)'
-  });
-
-  Logger.log('TEST EMAIL SENT to ' + RECIPIENT_EMAIL);
-  Logger.log('✅ Verify email shows:');
-  Logger.log('   1. Meter Readings block: Electric=12345.6 kWh, Water=789.1 m³');
-  Logger.log('   2. Checklist section: Electric and Water items with actual values');
+  Logger.log('testSubmit result: ' + result.getContent());
+  Logger.log('✅ Check sheet and email inbox for the test row.');
 }

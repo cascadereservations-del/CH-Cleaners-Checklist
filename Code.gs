@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  *  CASCADE HIDEAWAY — Cleaning Report Apps Script
- *  Version: 3.1  |  Updated: 2026
+ *  Version: 3.2  |  Updated: 2026
  * ═══════════════════════════════════════════════════════════════════
  *
  *  SETUP STEPS:
@@ -13,6 +13,15 @@
  *       Who has access: Anyone
  *  5. Copy the deployment URL into SCRIPT_URL in index.html.
  *  6. On the first run, authorise the script when prompted.
+ *
+ *  CHANGELOG v3.2:
+ *  - New: Added ⚡ Δ kWh and 💧 Δ m³ delta columns (J, K)
+ *  - New: Added ⚡ Month kWh and 💧 Month m³ running totals (L, M)
+ *  - New: "Monthly Summary" sheet auto-refreshes on every submission
+ *  - New: COL constant map for maintainable column references
+ *  - Improved: Header expanded to 19 columns; autoResizeColumns updated
+ *  - Maintained: Full backward compatibility — old rows without meter
+ *                readings show "—" in delta columns, no errors thrown
  *
  *  CHANGELOG v3.1:
  *  - Fixed: Meter readings now reliably extracted from ALL payload paths
@@ -32,6 +41,42 @@ const CALENDAR_ID      = 'cascadereservations@gmail.com';
 // ──────────────────────────────────────────────────────────────────
 
 
+// ─── COLUMN MAP (v3.2) ────────────────────────────────────────────
+// Update this object if you ever insert/remove columns.
+// All other functions reference COL.* — never raw numbers.
+//
+//  A  Timestamp       B  Cleaning Date   C  Property
+//  D  Cleaner         E  Start Time      F  End Time
+//  G  Elapsed         H  Electric (kWh)  I  Water (m³)
+//  J  ⚡ Δ kWh        K  💧 Δ m³         L  ⚡ Month kWh
+//  M  💧 Month m³     N  Completion %    O  Items Done
+//  P  Total Items     Q  Urgent Notes    R  General Notes
+//  S  Photos Folder
+const COL = {
+  TIMESTAMP:  1,   // A
+  DATE:       2,   // B
+  PROPERTY:   3,   // C
+  CLEANER:    4,   // D
+  START:      5,   // E
+  END:        6,   // F
+  ELAPSED:    7,   // G
+  ELECTRIC:   8,   // H
+  WATER:      9,   // I
+  DELTA_KWH: 10,   // J
+  DELTA_M3:  11,   // K
+  MONTH_KWH: 12,   // L
+  MONTH_M3:  13,   // M
+  RATE:      14,   // N
+  DONE:      15,   // O
+  TOTAL:     16,   // P
+  URGENT:    17,   // Q
+  NOTES:     18,   // R
+  FOLDER:    19    // S
+};
+const TOTAL_COLS = 19;
+// ──────────────────────────────────────────────────────────────────
+
+
 // ═══════════════════════════════════════════════════════════════════
 //  MAIN ENTRY POINT
 // ═══════════════════════════════════════════════════════════════════
@@ -43,12 +88,12 @@ function doPost(e) {
 
     const payload = JSON.parse(e.postData.contents);
 
-    // ── 1. Validate config ────────────────────────────────────────
+    // ── 1. Validate config ────────────────────────────────────
     if (!DRIVE_FOLDER_ID || DRIVE_FOLDER_ID === 'YOUR_DRIVE_FOLDER_ID_HERE') {
       throw new Error('DRIVE_FOLDER_ID is not configured. Please set it in Code.gs and redeploy.');
     }
 
-    // ── 2. Extract all fields ─────────────────────────────────────
+    // ── 2. Extract all fields ─────────────────────────────────
     const formData         = payload.formData        || {};
     const photos           = payload.photos          || {};
     const sectionNames     = payload.sectionNames    || {};
@@ -59,7 +104,7 @@ function doPost(e) {
     const emailSubject     = payload.emailSubject    || 'Cleaning Report – Cascade Bria';
     const meta             = payload.meta            || {};
 
-    // ── 3. Meter readings — read from ALL possible locations ──────
+    // ── 3. Meter readings — read from ALL possible locations ──
     //       Priority order:
     //         1. payload.electricReading      (top-level, set by index.html v3.1)
     //         2. payload.meterReadings.electric.value (structured object)
@@ -81,7 +126,7 @@ function doPost(e) {
       || ''
     ).trim() || 'Not recorded';
 
-    // ── 4. Other core fields ──────────────────────────────────────
+    // ── 4. Other core fields ──────────────────────────────────
     const cleaningDate = String(
       payload.cleaningDate
       || formData.cleaningDate
@@ -94,7 +139,7 @@ function doPost(e) {
     const endTime      = formData.endTime      || '—';
     const elapsedTime  = formData.elapsedTime  || '—';
 
-    // ── 5. Compute completion rate ────────────────────────────────
+    // ── 5. Compute completion rate ────────────────────────────
     const completionRate = Number(
       payload.completionRate
       || meta.rate
@@ -104,7 +149,7 @@ function doPost(e) {
     const doneItems  = meta.doneItems  || 0;
     const totalItems = meta.totalItems || 0;
 
-    // ── 6. Log everything for debugging ──────────────────────────
+    // ── 6. Log everything for debugging ──────────────────────
     Logger.log('=== CLEANING REPORT RECEIVED ===');
     Logger.log('Cleaner:          ' + cleanerName);
     Logger.log('Unit:             ' + unitName);
@@ -119,7 +164,7 @@ function doPost(e) {
     Logger.log('Photo sections:   ' + Object.keys(photos).join(', '));
     Logger.log('FormData keys:    ' + Object.keys(formData).join(', '));
 
-    // ── 7. Upload photos to Google Drive ─────────────────────────
+    // ── 7. Upload photos to Google Drive ─────────────────────
     const driveFolder  = DriveApp.getFolderById(DRIVE_FOLDER_ID);
     const dateStamp    = cleaningDate.replace(/-/g, '');
     const reportFolder = driveFolder.createFolder(
@@ -157,7 +202,7 @@ function doPost(e) {
       });
     }
 
-    // ── 8. Log to spreadsheet ─────────────────────────────────────
+    // ── 8. Log to spreadsheet ─────────────────────────────────
     logToSheet(
       cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
       electricReading, waterReading,
@@ -171,7 +216,7 @@ function doPost(e) {
       reportFolder.getUrl()
     );
 
-    // ── 9. Build and send email ───────────────────────────────────
+    // ── 9. Build and send email ───────────────────────────────
     const htmlEmail = buildEmailHtml({
       cleaningDate:     cleaningDate,
       cleanerName:      cleanerName,
@@ -201,7 +246,7 @@ function doPost(e) {
 
     Logger.log('Email sent to ' + RECIPIENT_EMAIL);
 
-    // ── 10. Add calendar event ────────────────────────────────────
+    // ── 10. Add calendar event ────────────────────────────────
     try {
       if (calendarData && calendarData.startDateTime) {
         const cal = CalendarApp.getCalendarById(CALENDAR_ID);
@@ -230,7 +275,7 @@ function doPost(e) {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  SPREADSHEET LOGGING
+//  SPREADSHEET LOGGING  (v3.2)
 // ═══════════════════════════════════════════════════════════════════
 function logToSheet(
   cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
@@ -238,49 +283,260 @@ function logToSheet(
   urgentText, notesText, folderUrl
 ) {
   try {
-    const ss    = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet   = ss.getSheetByName(SHEET_NAME);
+    const ss  = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(SHEET_NAME);
 
+    // ── Create sheet + header if it doesn't exist ─────────────
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
       sheet.appendRow([
-        'Timestamp', 'Cleaning Date', 'Property', 'Cleaner',
-        'Start Time', 'End Time', 'Elapsed',
-        'Electric (kWh)', 'Water (m³)',
-        'Completion %', 'Items Done', 'Total Items',
-        'Urgent Notes', 'General Notes', 'Photos Folder'
+        'Timestamp',     'Cleaning Date',  'Property',       'Cleaner',
+        'Start Time',    'End Time',       'Elapsed',
+        'Electric (kWh)','Water (m³)',
+        '⚡ Δ kWh',      '💧 Δ m³',        '⚡ Month kWh',   '💧 Month m³',
+        'Completion %',  'Items Done',     'Total Items',
+        'Urgent Notes',  'General Notes',  'Photos Folder'
       ]);
-      const headerRange = sheet.getRange(1, 1, 1, 15);
-      headerRange.setFontWeight('bold')
-                 .setBackground('#22333B')
-                 .setFontColor('#FFFFFF');
+      const hdr = sheet.getRange(1, 1, 1, TOTAL_COLS);
+      hdr.setFontWeight('bold')
+         .setBackground('#22333B')
+         .setFontColor('#FFFFFF');
       sheet.setFrozenRows(1);
     }
 
+    // ── Parse current meter values to numbers (or null) ───────
+    const elecVal  = (electricReading !== 'Not recorded')
+      ? (parseFloat(electricReading) || null)
+      : null;
+    const waterVal = (waterReading !== 'Not recorded')
+      ? (parseFloat(waterReading) || null)
+      : null;
+
+    // ── Compute Δ from the previous data row ──────────────────
+    // Falls back to '—' if either side is non-numeric.
+    const lastRow = sheet.getLastRow();   // row 1 = header
+    let deltaKwh  = '—';
+    let deltaM3   = '—';
+
+    if (lastRow >= 2) {
+      const prevElec  = sheet.getRange(lastRow, COL.ELECTRIC).getValue();
+      const prevWater = sheet.getRange(lastRow, COL.WATER).getValue();
+
+      if (elecVal  !== null && typeof prevElec  === 'number') {
+        // toFixed(2) then *1 strips trailing zeros and keeps it a number
+        deltaKwh = +(Math.max(0, elecVal  - prevElec).toFixed(2));
+      }
+      if (waterVal !== null && typeof prevWater === 'number') {
+        deltaM3  = +(Math.max(0, waterVal - prevWater).toFixed(3));
+      }
+    }
+
+    // ── Compute running monthly totals ────────────────────────
+    // Determine the month-year bucket for this new row.
+    let rowYear, rowMonth;
+    try {
+      const parts = String(cleaningDate).split('-');
+      rowYear  = parseInt(parts[0]);
+      rowMonth = parseInt(parts[1]);
+    } catch(parseErr) {
+      const now = new Date();
+      rowYear   = now.getFullYear();
+      rowMonth  = now.getMonth() + 1;
+    }
+
+    let monthKwh = '—';
+    let monthM3  = '—';
+
+    // Sum Δ values from existing rows that share the same month-year,
+    // then add the current row's delta on top.
+    if (lastRow >= 2) {
+      const allData = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+      let sumKwh = 0, sumM3 = 0;
+
+      allData.forEach(function(row) {
+        const cellDate = row[COL.DATE      - 1];   // col B (0-indexed)
+        const dKwh     = row[COL.DELTA_KWH - 1];   // col J
+        const dM3      = row[COL.DELTA_M3  - 1];   // col K
+
+        let yr, mo;
+        if (cellDate instanceof Date) {
+          yr = cellDate.getFullYear();
+          mo = cellDate.getMonth() + 1;
+        } else if (typeof cellDate === 'string' && cellDate.includes('-')) {
+          const p = cellDate.split('-');
+          yr = parseInt(p[0]);
+          mo = parseInt(p[1]);
+        } else {
+          return;   // skip rows with unparseable dates
+        }
+
+        if (yr === rowYear && mo === rowMonth) {
+          if (typeof dKwh === 'number') sumKwh += dKwh;
+          if (typeof dM3  === 'number') sumM3  += dM3;
+        }
+      });
+
+      if (typeof deltaKwh === 'number') monthKwh = +(sumKwh + deltaKwh).toFixed(2);
+      if (typeof deltaM3  === 'number') monthM3  = +(sumM3  + deltaM3).toFixed(3);
+
+    } else {
+      // First ever data row — the delta IS the monthly total
+      if (typeof deltaKwh === 'number') monthKwh = deltaKwh;
+      if (typeof deltaM3  === 'number') monthM3  = deltaM3;
+    }
+
+    // ── Append the new row ─────────────────────────────────────
     sheet.appendRow([
-      new Date(),
-      cleaningDate,
-      unitName,
-      cleanerName,
-      startTime,
-      endTime,
-      elapsedTime,
-      electricReading !== 'Not recorded' ? parseFloat(electricReading) || electricReading : electricReading,
-      waterReading    !== 'Not recorded' ? parseFloat(waterReading)    || waterReading    : waterReading,
-      rate + '%',
-      done,
-      total,
-      urgentText  || '—',
-      notesText   || '—',
-      folderUrl   || '—'
+      new Date(),                                          // A  Timestamp
+      cleaningDate,                                        // B  Cleaning Date
+      unitName,                                            // C  Property
+      cleanerName,                                         // D  Cleaner
+      startTime,                                           // E  Start Time
+      endTime,                                             // F  End Time
+      elapsedTime,                                         // G  Elapsed
+      elecVal  !== null ? elecVal  : electricReading,      // H  Electric (kWh)
+      waterVal !== null ? waterVal : waterReading,         // I  Water (m³)
+      deltaKwh,                                            // J  ⚡ Δ kWh
+      deltaM3,                                             // K  💧 Δ m³
+      monthKwh,                                            // L  ⚡ Month kWh
+      monthM3,                                             // M  💧 Month m³
+      rate + '%',                                          // N  Completion %
+      done,                                                // O  Items Done
+      total,                                               // P  Total Items
+      urgentText || '—',                                   // Q  Urgent Notes
+      notesText  || '—',                                   // R  General Notes
+      folderUrl  || '—'                                    // S  Photos Folder
     ]);
 
-    // Auto-resize columns
-    try { sheet.autoResizeColumns(1, 15); } catch(e) {}
+    // ── Auto-resize all columns ────────────────────────────────
+    try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
 
     Logger.log('Sheet row added to "' + SHEET_NAME + '"');
+
+    // ── Refresh Monthly Summary tab ────────────────────────────
+    updateMonthlySummary();
+
   } catch (sheetErr) {
     Logger.log('Sheet error (non-fatal): ' + sheetErr.toString());
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  MONTHLY SUMMARY TAB  (v3.2)
+// ═══════════════════════════════════════════════════════════════════
+function updateMonthlySummary() {
+  try {
+    const ss  = SpreadsheetApp.getActiveSpreadsheet();
+    const src = ss.getSheetByName(SHEET_NAME);
+    if (!src) return;
+
+    const SUMMARY_NAME = 'Monthly Summary';
+    let sum = ss.getSheetByName(SUMMARY_NAME);
+    if (!sum) {
+      sum = ss.insertSheet(SUMMARY_NAME);
+    }
+    sum.clearContents();
+
+    // ── Header ─────────────────────────────────────────────────
+    sum.appendRow([
+      'Month',
+      '⚡ kWh Consumed',
+      '💧 m³ Consumed',
+      '# of Cleans',
+      'Avg Completion %',
+      '🚨 Urgent Flags'
+    ]);
+    const hdr = sum.getRange(1, 1, 1, 6);
+    hdr.setFontWeight('bold')
+       .setBackground('#22333B')
+       .setFontColor('#FFFFFF');
+    sum.setFrozenRows(1);
+
+    // ── Pull all data rows from Cleaning Reports ───────────────
+    const lastRow = src.getLastRow();
+    if (lastRow < 2) {
+      Logger.log('Monthly Summary: no data rows yet.');
+      return;
+    }
+
+    const data = src.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+
+    // ── Aggregate by YYYY-MM key ───────────────────────────────
+    // Structure: { 'YYYY-MM': { kwh, m3, cleans, rateSum, urgent } }
+    const months = {};
+
+    data.forEach(function(row) {
+      const cellDate  = row[COL.DATE     - 1];    // B
+      const dKwh      = row[COL.DELTA_KWH - 1];   // J
+      const dM3       = row[COL.DELTA_M3  - 1];   // K
+      const rateRaw   = String(row[COL.RATE   - 1] || '0').replace('%', '');
+      const urgentVal = String(row[COL.URGENT - 1] || '');
+
+      // Parse date into year + month
+      let yr, mo;
+      if (cellDate instanceof Date && !isNaN(cellDate)) {
+        yr = cellDate.getFullYear();
+        mo = cellDate.getMonth() + 1;
+      } else if (typeof cellDate === 'string' && cellDate.includes('-')) {
+        const p = cellDate.split('-');
+        yr = parseInt(p[0]);
+        mo = parseInt(p[1]);
+      } else {
+        return;   // skip unparseable rows
+      }
+
+      const key = yr + '-' + String(mo).padStart(2, '0');
+
+      if (!months[key]) {
+        months[key] = { kwh: 0, m3: 0, cleans: 0, rateSum: 0, urgent: false };
+      }
+
+      const m = months[key];
+      if (typeof dKwh === 'number') m.kwh += dKwh;
+      if (typeof dM3  === 'number') m.m3  += dM3;
+      m.cleans++;
+      m.rateSum += parseFloat(rateRaw) || 0;
+      if (urgentVal && urgentVal !== '—' && urgentVal.trim() !== '') {
+        m.urgent = true;
+      }
+    });
+
+    // ── Write rows in chronological order ─────────────────────
+    Object.keys(months).sort().forEach(function(key) {
+      const m      = months[key];
+      const parts  = key.split('-');
+      const label  = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
+        .toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      const avgPct = m.cleans > 0
+        ? (m.rateSum / m.cleans).toFixed(1) + '%'
+        : '—';
+
+      sum.appendRow([
+        label,                                     // Month
+        +m.kwh.toFixed(2),                         // ⚡ kWh Consumed
+        +m.m3.toFixed(3),                          // 💧 m³ Consumed
+        m.cleans,                                  // # of Cleans
+        avgPct,                                    // Avg Completion %
+        m.urgent ? '⚠️ Yes' : '✅ None'           // 🚨 Urgent Flags
+      ]);
+    });
+
+    // ── Style: alternating row colours ────────────────────────
+    const dataRows = Object.keys(months).length;
+    if (dataRows > 0) {
+      for (let r = 2; r <= dataRows + 1; r++) {
+        const bg = (r % 2 === 0) ? '#F5F3EF' : '#FFFFFF';
+        sum.getRange(r, 1, 1, 6).setBackground(bg);
+      }
+    }
+
+    try { sum.autoResizeColumns(1, 6); } catch(e) {}
+
+    Logger.log('Monthly Summary refreshed — ' + dataRows + ' month(s).');
+
+  } catch(summaryErr) {
+    Logger.log('Monthly Summary error (non-fatal): ' + summaryErr.toString());
   }
 }
 
@@ -421,9 +677,7 @@ function buildEmailHtml(d) {
     + '</tr>'
     + '</table>'
 
-    // ═══════════════════════════════════════
-    // METER READINGS — prominent section
-    // ═══════════════════════════════════════
+    // Meter Readings
     + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;'
     +             'border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
     + '  <p style="font-weight:700;color:#006B54;margin:0 0 12px;font-size:1em;">⚡💧 Meter Readings</p>'
@@ -523,12 +777,81 @@ function jsonResponse(obj) {
 
 
 // ═══════════════════════════════════════════════════════════════════
+//  MANUAL TRIGGER — run once to backfill headers if you already
+//  have a "Cleaning Reports" sheet from v3.1 with only 15 columns.
+//
+//  HOW TO USE:
+//    1. Open Apps Script editor
+//    2. Select this function from the dropdown
+//    3. Click Run → it adds the 4 new column headers in place
+//    4. Existing data rows will show "—" in the new columns (expected)
+//    5. Run updateMonthlySummary() next to build the summary tab
+// ═══════════════════════════════════════════════════════════════════
+function migrateHeadersV32() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) { Logger.log('Sheet "' + SHEET_NAME + '" not found.'); return; }
+
+  const lastCol = sheet.getLastColumn();
+  Logger.log('Current column count: ' + lastCol);
+
+  if (lastCol >= TOTAL_COLS) {
+    Logger.log('Headers already at v3.2 width (' + lastCol + ' cols). Nothing to do.');
+    return;
+  }
+
+  // Current v3.1 layout has 15 cols:
+  //   A-I same, J=Completion%, K=Items Done, L=Total Items,
+  //   M=Urgent Notes, N=General Notes, O=Photos Folder
+  //
+  // We need to INSERT 4 new cols after col I (Water) and shift J-O right.
+  // insertColumnAfter inserts a single blank column to the right of the given col.
+  // Insert from right-to-left so indices don't shift as we go.
+
+  if (lastCol === 15) {
+    // Insert 4 blank columns after column I (index 9) — do it 4 times
+    for (var i = 0; i < 4; i++) {
+      sheet.insertColumnAfter(9);
+    }
+
+    // Now write the new headers into J, K, L, M
+    sheet.getRange(1, COL.DELTA_KWH).setValue('⚡ Δ kWh');
+    sheet.getRange(1, COL.DELTA_M3 ).setValue('💧 Δ m³');
+    sheet.getRange(1, COL.MONTH_KWH).setValue('⚡ Month kWh');
+    sheet.getRange(1, COL.MONTH_M3 ).setValue('💧 Month m³');
+
+    // Re-style the full header row
+    const hdr = sheet.getRange(1, 1, 1, TOTAL_COLS);
+    hdr.setFontWeight('bold')
+       .setBackground('#22333B')
+       .setFontColor('#FFFFFF');
+
+    // Fill existing data rows with '—' for the 4 new cols
+    const dataRows = sheet.getLastRow() - 1;
+    if (dataRows > 0) {
+      const blankRange = sheet.getRange(2, COL.DELTA_KWH, dataRows, 4);
+      blankRange.setValue('—');
+    }
+
+    try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
+    Logger.log('Migration complete. 4 new columns inserted. Existing rows filled with "—".');
+
+    // Build the Monthly Summary tab (will only have data if Δ cols are numeric — they won't be yet)
+    updateMonthlySummary();
+    Logger.log('Run updateMonthlySummary() again after new submissions to see monthly data.');
+
+  } else {
+    Logger.log('Unexpected column count: ' + lastCol + '. Inspect sheet manually before migrating.');
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  TEST FUNCTION — run manually from Apps Script editor
 //  Verifies: meter readings appear in BOTH email blocks
 // ═══════════════════════════════════════════════════════════════════
 function testReport() {
   var mockPayload = {
-    // ← Top-level meter fields (most reliable path)
     electricReading: '12345.6',
     waterReading:    '789.1',
     cleaningDate:    '2026-02-23',
@@ -565,12 +888,12 @@ function testReport() {
       {
         title: 'Get Ready & Check', icon: '🔍',
         items: [
-          { text: 'Gather all cleaning supplies', checked: true },
-          { text: 'Open windows and turn on lights', checked: true }
+          { text: 'Gather all cleaning supplies',        checked: true },
+          { text: 'Open windows and turn on lights',     checked: true }
         ]
       }
     ],
-    allNotes:   [],
+    allNotes:    [],
     urgentItems: '',
     meta: { rate: 100, doneItems: 5, totalItems: 5 }
   };

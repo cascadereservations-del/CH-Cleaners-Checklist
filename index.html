@@ -446,7 +446,6 @@ textarea:focus { outline: none; border-color: var(--accent-gold); box-shadow: 0 
     border: 1.5px solid var(--border); border-radius: 8px;
     font-family: 'Courier New', monospace; font-weight: 700; font-size: 1em;
     text-align: right; transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    /* Hide number spinners for cleaner look */
     -moz-appearance: textfield;
 }
 .meter-input::-webkit-outer-spin-button,
@@ -486,6 +485,29 @@ textarea:focus { outline: none; border-color: var(--accent-gold); box-shadow: 0 
     font-size: 0.78em; font-weight: 700;
     color: var(--text-secondary); white-space: nowrap;
 }
+
+/* ── Water meter decimal hint ─────────────────────────────── */
+.water-decimal-hint {
+    margin-top: 10px;
+    padding: 9px 11px;
+    background: #fffbea;
+    border: 1px solid #f6d860;
+    border-radius: 8px;
+    font-size: 0.81em;
+    line-height: 1.6;
+    color: #5a4b1a;
+}
+.water-decimal-hint strong { color: #7a5c00; }
+.water-decimal-hint code {
+    background: #fff3b0;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+    font-size: 1em;
+}
+.water-decimal-hint .red-digits { color: #c0392b; font-weight: 700; }
+/* ── end Water meter decimal hint ─────────────────────────── */
 
 @media (max-width: 560px) {
     .meter-cards-grid { grid-template-columns: 1fr; }
@@ -654,9 +676,6 @@ const CALENDAR_ID = "cascadereservations@gmail.com";
 // ═══════════════════════════════════════════════════════════════
 const checklistData = [
     // ── SECTION 0: Meter Readings ─────────────────────────────
-    // v3.4: replaced customFields with hasMeterPanel: true
-    // The 3-row UI (Previous / Current / Consumed) is rendered
-    // by generateHTML and populated by fetchLastReadings() on load.
     {
         title: "Record Meter Readings", icon: "⚡💧",
         description: "<strong>🎯 What we're doing:</strong> Record the latest electric and water meter readings and document them with photos.<br><br><strong>💡 Why it matters:</strong> Accurate readings prevent billing issues and help detect leaks or abnormal usage early.",
@@ -813,7 +832,6 @@ let isDirty = false;
 let elapsedTimer = null;
 
 // v3.4: stores last meter readings fetched from the sheet
-// { electric: number|null, water: number|null }
 let lastReadings = { electric: null, water: null };
 
 const cardContainer    = document.querySelector('.card-container');
@@ -911,19 +929,13 @@ function stopElapsedTimer() {
 window.addEventListener('beforeunload', stopElapsedTimer);
 
 // ═══════════════════════════════════════════════════════════════
-// METER READINGS HELPERS  (v3.4 — NEW)
+// METER READINGS HELPERS  (v3.4)
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Fetch the previous meter readings from the sheet via
- * GET ?action=lastReadings and populate the Previous fields.
- * Called once on DOMContentLoaded.
- */
 async function fetchLastReadings() {
     const statusEl = document.getElementById('meterFetchStatus');
     try {
         if (!SCRIPT_URL || SCRIPT_URL.includes('...')) {
-            // Script URL not configured yet — skip fetch silently
             if (statusEl) statusEl.classList.add('hidden');
             setMeterPreviousValues(null, null);
             return;
@@ -951,13 +963,6 @@ async function fetchLastReadings() {
     }
 }
 
-/**
- * Populate the Previous fields after a fetch (or set them to
- * empty/required when no prior data exists).
- * Fields remain editable so the cleaner can correct the value.
- * @param {number|null} electric
- * @param {number|null} water
- */
 function setMeterPreviousValues(electric, water) {
     _applyPrevField('prevElectricReading', 'prevElecLabel', electric);
     _applyPrevField('prevWaterReading',    'prevWaterLabel', water);
@@ -984,18 +989,9 @@ function _applyPrevField(inputId, labelId, value) {
     }
 }
 
-/**
- * Live-calculate consumption = Current − Previous for both meters.
- * Reads Previous directly from the (possibly manually edited) input field.
- * Called whenever any meter input changes.
- */
 function updateMeterConsumption() {
-    _calcConsumption(
-        'prevElectricReading', 'electricMeterReading', 'consumptionElectric', 2
-    );
-    _calcConsumption(
-        'prevWaterReading', 'waterMeterReading', 'consumptionWater', 3
-    );
+    _calcConsumption('prevElectricReading', 'electricMeterReading', 'consumptionElectric', 2);
+    _calcConsumption('prevWaterReading',    'waterMeterReading',    'consumptionWater',    3);
 }
 
 function _calcConsumption(prevId, curId, consId, decimals) {
@@ -1011,7 +1007,6 @@ function _calcConsumption(prevId, curId, consId, decimals) {
         const delta = +(cur - prev).toFixed(decimals);
         consEl.value = (delta >= 0 ? '+' : '') + delta;
         consEl.classList.toggle('negative', delta < 0);
-        // Visual feedback on current field if reading went backwards
         curEl.style.borderColor = delta < 0 ? 'var(--error)' : '';
     } else {
         consEl.value = '—';
@@ -1019,11 +1014,82 @@ function _calcConsumption(prevId, curId, consId, decimals) {
         curEl.style.borderColor = '';
     }
 
-    // Remove needs-input once the cleaner has typed something
     if (prevEl.value.trim()) {
         prevEl.classList.remove('needs-input');
         prevEl.classList.add('auto-filled');
     }
+}
+
+/**
+ * ── WATER DECIMAL AUTO-CORRECT (v3.4 addition) ──────────────────
+ *
+ * GSCWD meters display digits in two colours:
+ *   Black digits  = whole cubic metres  (e.g. 0003 7  →  37 m³)
+ *   Red digits    = decimal places      (e.g. 2 8 8   →  .288 m³)
+ *
+ * A common mistake is entering the meter face literally without the
+ * decimal point — e.g. typing 37288 instead of 37.288.
+ *
+ * Heuristic: if the entered value is ≥ 1000 AND is a whole integer
+ * (no decimal point typed), it is almost certainly missing the
+ * decimal separator. We prompt the cleaner to confirm the correction
+ * (divide by 1000) before committing it.
+ *
+ * Called on the 'blur' event of #waterMeterReading.
+ */
+function autoCorrectWaterReading() {
+    const inp = document.getElementById('waterMeterReading');
+    if (!inp || !inp.value.trim()) return;
+
+    const raw = parseFloat(inp.value);
+    if (isNaN(raw)) return;
+
+    // Only trigger when value is a whole number >= 1000
+    // (realistic m³ totals for a small unit are well under 9,999 m³)
+    if (raw >= 1000 && Number.isInteger(raw)) {
+        const corrected = +(raw / 1000).toFixed(3);
+        const confirmed = window.confirm(
+            '⚠️  Water reading looks like it may be missing a decimal point.\n\n' +
+            'You entered:        ' + raw + '\n' +
+            'Suggested value:  ' + corrected + ' m³\n\n' +
+            'On your GSCWD meter the LAST THREE digits printed in RED\n' +
+            'are decimals — not whole cubic metres.\n\n' +
+            'Example:  0003 7 | 2 8 8  →  enter 37.288\n\n' +
+            'Tap OK to use ' + corrected + ' m³, or Cancel to keep ' + raw + '.'
+        );
+        if (confirmed) {
+            inp.value = corrected;
+            updateMeterConsumption();
+        }
+    }
+}
+
+/**
+ * Validate that the water reading uses a decimal point.
+ * Called at submission time as a final safety net (in case the cleaner
+ * dismissed the blur prompt or the value was pasted programmatically).
+ * Returns true if the value is plausible, false + shows alert if not.
+ */
+function validateWaterReadingDecimal() {
+    const inp = document.getElementById('waterMeterReading');
+    if (!inp || !inp.value.trim()) return true; // blank handled elsewhere
+
+    const raw = parseFloat(inp.value);
+    if (isNaN(raw)) return true;
+
+    if (raw >= 1000 && Number.isInteger(raw)) {
+        const corrected = +(raw / 1000).toFixed(3);
+        showErrorModal(
+            'Water Reading Needs Decimal Point',
+            'The water reading you entered (' + raw + ') looks like it is missing a decimal.\n\n' +
+            'Your GSCWD meter\'s last three RED digits are decimals.\n' +
+            'Example: 0003 7 | 2 8 8  →  37.288 m³\n\n' +
+            'Please go back and correct the reading to ' + corrected + ' m³ before submitting.'
+        );
+        inp.focus();
+        return false;
+    }
+    return true;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1095,7 +1161,7 @@ function generateHTML(sections) {
                 </div>`;
             });
 
-            // ── v3.4: Meter Panel — renders 3-row Previous/Current/Consumed UI ──
+            // ── v3.4: Meter Panel ──────────────────────────────────────
             if (section.hasMeterPanel) {
                 cardsHTML += `
                 <div class="meter-panel">
@@ -1143,6 +1209,7 @@ function generateHTML(sections) {
                                 </div>
                             </div>
                         </div>
+
                         <!-- 💧 Water -->
                         <div class="meter-card">
                             <div class="meter-card-header">💧 Water Meter</div>
@@ -1181,11 +1248,18 @@ function generateHTML(sections) {
                                     <span class="meter-unit">m³</span>
                                 </div>
                             </div>
+                            <!-- ── Water decimal hint (v3.4 addition) ── -->
+                            <div class="water-decimal-hint">
+                                💡 <strong>Red digits = decimals!</strong><br>
+                                Your GSCWD meter shows <strong>black digits</strong> (whole m³)
+                                then <strong style="color:#c0392b;">red digits</strong> (decimal places).<br>
+                                Example: <code>0003 7 <span class="red-digits">2 8 8</span></code>
+                                → enter as <code>37.288</code>
+                            </div>
                         </div>
                     </div>
                 </div>`;
 
-            // ── Legacy: simple custom fields (kept for any future sections) ──
             } else if (section.customFields && section.customFields.length) {
                 cardsHTML += `<div class="info-field-grid">`;
                 section.customFields.forEach(f => {
@@ -1199,7 +1273,6 @@ function generateHTML(sections) {
                 cardsHTML += `</div>`;
             }
 
-            // Photos + notes block
             if (section.hasPhotos || section.hasNotes) {
                 cardsHTML += `<div class="pro-tip" style="background:var(--surface);border-color:var(--border);">`;
                 if (section.hasPhotos) {
@@ -1264,11 +1337,10 @@ function setupEventListeners(totalCards) {
         input.addEventListener('input', () => isDirty = true);
     });
 
-    // Start timer when start time changes
     const stEl = document.getElementById('startTime');
     if (stEl) stEl.addEventListener('change', () => startElapsedTimer());
 
-    // ── v3.4: live consumption recalculation on any meter input change ──
+    // ── v3.4: live consumption recalculation ──────────────────
     const elecInput  = document.getElementById('electricMeterReading');
     const waterInput = document.getElementById('waterMeterReading');
     const prevElec   = document.getElementById('prevElectricReading');
@@ -1277,6 +1349,9 @@ function setupEventListeners(totalCards) {
     if (waterInput) waterInput.addEventListener('input', updateMeterConsumption);
     if (prevElec)   prevElec.addEventListener('input',   updateMeterConsumption);
     if (prevWater)  prevWater.addEventListener('input',  updateMeterConsumption);
+
+    // ── v3.4 addition: auto-correct water decimal on blur ─────
+    if (waterInput) waterInput.addEventListener('blur', autoCorrectWaterReading);
 
     document.querySelectorAll('input[type="file"]').forEach(inp => {
         inp.addEventListener('change', handlePhotoUpload);
@@ -1289,7 +1364,6 @@ function setupEventListeners(totalCards) {
     });
     document.getElementById('error-modal-close').addEventListener('click', () => errorModal.style.display = 'none');
 
-    // Next button disable on first card until name filled
     const cn  = document.getElementById('cleanerName');
     const btn = document.getElementById('nextBtn');
     const updateNextDisabled = () => {
@@ -1532,13 +1606,11 @@ function applyDraft(draftData) {
     if (!document.getElementById('startTime').value) setStartTime();
     else startElapsedTimer();
     isDirty = false;
-
-    // v3.4: recalculate meter consumption after draft values are restored
     updateMeterConsumption();
 }
 
 // ═══════════════════════════════════════════════════════════════
-// EMAIL BUILDER — Generates rich HTML email for Apps Script
+// EMAIL BUILDER
 // ═══════════════════════════════════════════════════════════════
 function buildEmailHtml(data, checklistDetails, allPhotosData, allNotesArr, sectionNames) {
     const cleanerDate = formatDateReadable(data.cleaningDate) || data.cleaningDate || '';
@@ -1706,7 +1778,10 @@ function handleSubmission() {
         return;
     }
 
-    // ── v3.4: Warn if current < previous (meter may have been replaced) ──
+    // ── v3.4 addition: final decimal validation for water ──────
+    if (!validateWaterReadingDecimal()) return;
+
+    // ── v3.4: Warn if current < previous ──────────────────────
     const elecCurCheck   = parseFloat(document.getElementById('electricMeterReading')?.value);
     const waterCurCheck  = parseFloat(document.getElementById('waterMeterReading')?.value);
     const elecPrevCheck  = parseFloat(prevElecVal);
@@ -1779,12 +1854,11 @@ async function proceedWithSubmission() {
         data.endTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
         data.isWeekendCleaning = isWeekend();
 
-        // ── Meter readings (explicit) ───────────────────────────
         data.electricMeterReading = data.electricMeterReading || document.getElementById('electricMeterReading')?.value || '';
         data.waterMeterReading    = data.waterMeterReading    || document.getElementById('waterMeterReading')?.value    || '';
         data.cleaningDate         = data.cleaningDate         || document.getElementById('cleaningDate')?.value         || getTodayISO();
 
-        // ── v3.4: Pre-calculate deltas from the (possibly manually edited) prev fields ──
+        // ── v3.4: Pre-calculate deltas ─────────────────────────
         const prevElecInput  = parseFloat(document.getElementById('prevElectricReading')?.value);
         const prevWaterInput = parseFloat(document.getElementById('prevWaterReading')?.value);
         const elecCur  = parseFloat(data.electricMeterReading);
@@ -1796,7 +1870,7 @@ async function proceedWithSubmission() {
         const previousElectricReading = !isNaN(prevElecInput)  ? prevElecInput  : null;
         const previousWaterReading    = !isNaN(prevWaterInput) ? prevWaterInput : null;
 
-        // ── Build notes with section context ───────────────────
+        // ── Build notes ────────────────────────────────────────
         const allSectionsData = isWeekend()
             ? [...checklistData.slice(0, -1), weeklyMaintenanceData, checklistData[checklistData.length - 1]]
             : checklistData;
@@ -1813,8 +1887,7 @@ async function proceedWithSubmission() {
             allNotesArr.push({ section: title, text: value, isUrgent });
         });
 
-        // ── Checklist details ───────────────────────────────────
-        // v3.4: hasMeterPanel sections inject Previous→Current + Δ lines
+        // ── Checklist details ──────────────────────────────────
         const checklistDetails = allSectionsData.map(section => {
             const items = section.items.map(item => ({
                 text:    stripHTML(item.text),
@@ -1822,7 +1895,6 @@ async function proceedWithSubmission() {
             }));
 
             if (section.hasMeterPanel) {
-                // Inject labeled meter summary rows at the top of the section
                 const elecCurStr  = (document.getElementById('electricMeterReading')?.value || '').trim();
                 const waterCurStr = (document.getElementById('waterMeterReading')?.value    || '').trim();
                 const prevE = parseFloat(document.getElementById('prevElectricReading')?.value);
@@ -1848,7 +1920,6 @@ async function proceedWithSubmission() {
                 });
 
             } else if (section.customFields && section.customFields.length) {
-                // Legacy handler (kept for any future sections with customFields)
                 [...section.customFields].reverse().forEach(f => {
                     const val  = (document.getElementById(f.id)?.value || '').trim();
                     const unit = f.id.includes('electric') ? ' kWh' : f.id.includes('water') ? ' m³' : '';
@@ -1862,7 +1933,7 @@ async function proceedWithSubmission() {
             return { title: section.title, icon: section.icon || '', items };
         });
 
-        // ── Photos with section names ───────────────────────────
+        // ── Photos ─────────────────────────────────────────────
         const sectionNames = {};
         const finalPhotos  = {};
         allSectionsData.forEach((section, idx) => {
@@ -1871,13 +1942,9 @@ async function proceedWithSubmission() {
             finalPhotos[sid]  = (allPhotos[sid] || []).filter(Boolean);
         });
 
-        // ── Urgent items summary ────────────────────────────────
         const urgentItems = allNotesArr.filter(n => n.isUrgent).map(n => `[${n.section}] ${n.text}`).join('\n');
+        const emailHtml   = buildEmailHtml(data, checklistDetails, finalPhotos, allNotesArr, sectionNames);
 
-        // ── Email HTML ──────────────────────────────────────────
-        const emailHtml = buildEmailHtml(data, checklistDetails, finalPhotos, allNotesArr, sectionNames);
-
-        // ── Completion stats ────────────────────────────────────
         const total = checklistDetails.reduce((s, sec) => s + sec.items.length, 0);
         const done  = checklistDetails.reduce((s, sec) => s + sec.items.filter(i => i.checked).length, 0);
         const rate  = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -1894,7 +1961,6 @@ async function proceedWithSubmission() {
             ? `🚨 [URGENT] Cleaning Report: ${data.unitName} — ${data.cleanerName} (${data.cleaningDate})`
             : `🧹 Cleaning Report: ${data.unitName} — ${data.cleanerName} (${data.cleaningDate})`;
 
-        // ── Final payload — v3.4 includes pre-calculated deltas ─
         const payload = {
             formData: data,
             photos: finalPhotos,
@@ -1909,14 +1975,12 @@ async function proceedWithSubmission() {
                 electric: { value: data.electricMeterReading, unit: 'kWh' },
                 water:    { value: data.waterMeterReading,    unit: 'm³'  }
             },
-            // v3.4: pre-calculated values (Code.gs no longer scans the sheet)
             previousElectricReading,
             previousWaterReading,
             deltaKwh,
             deltaM3
         };
 
-        // ── Send to Apps Script ─────────────────────────────────
         const controller = new AbortController();
         const timeout    = setTimeout(() => controller.abort(), 45000);
 
@@ -1931,7 +1995,6 @@ async function proceedWithSubmission() {
         const result = await resp.json();
         if (result.status !== 'success') throw new Error(result.message || 'Script error');
 
-        // ── Success ─────────────────────────────────────────────
         submitMessageDiv.className = 'submit-message success';
         submitMessageDiv.textContent = '✅ Report submitted! Email and spreadsheet have been updated.';
         localStorage.removeItem('cleaningFormDraft');
@@ -1981,7 +2044,6 @@ function resetAll() {
         if (dateEl) dateEl.value = getTodayISO();
         window.scrollTo({ top: 0, behavior: 'smooth' });
         startElapsedTimer();
-        // v3.4: re-fetch last readings so new report starts fresh
         fetchLastReadings();
     } catch(e) { location.reload(); }
 }
@@ -2003,10 +2065,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateProgress();
     loadDraft();
 
-    // v3.4: fetch previous meter readings on load (non-blocking)
     fetchLastReadings();
 
-    // Save draft button
     const sdb = document.getElementById('saveDraftBtn');
     if (sdb) {
         sdb.addEventListener('click', () => {

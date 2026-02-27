@@ -1971,6 +1971,15 @@ async function proceedWithSubmission() {
             urgentItems,
             emailHtml,
             emailSubject,
+            // ── Completion stats — required by Code.gs _handleSubmit ──
+            // Without these, the sheet logs 0% / 0 / 0 regardless of
+            // how many checklist items were actually ticked.
+            completionRate: rate,
+            meta: {
+                rate,
+                doneItems:  done,
+                totalItems: total
+            },
             meterReadings: {
                 electric: { value: data.electricMeterReading, unit: 'kWh' },
                 water:    { value: data.waterMeterReading,    unit: 'm³'  }

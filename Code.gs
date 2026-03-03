@@ -305,6 +305,14 @@ function _handleSubmit(payload) {
   const deltaM3  = (typeof rawDeltaM3  === 'number' && !isNaN(rawDeltaM3))
     ? +(rawDeltaM3.toFixed(3))  : '—';
 
+  // ── v3.5: Guest stay info & avg consumption per day ─────────
+  const lastGuestName  = String(payload.lastGuestName  || formData.lastGuestName  || '—').trim() || '—';
+  const numberOfNights = Number(payload.numberOfNights || formData.numberOfNights || 0);
+  const avgKwhPerDay   = (typeof rawDeltaKwh === 'number' && !isNaN(rawDeltaKwh) && numberOfNights > 0)
+    ? +(rawDeltaKwh / numberOfNights).toFixed(2) : null;
+  const avgM3PerDay    = (typeof rawDeltaM3  === 'number' && !isNaN(rawDeltaM3)  && numberOfNights > 0)
+    ? +(rawDeltaM3  / numberOfNights).toFixed(3) : null;
+
   // ── Core form fields ────────────────────────────────────────
   const cleaningDate = String(
     payload.cleaningDate || formData.cleaningDate || ''
@@ -369,12 +377,21 @@ function _handleSubmit(payload) {
   }).join('\n');
 
   // ── Log to spreadsheet ──────────────────────────────────────
+  // v3.5: Prepend guest stay info to the General Notes column
+  const _guestInfoNote = (lastGuestName !== '—' || numberOfNights > 0)
+    ? 'Last Guest: ' + lastGuestName +
+      (numberOfNights > 0
+        ? ' (' + numberOfNights + ' night' + (numberOfNights !== 1 ? 's' : '') + ')'
+        : '')
+    : '';
+  const _fullNotesText = [_guestInfoNote, notesText].filter(Boolean).join('\n');
+
   _logToSheet(
     cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
     electricReading, waterReading,
     deltaKwh, deltaM3,
     completionRate, doneItems, totalItems,
-    urgentText, notesText,
+    urgentText, _fullNotesText,
     reportFolder.getUrl()
   );
 
@@ -383,6 +400,8 @@ function _handleSubmit(payload) {
     cleaningDate, cleanerName, unitName, startTime, endTime, elapsedTime,
     electricReading, waterReading,
     deltaKwh: deltaKwh, deltaM3: deltaM3,
+    avgKwhPerDay: avgKwhPerDay, avgM3PerDay: avgM3PerDay,
+    lastGuestName: lastGuestName, numberOfNights: numberOfNights,
     rate: completionRate, done: doneItems, total: totalItems,
     urgentText, notesArr, photoLinks, sectionNames, checklistDetails,
     reportFolderUrl: reportFolder.getUrl()
@@ -777,6 +796,9 @@ function _buildEmailHtml(d) {
   // Delta display helpers
   const fmtDeltaKwh = (typeof d.deltaKwh === 'number') ? '+' + d.deltaKwh.toFixed(2) + ' kWh' : '—';
   const fmtDeltaM3  = (typeof d.deltaM3  === 'number') ? '+' + d.deltaM3.toFixed(3)  + ' m³'  : '—';
+  // v3.5: avg per day (null when numberOfNights === 0)
+  const fmtAvgKwh   = (typeof d.avgKwhPerDay === 'number') ? d.avgKwhPerDay.toFixed(2) + ' kWh/night' : null;
+  const fmtAvgM3    = (typeof d.avgM3PerDay  === 'number') ? d.avgM3PerDay.toFixed(3)  + ' m³/night'  : null;
 
   // Urgent block
   let urgentBlock = '';
@@ -880,6 +902,7 @@ function _buildEmailHtml(d) {
     + '<span style="display:block;font-size:1.6em;font-weight:700;color:' + (d.electricReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">' + _esc(d.electricReading) + '</span>'
     + '<span style="font-size:0.8em;color:#888;">kWh</span>'
     + '<div style="margin-top:6px;font-size:0.82em;color:#006B54;font-weight:700;">' + _esc(fmtDeltaKwh) + ' this session</div>'
+    + (fmtAvgKwh ? '<div style="margin-top:3px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ' + _esc(fmtAvgKwh) + '</div>' : '')
     + '</td>'
     + '<td width="4%"></td>'
     + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;vertical-align:top;">'
@@ -887,6 +910,7 @@ function _buildEmailHtml(d) {
     + '<span style="display:block;font-size:1.6em;font-weight:700;color:' + (d.waterReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">' + _esc(d.waterReading) + '</span>'
     + '<span style="font-size:0.8em;color:#888;">m³</span>'
     + '<div style="margin-top:6px;font-size:0.82em;color:#006B54;font-weight:700;">' + _esc(fmtDeltaM3) + ' this session</div>'
+    + (fmtAvgM3 ? '<div style="margin-top:3px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ' + _esc(fmtAvgM3) + '</div>' : '')
     + '</td>'
     + '</tr></table></div>'
 

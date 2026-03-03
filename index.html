@@ -1102,6 +1102,7 @@ function generateHTML(sections) {
     sections.forEach((section, index) => {
         const sectionId = `section_${index}`;
         if (!section.isInfoCard) allPhotos[sectionId] = [];
+        if (section.hasMeterPanel) allPhotos['preclean'] = []; // v3.5
 
         const weeklyClass = section.title.includes('Weekly') ? 'weekly' : '';
         tabsHTML += `<div class="nav-tab ${weeklyClass}" data-index="${index}">
@@ -1164,6 +1165,55 @@ function generateHTML(sections) {
             // ── v3.4: Meter Panel ──────────────────────────────────────
             if (section.hasMeterPanel) {
                 cardsHTML += `
+                <!-- ── v3.5: Guest stay info ─────────────────────── -->
+                <div class="section-description" style="margin-bottom:1.25rem;">
+                    <strong>👤 Who was the last guest?</strong> Fill in the name and number of nights
+                    before recording meter readings — this lets us calculate average daily usage.
+                </div>
+                <div class="info-field-grid" style="margin-bottom:1.5rem;">
+                    <div class="info-field">
+                        <label for="lastGuestName">👤 Last Guest Name</label>
+                        <input type="text" id="lastGuestName" name="lastGuestName"
+                               placeholder="e.g. Juan Dela Cruz" autocomplete="off"
+                               style="font-size:16px;">
+                    </div>
+                    <div class="info-field">
+                        <label for="numberOfNights">🌙 Number of Nights Stayed</label>
+                        <input type="number" id="numberOfNights" name="numberOfNights"
+                               min="1" max="365" placeholder="e.g. 2"
+                               inputmode="numeric" style="font-size:16px;">
+                    </div>
+                </div>
+
+                <!-- ── v3.5: Pre-cleaning photos ─────────────────── -->
+                <div class="photo-upload" style="margin-bottom:1.5rem;
+                     border-color:var(--earthen-mocha);background:rgba(94,80,63,0.04);">
+                    <h4 style="color:var(--earthen-mocha);">
+                        📸 Pre-Cleaning Photos
+                        <span style="font-size:0.78em;font-weight:500;color:var(--text-secondary);">
+                            — document unit condition <em>before</em> cleaning
+                        </span>
+                    </h4>
+                    <div class="photo-hint">
+                        Take photos of <strong>every area</strong> before you start cleaning.
+                        This creates a time-stamped record of the unit's exact condition right
+                        after guest check-out. Cover: bedroom, bathroom, kitchen, living area,
+                        balcony, and any visible damage or mess. These protect everyone if a
+                        guest disputes damage charges.
+                    </div>
+                    <div class="photo-btn-group">
+                        <label for="camera_preclean" class="photo-upload-btn primary"
+                               style="background:linear-gradient(135deg,var(--earthen-mocha) 0%,#4a3d2f 100%);">📷 Camera</label>
+                        <input type="file" id="camera_preclean" accept="image/*"
+                               capture="environment" data-section-id="preclean">
+                        <label for="attach_preclean" class="photo-upload-btn"
+                               style="color:var(--earthen-mocha);border-color:var(--earthen-mocha);">📎 Attach</label>
+                        <input type="file" id="attach_preclean" accept="image/*"
+                               multiple data-section-id="preclean">
+                    </div>
+                    <div id="preview_preclean" class="photo-preview"></div>
+                </div>
+
                 <div class="meter-panel">
                     <div class="meter-fetch-status" id="meterFetchStatus">
                         <span class="mini-spinner"></span>
@@ -1701,6 +1751,16 @@ function buildEmailHtml(data, checklistDetails, allPhotosData, allNotesArr, sect
           </td>
         </tr>
         <tr>
+          <td style="padding:0.85rem 1rem;border-bottom:1px solid #EAE0D5;">
+            <span style="font-size:0.75em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Last Guest</span><br>
+            <strong style="color:#22333B;">${sanitizeHTML(data.lastGuestName || '—')}</strong>
+          </td>
+          <td style="padding:0.85rem 1rem;border-bottom:1px solid #EAE0D5;">
+            <span style="font-size:0.75em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Nights Stayed</span><br>
+            <strong style="color:#22333B;">${data.numberOfNights > 0 ? data.numberOfNights + ' night' + (data.numberOfNights !== 1 ? 's' : '') : '—'}</strong>
+          </td>
+        </tr>
+        <tr>
           <td style="padding:0.85rem 1rem;" colspan="2">
             <span style="font-size:0.75em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Completion Rate</span><br>
             <strong style="color:${rateColor};font-size:1.2em;">${completionRate}%</strong>
@@ -1717,6 +1777,7 @@ function buildEmailHtml(data, checklistDetails, allPhotosData, allNotesArr, sect
               <div style="font-size:1.5em;font-weight:700;color:#22333B;margin-top:0.25rem;">
                 ${sanitizeHTML(data.electricMeterReading || '—')} <span style="font-size:0.6em;color:#888;">kWh</span>
               </div>
+              ${data.avgKwhPerDay !== null ? `<div style="margin-top:4px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ${data.avgKwhPerDay} kWh/night</div>` : ''}
             </td>
             <td style="width:4%;"></td>
             <td style="padding:0.5rem;background:#fff;border-radius:8px;text-align:center;width:48%;">
@@ -1724,6 +1785,7 @@ function buildEmailHtml(data, checklistDetails, allPhotosData, allNotesArr, sect
               <div style="font-size:1.5em;font-weight:700;color:#22333B;margin-top:0.25rem;">
                 ${sanitizeHTML(data.waterMeterReading || '—')} <span style="font-size:0.6em;color:#888;">m³</span>
               </div>
+              ${data.avgM3PerDay !== null ? `<div style="margin-top:4px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ${data.avgM3PerDay} m³/night</div>` : ''}
             </td>
           </tr>
         </table>
@@ -1870,6 +1932,18 @@ async function proceedWithSubmission() {
         const previousElectricReading = !isNaN(prevElecInput)  ? prevElecInput  : null;
         const previousWaterReading    = !isNaN(prevWaterInput) ? prevWaterInput : null;
 
+        // v3.5: avg consumption per day
+        const _numNights    = Math.max(0, parseInt(data.numberOfNights || '0', 10));
+        const avgKwhPerDay  = (deltaKwh !== null && _numNights > 0)
+            ? +(deltaKwh / _numNights).toFixed(2) : null;
+        const avgM3PerDay   = (deltaM3  !== null && _numNights > 0)
+            ? +(deltaM3  / _numNights).toFixed(3) : null;
+        // Augment data so client-side email builder can render avg/day
+        data.avgKwhPerDay   = avgKwhPerDay;
+        data.avgM3PerDay    = avgM3PerDay;
+        data.lastGuestName  = (data.lastGuestName  || '').trim() || '—';
+        data.numberOfNights = _numNights;
+
         // ── Build notes ────────────────────────────────────────
         const allSectionsData = isWeekend()
             ? [...checklistData.slice(0, -1), weeklyMaintenanceData, checklistData[checklistData.length - 1]]
@@ -1941,6 +2015,9 @@ async function proceedWithSubmission() {
             sectionNames[sid] = `${section.icon || ''} ${section.title}`;
             finalPhotos[sid]  = (allPhotos[sid] || []).filter(Boolean);
         });
+        // v3.5: pre-cleaning photos
+        sectionNames['preclean'] = '📸 Pre-Cleaning (Unit Condition After Guest Check-Out)';
+        finalPhotos['preclean']  = (allPhotos['preclean'] || []).filter(Boolean);
 
         const urgentItems = allNotesArr.filter(n => n.isUrgent).map(n => `[${n.section}] ${n.text}`).join('\n');
         const emailHtml   = buildEmailHtml(data, checklistDetails, finalPhotos, allNotesArr, sectionNames);
@@ -1987,7 +2064,12 @@ async function proceedWithSubmission() {
             previousElectricReading,
             previousWaterReading,
             deltaKwh,
-            deltaM3
+            deltaM3,
+            // v3.5 additions
+            lastGuestName:  data.lastGuestName,
+            numberOfNights: data.numberOfNights,
+            avgKwhPerDay:   avgKwhPerDay,
+            avgM3PerDay:    avgM3PerDay
         };
 
         const controller = new AbortController();
@@ -2045,6 +2127,7 @@ function resetAll() {
         document.querySelectorAll('textarea, input[type="text"], input[type="number"], input[type="date"], input[type="time"]').forEach(el => { el.value = ''; });
         document.querySelectorAll('.photo-preview').forEach(n => n.innerHTML = '');
         for (const k in allPhotos) allPhotos[k] = [];
+        allPhotos['preclean'] = []; // v3.5
         updateProgress();
         const sm = document.getElementById('successModal');
         if (sm) sm.style.display = 'none';

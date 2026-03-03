@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  *  CASCADE HIDEAWAY — Cleaning Report Web App Backend
- *  Version: 3.4  |  Updated: 2026
+ *  Version: 3.5  |  Updated: 2026
  * ═══════════════════════════════════════════════════════════════════
  *
  *  SETUP STEPS:
@@ -15,7 +15,7 @@
  *  6. Copy the deployment URL into SCRIPT_URL in index.html.
  *  7. Authorise the script when prompted on the first run.
  *
- *  ── If upgrading from v3.3 ──────────────────────────────────────
+ *  ── If upgrading from v3.4 ──────────────────────────────────────
  *  Simply deploy a new version after pasting this file.
  *  Run testSubmit() once from the editor to re-authorise if needed.
  *  ────────────────────────────────────────────────────────────────
@@ -31,6 +31,12 @@
  *    POST action=init   → create dated subfolder
  *    POST action=upload → save one photo
  *    POST (default)     → full cleaning report → Sheet + Drive + Email
+ *
+ *  CHANGELOG v3.5:
+ *  - FIX: _buildEmailHtml() now renders Last Guest Name and
+ *         Number of Nights Stayed in the summary table.
+ *         Added _cell() helper for consistent table cell markup.
+ *         Updated testSubmit() to include lastGuestName / numberOfNights.
  *
  *  CHANGELOG v3.4:
  *  - NEW:  GET ?action=lastReadings — fast backwards scan for previous
@@ -109,7 +115,7 @@ function doGet(e) {
     return _handleLastReadings();
   }
 
-  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.4 — online' });
+  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.5 — online' });
 }
 
 function doPost(e) {
@@ -328,9 +334,10 @@ function _handleSubmit(payload) {
   const doneItems      = Number(meta.doneItems  || 0);
   const totalItems     = Number(meta.totalItems || 0);
 
-  Logger.log('=== CLEANING REPORT RECEIVED (v3.4) ===');
+  Logger.log('=== CLEANING REPORT RECEIVED (v3.5) ===');
   Logger.log('Cleaner:    ' + cleanerName + ' | Unit: ' + unitName);
   Logger.log('Date:       ' + cleaningDate);
+  Logger.log('Last Guest: ' + lastGuestName + ' | Nights: ' + numberOfNights);
   Logger.log('Electric:   ' + electricReading + ' kWh  |  Δ: ' + deltaKwh);
   Logger.log('Water:      ' + waterReading + ' m³    |  Δ: ' + deltaM3);
   Logger.log('Completion: ' + completionRate + '%');
@@ -435,7 +442,7 @@ function _handleSubmit(payload) {
     Logger.log('Calendar error (non-fatal): ' + calErr.toString());
   }
 
-  Logger.log('=== REPORT PROCESSED SUCCESSFULLY (v3.4) ===');
+  Logger.log('=== REPORT PROCESSED SUCCESSFULLY (v3.5) ===');
   return _json({ result: 'success', status: 'success', message: 'Report submitted successfully.' });
 }
 
@@ -576,7 +583,7 @@ function _logToSheet(
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  MONTHLY SUMMARY TAB  (v3.3 / unchanged in v3.4)
+//  MONTHLY SUMMARY TAB  (v3.3 / unchanged in v3.4 / unchanged in v3.5)
 //  FIX: All appendRow() replaced with getRange().setValues()
 // ═══════════════════════════════════════════════════════════════════
 function _updateMonthlySummary(ssParam) {
@@ -788,6 +795,10 @@ function migrateSheetV32() {
 
 // ═══════════════════════════════════════════════════════════════════
 //  EMAIL HTML BUILDER
+//
+//  v3.5 FIX: Added Last Guest Name and Number of Nights Stayed rows
+//            to the summary table. Added _cell() inner helper for
+//            consistent two-column cell markup.
 // ═══════════════════════════════════════════════════════════════════
 function _buildEmailHtml(d) {
   const rateColor = d.rate === 100 ? '#006B54' : d.rate >= 80 ? '#e07b00' : '#C1414D';
@@ -799,6 +810,20 @@ function _buildEmailHtml(d) {
   // v3.5: avg per day (null when numberOfNights === 0)
   const fmtAvgKwh   = (typeof d.avgKwhPerDay === 'number') ? d.avgKwhPerDay.toFixed(2) + ' kWh/night' : null;
   const fmtAvgM3    = (typeof d.avgM3PerDay  === 'number') ? d.avgM3PerDay.toFixed(3)  + ' m³/night'  : null;
+
+  // v3.5: nights label
+  const nightsLabel = (d.numberOfNights && d.numberOfNights > 0)
+    ? d.numberOfNights + ' night' + (d.numberOfNights !== 1 ? 's' : '')
+    : '—';
+
+  // ── Inner helper: one 50%-wide table cell ──────────────────
+  function _cell(label, value) {
+    return '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;vertical-align:top;">'
+      + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
+      + 'text-transform:uppercase;letter-spacing:1px;">' + label + '</span>'
+      + '<strong style="color:#22333B;">' + value + '</strong>'
+      + '</td>';
+  }
 
   // Urgent block
   let urgentBlock = '';
@@ -875,46 +900,74 @@ function _buildEmailHtml(d) {
     + '<div style="max-width:660px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;'
     +   'box-shadow:0 4px 18px rgba(0,0,0,0.1);">'
 
+    // ── Email header banner ────────────────────────────────────
     + '<div style="background:linear-gradient(135deg,#22333B 0%,#5E503F 100%);padding:28px 24px;text-align:center;">'
     + '<h1 style="font-family:Georgia,serif;color:#ffffff;margin:0;font-size:1.7rem;letter-spacing:1px;">CASCADE HIDEAWAY</h1>'
     + '<p style="color:#EAE0D5;margin:6px 0 0;font-size:0.82rem;text-transform:uppercase;letter-spacing:2px;">Cleaning &amp; Turn-over Report</p>'
     + '</div>'
     + '<div style="padding:24px 28px;">'
 
-    // Summary table
-    + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;background:#f9f8f5;border-radius:10px;overflow:hidden;border:1px solid #EAE0D5;">'
+    // ── Summary table ──────────────────────────────────────────
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;background:#f9f8f5;'
+    +   'border-radius:10px;overflow:hidden;border:1px solid #EAE0D5;">'
+    // Row 1: Property | Cleaning Date
     + '<tr>'
-    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Property</span><strong style="color:#22333B;">' + _esc(d.unitName) + '</strong></td>'
-    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Cleaning Date</span><strong style="color:#22333B;">' + _esc(dateStr) + '</strong></td>'
-    + '</tr><tr>'
-    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Cleaner</span><strong style="color:#22333B;">' + _esc(d.cleanerName) + '</strong></td>'
-    + '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">Time</span><strong style="color:#22333B;">' + _esc(d.startTime) + ' → ' + _esc(d.endTime) + (d.elapsedTime && d.elapsedTime !== '—' ? ' (' + _esc(d.elapsedTime) + ')' : '') + '</strong></td>'
-    + '</tr><tr>'
-    + '<td style="padding:12px 14px;" colspan="2"><span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Completion</span><strong style="color:' + rateColor + ';font-size:1.3em;">' + d.rate + '%</strong><span style="color:#888;font-size:0.85em;margin-left:6px;">(' + d.done + ' / ' + d.total + ' items)</span></td>'
-    + '</tr></table>'
+    + _cell('Property',      _esc(d.unitName))
+    + _cell('Cleaning Date', _esc(dateStr))
+    + '</tr>'
+    // Row 2: Cleaner | Time
+    + '<tr>'
+    + _cell('Cleaner', _esc(d.cleanerName))
+    + _cell('Time',    _esc(d.startTime) + ' → ' + _esc(d.endTime)
+                       + (d.elapsedTime && d.elapsedTime !== '—'
+                          ? ' (' + _esc(d.elapsedTime) + ')' : ''))
+    + '</tr>'
+    // Row 3 (v3.5 NEW): Last Guest | Nights Stayed
+    + '<tr>'
+    + _cell('Last Guest',    _esc(d.lastGuestName || '—'))
+    + _cell('Nights Stayed', _esc(nightsLabel))
+    + '</tr>'
+    // Row 4: Completion (full width)
+    + '<tr>'
+    + '<td style="padding:12px 14px;" colspan="2">'
+    + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
+    +   'text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Completion</span>'
+    + '<strong style="color:' + rateColor + ';font-size:1.3em;">' + d.rate + '%</strong>'
+    + '<span style="color:#888;font-size:0.85em;margin-left:6px;">(' + d.done + ' / ' + d.total + ' items)</span>'
+    + '</td>'
+    + '</tr>'
+    + '</table>'
 
-    // Meter readings — now includes delta row
-    + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
+    // ── Meter readings block ───────────────────────────────────
+    + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;'
+    +   'border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
     + '<p style="font-weight:700;color:#006B54;margin:0 0 12px;font-size:1em;">⚡💧 Meter Readings</p>'
     + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+    // Electric card
     + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;vertical-align:top;">'
     + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">⚡ Electric</span>'
-    + '<span style="display:block;font-size:1.6em;font-weight:700;color:' + (d.electricReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">' + _esc(d.electricReading) + '</span>'
+    + '<span style="display:block;font-size:1.6em;font-weight:700;color:'
+    +   (d.electricReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">'
+    +   _esc(d.electricReading) + '</span>'
     + '<span style="font-size:0.8em;color:#888;">kWh</span>'
     + '<div style="margin-top:6px;font-size:0.82em;color:#006B54;font-weight:700;">' + _esc(fmtDeltaKwh) + ' this session</div>'
     + (fmtAvgKwh ? '<div style="margin-top:3px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ' + _esc(fmtAvgKwh) + '</div>' : '')
     + '</td>'
     + '<td width="4%"></td>'
+    // Water card
     + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;vertical-align:top;">'
     + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">💧 Water</span>'
-    + '<span style="display:block;font-size:1.6em;font-weight:700;color:' + (d.waterReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">' + _esc(d.waterReading) + '</span>'
+    + '<span style="display:block;font-size:1.6em;font-weight:700;color:'
+    +   (d.waterReading === 'Not recorded' ? '#C1414D' : '#22333B') + ';margin-top:4px;">'
+    +   _esc(d.waterReading) + '</span>'
     + '<span style="font-size:0.8em;color:#888;">m³</span>'
     + '<div style="margin-top:6px;font-size:0.82em;color:#006B54;font-weight:700;">' + _esc(fmtDeltaM3) + ' this session</div>'
     + (fmtAvgM3 ? '<div style="margin-top:3px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ' + _esc(fmtAvgM3) + '</div>' : '')
     + '</td>'
     + '</tr></table></div>'
 
-    + urgentBlock + notesBlock
+    + urgentBlock
+    + notesBlock
 
     + '<h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:16px;margin:20px 0 12px;font-size:1.05em;">📸 Photos by Section</h3>'
     + photosBlock
@@ -922,9 +975,12 @@ function _buildEmailHtml(d) {
     + '<h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:16px;margin:20px 0 6px;font-size:1.05em;">📋 Full Checklist Details</h3>'
     + checklistBlock
 
-    + '<p style="margin-top:20px;font-size:0.82em;color:#888;"><a href="' + (d.reportFolderUrl || '#') + '" style="color:#22333B;">📁 View All Photos in Drive</a></p>'
+    + '<p style="margin-top:20px;font-size:0.82em;color:#888;">'
+    +   '<a href="' + (d.reportFolderUrl || '#') + '" style="color:#22333B;">📁 View All Photos in Drive</a>'
+    + '</p>'
     + '</div>'
 
+    // ── Email footer ───────────────────────────────────────────
     + '<div style="background:#22333B;padding:16px;text-align:center;">'
     + '<p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.8em;">✨ Cascade Hideaway Automated Report ✨</p>'
     + '<p style="color:rgba(255,255,255,0.4);margin:6px 0 0;font-size:0.72em;">Generated: '
@@ -992,6 +1048,8 @@ function testSubmit() {
     deltaM3:                  1.4,
     cleaningDate:             today,
     completionRate:           100,
+    lastGuestName:            'Juan Dela Cruz',
+    numberOfNights:           2,
     emailSubject:             '🧹 TEST Report — Cascade Bria — ' + today,
     formData: {
       unitName:             'Cascade Bria',
@@ -1001,7 +1059,9 @@ function testSubmit() {
       endTime:              '12:30',
       elapsedTime:          '03:30:00',
       electricMeterReading: '12350.0',
-      waterMeterReading:    '790.5'
+      waterMeterReading:    '790.5',
+      lastGuestName:        'Juan Dela Cruz',
+      numberOfNights:       2
     },
     meterReadings: {
       electric: { value: '12350.0', unit: 'kWh' },

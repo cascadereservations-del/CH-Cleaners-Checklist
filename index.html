@@ -199,6 +199,11 @@ body::after {
     display: inline-block; background: #f59e0b; color: #111827; font-weight: 700;
     font-size: 0.75em; padding: 0.2rem 0.5rem; border-radius: 12px; margin-left: 0.4rem; text-transform: uppercase;
 }
+.new-badge {
+    display: inline-block; background: var(--success); color: #ffffff; font-weight: 700;
+    font-size: 0.75em; padding: 0.2rem 0.5rem; border-radius: 12px; margin-left: 0.4rem;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
 .checklist-item.new-item {
     border-left: 3px solid var(--success);
     background: linear-gradient(135deg, rgba(0,107,84,0.04), rgba(0,107,84,0.02)) !important;
@@ -774,6 +779,7 @@ const checklistData = [
             { id: "check_9_1",    text: "Walk through as if you're a guest — check for fingerprints and dust", detail: "Pretend you just arrived as a guest. Look for smudges on mirrors, glass, chrome, and door handles. Wipe them off." },
             { id: "check_9_4",    text: "Set up the room perfectly for guests", detail: "Set AC to 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight. <strong>Crucially, ensure the refrigerator is switched on and getting cold for the guest.</strong>" },
             { id: "check_key_card", text: "Place key card on keychain in the designated spot", detail: "Final confirmation: the Cascade Hideaway keychain with the access card must be in its designated spot (near the TV remotes or key hook). The guest will need this to re-enter the unit.", highlight: true },
+            { id: "check_guest_code", text: "Test the guest door code — confirm it unlocks the unit<span class='new-badge'>NEW</span>", detail: "Enter the upcoming guest's access code on the keypad <strong>before you leave</strong>. The lock must click open cleanly. If the code fails: (1) Check if the smart lock battery is low — replace batteries immediately. (2) Confirm the correct code is set with the host before the guest's arrival time. A non-working code means the guest cannot self check-in — this is one of the most common complaints.", isNew: true },
             { id: "check_10_6",   text: "Final power & safety check before leaving", detail: `What to do with power before you leave? It depends on when the next guest comes.<div class="scenario-box"><div class="icon">☀️</div><div class="content"><div class="title">IF a guest is coming TODAY (before 2 PM):</div><div class="instruction">Leave the <strong class="on">fridge</strong> and the <strong class="on">water heater</strong> ON. Turn <strong class="off">OFF</strong> all the lights. The aircon can be turned on later when the guest is very close to arriving.</div></div></div><div class="scenario-box"><div class="icon">🌙</div><div class="content"><div class="title">IF a guest is coming LATER or NO GUEST today:</div><div class="instruction">Walk around and turn <strong class="off">OFF</strong> everything. Then, go to the breaker box. Find the switch for the <strong class="off">Water Heater</strong> and flip it <strong class="off">OFF</strong>. Leave all other switches ON for the WiFi and cameras.</div></div></div>Finally, make sure all windows are closed and the front door is locked.` }
         ]
     }
@@ -796,7 +802,12 @@ const weeklyMaintenanceData = {
         { id: "weekly_6", text: "Descale iron steamer", detail: "Empty water tank. Run descaling solution (or 1:1 white vinegar + water). Steam cycle, then rinse thoroughly." },
         { id: "weekly_7", text: "Vacuum behind/under furniture", detail: "Move lightweight furniture safely. Vacuum corners, baseboards, and hard-to-reach areas." },
         { id: "weekly_8", text: "🔹 BIWEEKLY (2nd & 4th week): Change sofa cover and mattress protector", detail: "Remove sofa cover and mattress protector. Replace with clean ones. Wash the removed covers.", biweekly: true },
-        { id: "weekly_9", text: "🔹 BIWEEKLY (2nd & 4th week): Liquid Sosa Treatment", detail: "✋ ONLY if NO guest is coming the next day: Pour liquid sosa down CR toilet/sink and kitchen sink drains. Leave overnight to prevent clogs. Flush with water in the morning before guest arrives.", biweekly: true }
+        { id: "weekly_9", text: "🔹 BIWEEKLY (2nd & 4th week): Liquid Sosa Treatment", detail: "✋ ONLY if NO guest is coming the next day: Pour liquid sosa down CR toilet/sink and kitchen sink drains. Leave overnight to prevent clogs. Flush with water in the morning before guest arrives.", biweekly: true },
+        { id: "weekly_10", text: "Check smart lock battery — replace if low or blinking", detail: "Press the lock's test button or open the companion app (Tuya / Smart Life) to check battery level. Replace batteries immediately if below 20% or if the lock emits a low-battery beep. A dead lock = failed self check-in. Keep spare AA/AAA batteries in the supply drawer at all times." },
+        { id: "weekly_11", text: "Clear floor drains — bathroom shower and kitchen sink", detail: "Remove the drain cover. Use a thin brush or drain snake to clear hair and soap buildup from the bathroom drain. Pour a cup of hot water down the kitchen drain to flush grease. This prevents slow drains and bad smells that guests notice immediately." },
+        { id: "weekly_12", text: "Check all light bulbs — replace any burnt or flickering ones", detail: "Walk through every room and flip each switch on and off. Include: bathroom vanity, bedside lamps, kitchen under-cabinet, balcony light. Replace any burnt bulb immediately — a dark room is an instant 4-star review risk. Store spare bulbs in the same supply drawer as extra batteries." },
+        { id: "weekly_13", text: "Wipe wall scuffs, door frames, light switch plates, and skirting boards", detail: "Use a damp microfibre cloth with a small amount of all-purpose cleaner. Focus on high-touch areas: around door handles, near light switches, and skirting boards where the mop misses. Scuff marks on white walls are invisible daily but accumulate fast — catching them weekly keeps the unit looking freshly painted." },
+        { id: "weekly_14", text: "Inspect for mold spots and pest signs — under sink, bathroom corners, balcony", detail: "Open the cabinet under the kitchen and bathroom sinks. Check for moisture, water stains, or black spots (mold). Look along bathroom tile grout and in the balcony corners for mildew. Check kitchen pantry for pest droppings. Report any findings to the host immediately with a photo — early detection prevents expensive remediation." }
     ]
 };
 
@@ -820,7 +831,10 @@ const itemEmojis = {
     'check_10_6':  '⚡',
     'weekly_1': '🛋️', 'weekly_2': '🔧', 'weekly_3': '🧊',
     'weekly_4': '❄️', 'weekly_5': '💨', 'weekly_6': '👔',
-    'weekly_7': '🧹', 'weekly_8': '🛏️', 'weekly_9': '🧪'
+    'weekly_7': '🧹', 'weekly_8': '🛏️', 'weekly_9': '🧪',
+    'check_guest_code': '🔑',
+    'weekly_10': '🔋', 'weekly_11': '🚿', 'weekly_12': '💡',
+    'weekly_13': '🧽', 'weekly_14': '🔍'
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -1150,7 +1164,8 @@ function generateHTML(sections) {
                 const disinfectClass = item.disinfect  ? 'disinfect'  : '';
                 const biweeklyClass  = item.biweekly   ? 'biweekly'   : '';
                 const highlightClass = item.highlight  ? 'highlight'  : '';
-                const combinedClass  = [disinfectClass, biweeklyClass, highlightClass].filter(Boolean).join(' ');
+                const newItemClass   = item.isNew      ? 'new-item'   : '';
+                const combinedClass  = [disinfectClass, biweeklyClass, highlightClass, newItemClass].filter(Boolean).join(' ');
                 const emoji = itemEmojis[item.id] || '📋';
 
                 cardsHTML += `<div class="checklist-item ${combinedClass}">

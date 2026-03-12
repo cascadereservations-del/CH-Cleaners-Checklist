@@ -136,6 +136,8 @@ body::after {
 .nav-tab:hover { background: rgba(198, 172, 142, 0.10); color: var(--earthen-darkest); }
 .nav-tab.active { color: var(--earthen-darkest); border-bottom-color: var(--earthen-gold); background: rgba(198, 172, 142, 0.12); }
 .nav-tab.completed { color: var(--success); }
+.nav-tab.has-critical-issue { position: relative; }
+.nav-tab.has-critical-issue::after { content: "⚠"; position: absolute; top: 4px; right: 4px; font-size: 0.65em; color: #d9534f; line-height: 1; pointer-events: none; }
 .nav-tab.weekly { background: rgba(147, 51, 234, 0.08); }
 .nav-tab .icon { margin-right: 0.5rem; font-size: 1.1em; flex: 0 0 auto; }
 .nav-tab .label {
@@ -167,7 +169,7 @@ body::after {
 .pro-tip strong { color: var(--primary-green); font-weight: 700; }
 
 .checklist-item {
-    padding: 1.25rem 1rem; border-bottom: 1px solid var(--border);
+    padding: 1.25rem 1rem; border-bottom: 1.5px solid rgba(94, 80, 63, 0.18);
     display: flex; align-items: flex-start !important; gap: 1rem;
     transition: background 0.3s ease; position: relative;
 }
@@ -211,10 +213,11 @@ body::after {
 
 .checklist-item input[type="checkbox"] {
     -webkit-appearance: none; appearance: none;
-    margin-top: 0.2rem !important; width: 1.5em; height: 1.5em;
-    border: 2.5px solid var(--border); border-radius: 6px;
+    margin-top: 0.15rem !important; width: 1.75em; height: 1.75em;
+    border: 2.5px solid rgba(94, 80, 63, 0.45); border-radius: 6px;
     display: grid; place-content: center; flex-shrink: 0; cursor: pointer;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    background: rgba(255,255,255,0.7);
 }
 .checklist-item input[type="checkbox"]:hover { border-color: var(--accent-gold); transform: scale(1.05); }
 .checklist-item input[type="checkbox"]::before {
@@ -226,10 +229,11 @@ body::after {
 .checklist-item input[type="checkbox"]:checked { background: var(--light-gold-bg); border-color: var(--accent-gold); }
 .checklist-item input[type="checkbox"]:checked::before { transform: scale(1); }
 
-.checklist-item label { flex: 1; cursor: pointer; font-weight: 600; transition: color 0.3s ease; font-size: 1.02em; line-height: 1.55; word-break: break-word; overflow-wrap: anywhere; }
-.checklist-item.checked label { text-decoration: line-through; color: var(--text-secondary); opacity: 0.7; }
+.checklist-item label { flex: 1; cursor: pointer; font-weight: 700; transition: color 0.3s ease; font-size: 1.02em; line-height: 1.55; word-break: break-word; overflow-wrap: anywhere; color: var(--text-primary); }
+.checklist-item.checked { background: rgba(198, 210, 190, 0.22) !important; border-radius: 8px; }
+.checklist-item.checked label { text-decoration: line-through; color: var(--text-secondary); opacity: 0.65; font-weight: 500; }
 
-.item-detail { font-size: 0.9em; color: var(--text-secondary); margin-top: 0.35rem; padding-left: 0.5rem; font-weight: 400; line-height: 1.6; }
+.item-detail { font-size: 0.84em; color: var(--text-secondary); margin-top: 0.35rem; padding-left: 0.5rem; font-weight: 400; line-height: 1.6; opacity: 0.85; }
 .item-detail code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
 
 .scenario-box {
@@ -542,6 +546,81 @@ textarea:focus { outline: none; border-color: var(--accent-gold); box-shadow: 0 
     .nav-btn { width: 100%; }
 }
 @media screen and (max-width: 480px) { .nav-btn { padding: 0.8rem 1.2rem; font-size: 0.9em; } }
+
+/* ── Critical Action Items (v3.6) ─────────────────────────── */
+.checklist-item.critical-action {
+    background: linear-gradient(135deg, rgba(198,172,142,0.07) 0%, rgba(255,255,255,0) 100%);
+    border-left: 3px solid var(--earthen-gold);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+}
+.critical-item-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    width: 100%;
+}
+/* Critical item title — match hierarchy of checkbox item labels */
+.critical-item-inner [id$="-label"] {
+    display: block;
+    font-weight: 700;
+    font-size: 1.02em;
+    line-height: 1.55;
+    color: var(--text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.critical-controls {
+    margin-top: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+.critical-btn-row {
+    display: flex;
+    gap: 0.6rem;
+}
+.critical-btn {
+    flex: 1;
+    padding: 0.55rem 0.5rem;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: #fff;
+    font-family: 'Raleway', sans-serif;
+    font-size: 0.82em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+    letter-spacing: 0.3px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+.critical-btn:active { transform: scale(0.97); }
+.critical-btn.good           { border-color: #c6e4d8; color: #2a7a5a; }
+.critical-btn.good:hover     { background: #e6f4ee; border-color: var(--success); color: var(--success); }
+.critical-btn.good.active    { background: #d0eddf; border-color: var(--success); color: var(--success); box-shadow: 0 0 0 3px rgba(44,135,100,0.15); }
+.critical-btn.issue          { border-color: #f5d0cc; color: #b84040; }
+.critical-btn.issue:hover    { background: #fdecea; border-color: #d9534f; color: #c0392b; }
+.critical-btn.issue.active   { background: #fad7d4; border-color: #d9534f; color: #c0392b; box-shadow: 0 0 0 3px rgba(217,83,79,0.15); }
+.critical-issue-input        { display: none; flex-direction: column; gap: 0.35rem; }
+.critical-issue-input.visible { display: flex; }
+.critical-issue-input label  { font-size: 0.78em; font-weight: 700; color: #b84040; text-transform: uppercase; letter-spacing: 0.4px; }
+.critical-issue-input textarea {
+    width: 100%; border: 1.5px solid #f5d0cc; border-radius: 8px;
+    padding: 0.5rem 0.7rem; font-family: 'Raleway', sans-serif; font-size: 0.88em;
+    color: var(--text-primary); resize: vertical; min-height: 60px;
+    box-sizing: border-box; background: #fff9f8; font-size: 16px;
+}
+.critical-issue-input textarea:focus { outline: none; border-color: #d9534f; box-shadow: 0 0 0 3px rgba(217,83,79,0.1); }
+.critical-status-bar {
+    display: none; align-items: center; gap: 0.4rem; font-size: 0.8em; font-weight: 700;
+    padding: 0.35rem 0.65rem; border-radius: 6px; margin-top: 0.1rem;
+}
+.critical-status-bar.confirmed { display: flex; background: #e6f4ee; color: var(--success); }
+.critical-status-bar.has-issue { display: flex; background: #fdecea; color: #c0392b; }
+.checklist-item.issue-flagged  { border-left: 3px solid #d9534f !important; background: linear-gradient(135deg, rgba(217,83,79,0.04) 0%, rgba(255,255,255,0) 100%) !important; }
 </style>
 </head>
 <body>
@@ -705,10 +784,10 @@ const checklistData = [
         items: [
             { id: "check_0_1",  text: "Get all your cleaning tools ready", detail: "Grab your: cleaning sprays, cloths (at least 4), vacuum, mop, fresh bed sheets, fresh towels, bathroom supplies (soap, shampoo), coffee packs (2), water bottles (2), and tissues." },
             { id: "check_1_1",  text: "Knock and say 'Housekeeping', then open all windows and turn on all lights", detail: "Knock 3 times loudly. Open windows for fresh air. Turn on every light so you can see dirt clearly. <code>Important:</code> This step is primarily for mid-stay cleaning when a guest may be present." },
-            { id: "check_1_4",  text: "Test all appliances: TV (Netflix & YouTube), WiFi, AC, lights, ref, microwave", detail: "Turn on TV → open <strong>Netflix</strong> and confirm the account is logged in and streaming loads. Open <strong>YouTube Premium</strong> as well. Check WiFi on your phone. Turn on AC to confirm cooling. Flip every light switch. Refrigerator should be cold. Microwave should power on. Report any issues immediately." },
+            { id: "check_1_4",  text: "Test all appliances: TV (Netflix & YouTube), WiFi, AC, lights, ref, microwave", detail: "Turn on TV → open <strong>Netflix</strong> and confirm the account is logged in and streaming loads. Open <strong>YouTube Premium</strong> as well. Check WiFi on your phone. Turn on AC to confirm cooling. Flip every light switch. Refrigerator should be cold. Microwave should power on. Report any issues immediately.", critical: true },
             { id: "check_1_5",  text: "Look for broken things or water leaks", detail: "Check under sinks for drips. Look at walls for cracks or stains. Check furniture for damage. Look around the AC for water." },
             { id: "check_1_7",  text: "Search everywhere for items guests left behind", detail: "Important spots: inside drawers, under the bed, behind doors, between mattress and headboard, under couch cushions, inside the washing machine drum." },
-            { id: "check_1_9",  text: "Confirm key card is on keychain in its designated spot", detail: "Look for the Cascade Hideaway keychain with the access card — it should be placed near the TV remotes or on the key hook by the entry. If missing, report immediately — the next guest cannot access the unit.", highlight: true },
+            { id: "check_1_9",  text: "Confirm key card is on keychain in its designated spot", detail: "Look for the Cascade Hideaway keychain with the access card — it should be placed near the TV remotes or on the key hook by the entry. If missing, report immediately — the next guest cannot access the unit.", highlight: true, critical: true },
             { id: "check_1_10", text: "Check washing machine: empty the drum and leave door ajar", detail: "Open the washing machine lid/door. Remove any items left inside by the previous guest. Wipe the drum interior if damp or musty. Always leave the door slightly open between uses to prevent mold and mildew buildup." },
             { id: "check_1_11", text: "Confirm air purifier is powered on and filter light is green", detail: "Press the power button if off. Check the filter indicator light — if it is red or orange, report it so the filter can be replaced. Air purifier should run throughout cleaning for best air quality." },
             { id: "check_1_8",  text: "Check all plants (Snake Plants) and water ONLY if soil is very dry", detail: "Gently press finger 1–2 inches into soil. Snake plants need water only 1–2 times per week when soil is completely dry. <strong>IMPORTANT:</strong> If NO guest is coming the next day, put all plants outside on the balcony for fresh air and sunlight. Bring them back inside before the next guest arrives." }
@@ -741,7 +820,7 @@ const checklistData = [
             { id: "check_5_6",  text: "Fluff pillows and arrange them nicely", detail: "Shake pillows hard to make them puffy. Arrange them perfectly straight and even. This makes the bed look luxurious." },
             { id: "check_5_7",  text: "Check and refill the room fragrance", detail: "Look at the bottle of the room perfume. If it's almost empty, fill it up so the room smells nice for the new guest." },
             { id: "check_5_8",  text: "Arrange items and clean mirrors", detail: "Put everything back in its special spot: the TV remote, AC remote, plants, and tissue box. Make sure all mirrors are super clean with no fingerprints." },
-            { id: "check_5_9",  text: "Verify wardrobe hangers — count and straighten all hangers", detail: "Count all hangers and ensure a minimum of 8 are present and neatly spaced in the wardrobe. Missing hangers are a frequent guest complaint — report any shortage immediately so they can be replaced before arrival.", highlight: true },
+            { id: "check_5_9",  text: "Verify wardrobe hangers — count and straighten all hangers", detail: "Count all hangers and ensure a minimum of 8 are present and neatly spaced in the wardrobe. Missing hangers are a frequent guest complaint — report any shortage immediately so they can be replaced before arrival.", highlight: true, critical: true },
             { id: "check_5_10", text: "Check cloth steamer — present, cord coiled, water tank emptied", detail: "Locate the cloth steamer in its storage spot. If it was used by the previous guest, wipe the exterior clean. Empty the water tank completely (stored water causes odor and scale). Coil the cord neatly. Confirm it is stored in its proper location." }
         ]
     },
@@ -757,7 +836,7 @@ const checklistData = [
             { id: "check_7_4", text: "Scrub, disinfect and clean the toilet, shower, and sink<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Now scrub the toilet (remember, the cleaner has been sitting!). Scrub shower and tub, then rinse well with water. Clean the sink and make the faucet shine.", disinfect: true },
             { id: "check_7_2", text: "Clean mirrors and glass until there are NO streaks", detail: "Pro trick: After cleaning shower glass, use a squeegee (rubber wiper) to dry it completely. This stops water spots and looks professional." },
             { id: "check_7_5", text: "Check toilet smell and clean the bathroom vent", detail: "Does the toilet area smell bad? If yes, report it. Also, look at the vent above the mirror. If you see dust, use a vacuum or broom to clean it all off." },
-            { id: "check_7_6", text: "Check all utensils — spoons, plates, glasses, cooking pans, and knives", detail: "Ensure they are streak-free and clean. No burnt marks on pans. No damage or cracks in plates and glasses. Any broken item must be reported and removed immediately.", highlight: true },
+            { id: "check_7_6", text: "Check all utensils — spoons, plates, glasses, cooking pans, and knives", detail: "Ensure they are streak-free and clean. No burnt marks on pans. No damage or cracks in plates and glasses. Any broken item must be reported and removed immediately.", highlight: true, critical: true },
             { id: "check_6_1", text: "Clean inside and outside of all kitchen appliances", detail: "Clean inside microwave (no oil or food). Wipe outside of fridge, rice cooker, kettle. Make the stovetop shiny." },
             { id: "check_6_4", text: "Clean, disinfect and polish sink, faucet, and counters<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Make the faucet SUPER shiny — this shows you did a detailed job. Wipe all counters including edges and backsplash.", disinfect: true },
             { id: "check_6_5", text: "Check the dishwashing sponge", detail: "Is the sponge old, wet, or yucky? Put a brand new, dry one for the guest. Wash and dry the old one if it's still okay to be used next time." },
@@ -777,9 +856,9 @@ const checklistData = [
             { id: "check_8_1",    text: "Vacuum then mop all floors", detail: "Start from the far corner and work backward toward the exit. This way you don't step on clean floors." },
             { id: "check_balcony",text: "Clean and disinfect the balcony table, chairs, and railing<span class='disinfect-badge'>🦠 Disinfect</span>", detail: "Wipe down outdoor furniture so guests can enjoy the balcony too.", disinfect: true },
             { id: "check_9_1",    text: "Walk through as if you're a guest — check for fingerprints and dust", detail: "Pretend you just arrived as a guest. Look for smudges on mirrors, glass, chrome, and door handles. Wipe them off." },
-            { id: "check_9_4",    text: "Set up the room perfectly for guests", detail: "Set AC to 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight. <strong>Crucially, ensure the refrigerator is switched on and getting cold for the guest.</strong>" },
-            { id: "check_key_card", text: "Place key card on keychain in the designated spot", detail: "Final confirmation: the Cascade Hideaway keychain with the access card must be in its designated spot (near the TV remotes or key hook). The guest will need this to re-enter the unit.", highlight: true },
-            { id: "check_guest_code", text: "Test the guest door code — confirm it unlocks the unit<span class='new-badge'>NEW</span>", detail: "Enter the upcoming guest's access code on the keypad <strong>before you leave</strong>. The lock must click open cleanly. If the code fails: (1) Check if the smart lock battery is low — replace batteries immediately. (2) Confirm the correct code is set with the host before the guest's arrival time. A non-working code means the guest cannot self check-in — this is one of the most common complaints.", isNew: true },
+            { id: "check_9_4",    text: "Set up the room perfectly for guests", detail: "Set AC to 23°C. Turn on soft lights (like bedside lamps). Make sure decorations are straight. <strong>Crucially, ensure the refrigerator is switched on and getting cold for the guest.</strong>", critical: true },
+            { id: "check_key_card", text: "Place key card on keychain in the designated spot", detail: "Final confirmation: the Cascade Hideaway keychain with the access card must be in its designated spot (near the TV remotes or key hook). The guest will need this to re-enter the unit.", highlight: true, critical: true },
+            { id: "check_guest_code", text: "Test the guest door code — confirm it unlocks the unit<span class='new-badge'>NEW</span>", detail: "Enter the upcoming guest's access code on the keypad <strong>before you leave</strong>. The lock must click open cleanly. If the code fails: (1) Check if the smart lock battery is low — replace batteries immediately. (2) Confirm the correct code is set with the host before the guest's arrival time. A non-working code means the guest cannot self check-in — this is one of the most common complaints.", isNew: true, critical: true },
             { id: "check_10_6",   text: "Final power & safety check before leaving", detail: `What to do with power before you leave? It depends on when the next guest comes.<div class="scenario-box"><div class="icon">☀️</div><div class="content"><div class="title">IF a guest is coming TODAY (before 2 PM):</div><div class="instruction">Leave the <strong class="on">fridge</strong> and the <strong class="on">water heater</strong> ON. Turn <strong class="off">OFF</strong> all the lights. The aircon can be turned on later when the guest is very close to arriving.</div></div></div><div class="scenario-box"><div class="icon">🌙</div><div class="content"><div class="title">IF a guest is coming LATER or NO GUEST today:</div><div class="instruction">Walk around and turn <strong class="off">OFF</strong> everything. Then, go to the breaker box. Find the switch for the <strong class="off">Water Heater</strong> and flip it <strong class="off">OFF</strong>. Leave all other switches ON for the WiFi and cameras.</div></div></div>Finally, make sure all windows are closed and the front door is locked.` }
         ]
     }
@@ -803,7 +882,7 @@ const weeklyMaintenanceData = {
         { id: "weekly_7", text: "Vacuum behind/under furniture", detail: "Move lightweight furniture safely. Vacuum corners, baseboards, and hard-to-reach areas." },
         { id: "weekly_8", text: "🔹 BIWEEKLY (2nd & 4th week): Change sofa cover and mattress protector", detail: "Remove sofa cover and mattress protector. Replace with clean ones. Wash the removed covers.", biweekly: true },
         { id: "weekly_9", text: "🔹 BIWEEKLY (2nd & 4th week): Liquid Sosa Treatment", detail: "✋ ONLY if NO guest is coming the next day: Pour liquid sosa down CR toilet/sink and kitchen sink drains. Leave overnight to prevent clogs. Flush with water in the morning before guest arrives.", biweekly: true },
-        { id: "weekly_10", text: "Check smart lock battery — replace if low or blinking", detail: "Press the lock's test button or open the companion app (Tuya / Smart Life) to check battery level. Replace batteries immediately if below 20% or if the lock emits a low-battery beep. A dead lock = failed self check-in. Keep spare AA/AAA batteries in the supply drawer at all times." },
+        { id: "weekly_10", text: "Check smart lock battery — replace if low or blinking", detail: "Press the lock's test button or open the companion app (Tuya / Smart Life) to check battery level. Replace batteries immediately if below 20% or if the lock emits a low-battery beep. A dead lock = failed self check-in. Keep spare AA/AAA batteries in the supply drawer at all times.", critical: true },
         { id: "weekly_11", text: "Clear floor drains — bathroom shower and kitchen sink", detail: "Remove the drain cover. Use a thin brush or drain snake to clear hair and soap buildup from the bathroom drain. Pour a cup of hot water down the kitchen drain to flush grease. This prevents slow drains and bad smells that guests notice immediately." },
         { id: "weekly_12", text: "Check all light bulbs — replace any burnt or flickering ones", detail: "Walk through every room and flip each switch on and off. Include: bathroom vanity, bedside lamps, kitchen under-cabinet, balcony light. Replace any burnt bulb immediately — a dark room is an instant 4-star review risk. Store spare bulbs in the same supply drawer as extra batteries." },
         { id: "weekly_13", text: "Wipe wall scuffs, door frames, light switch plates, and skirting boards", detail: "Use a damp microfibre cloth with a small amount of all-purpose cleaner. Focus on high-touch areas: around door handles, near light switches, and skirting boards where the mop misses. Scuff marks on white walls are invisible daily but accumulate fast — catching them weekly keeps the unit looking freshly painted." },
@@ -1168,13 +1247,40 @@ function generateHTML(sections) {
                 const combinedClass  = [disinfectClass, biweeklyClass, highlightClass, newItemClass].filter(Boolean).join(' ');
                 const emoji = itemEmojis[item.id] || '📋';
 
-                cardsHTML += `<div class="checklist-item ${combinedClass}">
-                    <input type="checkbox" id="${item.id}" data-section-index="${index}" aria-labelledby="${item.id}-label">
-                    <label id="${item.id}-label" for="${item.id}">
-                        <span class="item-emoji">${emoji}</span>${item.text}
-                        <div class="item-detail">${item.detail}</div>
-                    </label>
-                </div>`;
+                if (item.critical) {
+                    // v3.6 — critical items render Yes/No action buttons instead of a checkbox
+                    const critClass = combinedClass ? combinedClass + ' critical-action' : 'critical-action';
+                    cardsHTML += `<div class="checklist-item ${critClass}" id="wrap_${item.id}" data-critical-state="">
+                        <div class="critical-item-inner">
+                            <span class="item-emoji" style="flex-shrink:0;margin-top:1px;">${emoji}</span>
+                            <div style="flex:1;min-width:0;">
+                                <span id="${item.id}-label">${item.text}</span>
+                                <div class="item-detail">${item.detail}</div>
+                            </div>
+                        </div>
+                        <div class="critical-controls">
+                            <div class="critical-btn-row">
+                                <button type="button" class="critical-btn good" data-for="${item.id}" data-action="confirmed"
+                                    onclick="setCriticalState('${item.id}','confirmed')">✅ All Good</button>
+                                <button type="button" class="critical-btn issue" data-for="${item.id}" data-action="issue"
+                                    onclick="setCriticalState('${item.id}','issue')">⚠️ Issue Found</button>
+                            </div>
+                            <div class="critical-issue-input" id="issue_input_${item.id}">
+                                <label for="issue_detail_${item.id}">Describe the issue:</label>
+                                <textarea id="issue_detail_${item.id}" placeholder="What went wrong? e.g. Code didn't unlock — lock may need new batteries." rows="2" oninput="markDirty()"></textarea>
+                            </div>
+                            <div class="critical-status-bar" id="status_${item.id}"></div>
+                        </div>
+                    </div>`;
+                } else {
+                    cardsHTML += `<div class="checklist-item ${combinedClass}">
+                        <input type="checkbox" id="${item.id}" data-section-index="${index}" aria-labelledby="${item.id}-label">
+                        <label id="${item.id}-label" for="${item.id}">
+                            <span class="item-emoji">${emoji}</span>${item.text}
+                            <div class="item-detail">${item.detail}</div>
+                        </label>
+                    </div>`;
+                }
             });
 
             // ── v3.4: Meter Panel ──────────────────────────────────────
@@ -1483,19 +1589,96 @@ function showCard(index) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// CRITICAL ITEM ACTIONS (v3.6)
+// ═══════════════════════════════════════════════════════════════
+function setCriticalState(itemId, state) {
+    const wrap = document.getElementById(`wrap_${itemId}`);
+    if (!wrap) return;
+    wrap.dataset.criticalState = state;
+
+    // Update button active states
+    wrap.querySelectorAll('.critical-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.action === state);
+    });
+
+    // Show/hide issue textarea
+    const issueInput = document.getElementById(`issue_input_${itemId}`);
+    if (issueInput) {
+        issueInput.classList.toggle('visible', state === 'issue');
+        // v3.7: remove photo nudge if state switches away from issue
+        if (state !== 'issue') {
+            const staleNudge = document.getElementById(`photo_nudge_${itemId}`);
+            if (staleNudge) staleNudge.remove();
+        }
+        if (state === 'issue') {
+            const ta = document.getElementById(`issue_detail_${itemId}`);
+            if (ta) setTimeout(() => ta.focus(), 120);
+            // v3.7: photo nudge when issue is flagged
+            const existingNudge = document.getElementById(`photo_nudge_${itemId}`);
+            if (!existingNudge && issueInput) {
+                const sectionCard = document.getElementById(`wrap_${itemId}`)?.closest('.card');
+                const sectionIndex = sectionCard?.dataset?.index;
+                const sectionId = sectionIndex !== undefined ? `section_${sectionIndex}` : null;
+                if (sectionId) {
+                    const nudge = document.createElement('div');
+                    nudge.id = `photo_nudge_${itemId}`;
+                    nudge.style.cssText = 'margin-top:0.5rem;padding:0.45rem 0.65rem;background:#fff8e6;border:1px solid #e9b44c;border-radius:6px;font-size:0.82em;color:#5E503F;display:flex;align-items:center;gap:0.4rem;';
+                    const camId = 'camera_' + sectionId;
+                    nudge.innerHTML = '📷 <span>Add a photo of this issue → <a href="#" style="color:#b8860b;font-weight:700;text-decoration:underline;">Take photo</a></span>';
+                    nudge.querySelector('a').addEventListener('click', e => {
+                        e.preventDefault();
+                        const cam = document.getElementById(camId);
+                        if (cam) cam.click();
+                    });
+                    issueInput.appendChild(nudge);
+                }
+            }
+        }
+    }
+
+    // Update status bar
+    const bar = document.getElementById(`status_${itemId}`);
+    if (bar) {
+        bar.className = 'critical-status-bar';
+        if (state === 'confirmed') {
+            bar.classList.add('confirmed');
+            bar.innerHTML = '✅ Confirmed — no issues';
+        } else if (state === 'issue') {
+            bar.classList.add('has-issue');
+            bar.innerHTML = '⚠️ Issue reported — host will be notified';
+        }
+    }
+
+    // Visual state on the wrapper
+    wrap.classList.remove('issue-flagged');
+    if (state === 'confirmed') wrap.classList.add('checked');
+    if (state === 'issue')     wrap.classList.add('checked', 'issue-flagged');
+
+    markDirty();
+    updateProgress();
+    const sectionIndex = wrap.closest('.card')?.dataset?.index;
+    if (sectionIndex !== undefined) updateSectionCompletionStatus(parseInt(sectionIndex));
+}
+
+// ═══════════════════════════════════════════════════════════════
 // PROGRESS
 // ═══════════════════════════════════════════════════════════════
 function updateProgress() {
-    const all     = document.querySelectorAll('.checklist-item input[type="checkbox"]');
-    const checked = document.querySelectorAll('.checklist-item input[type="checkbox"]:checked');
-    const pct     = all.length > 0 ? Math.round((checked.length / all.length) * 100) : 0;
+    const allCb       = document.querySelectorAll('.checklist-item input[type="checkbox"]');
+    const checkedCb   = document.querySelectorAll('.checklist-item input[type="checkbox"]:checked');
+    const allCrit     = document.querySelectorAll('.checklist-item[data-critical-state]');
+    const doneCrit    = document.querySelectorAll('.checklist-item[data-critical-state="confirmed"], .checklist-item[data-critical-state="issue"]');
+
+    const total = allCb.length + allCrit.length;
+    const done  = checkedCb.length + doneCrit.length;
+    const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
 
     document.querySelector('.percentage').textContent = `${pct}%`;
     document.querySelector('.progress-fill').style.width = `${pct}%`;
     const ps = document.querySelector('.progress-section');
     if (ps) ps.setAttribute('aria-valuenow', pct);
 
-    all.forEach(cb => {
+    allCb.forEach(cb => {
         const item = cb.closest('.checklist-item');
         if (item) item.classList.toggle('checked', cb.checked);
     });
@@ -1505,8 +1688,15 @@ function updateSectionCompletionStatus(sectionIndex) {
     const card = document.querySelector(`.card[data-index='${sectionIndex}']`);
     const tab  = document.querySelector(`.nav-tab[data-index='${sectionIndex}']`);
     if (!card || !tab) return;
-    const boxes = card.querySelectorAll('.checklist-item input[type="checkbox"]');
-    if (boxes.length > 0) tab.classList.toggle('completed', Array.from(boxes).every(cb => cb.checked));
+    const boxes    = card.querySelectorAll('.checklist-item input[type="checkbox"]');
+    const critical = card.querySelectorAll('.checklist-item[data-critical-state]');
+    if (boxes.length === 0 && critical.length === 0) return;
+    const boxesDone    = Array.from(boxes).every(cb => cb.checked);
+    const criticalDone = Array.from(critical).every(el => el.dataset.criticalState !== '');
+    tab.classList.toggle('completed', boxesDone && criticalDone);
+    // v3.7: show ⚠ badge on tab if any critical item in this section has an issue
+    const hasCriticalIssue = Array.from(critical).some(el => el.dataset.criticalState === 'issue');
+    tab.classList.toggle('has-critical-issue', hasCriticalIssue);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1603,7 +1793,16 @@ function saveDraft() {
         const data = Object.fromEntries(fd.entries());
         const photos = {};
         for (const k in allPhotos) photos[k] = (allPhotos[k] || []).filter(Boolean);
-        localStorage.setItem('cleaningFormDraft', JSON.stringify({ form: data, photos }));
+        // v3.6: persist critical item states
+        const criticalStates = {};
+        document.querySelectorAll('.checklist-item[data-critical-state]').forEach(wrap => {
+            const itemId = wrap.id.replace('wrap_', '');
+            criticalStates[wrap.id] = {
+                state:  wrap.dataset.criticalState,
+                detail: (document.getElementById(`issue_detail_${itemId}`)?.value || '')
+            };
+        });
+        localStorage.setItem('cleaningFormDraft', JSON.stringify({ form: data, photos, criticalStates }));
         isDirty = false;
         return true;
     } catch(e) { console.warn('Draft save failed', e); return false; }
@@ -1664,6 +1863,16 @@ function applyDraft(draftData) {
         for (const sid in photos) {
             allPhotos[sid] = photos[sid] || [];
             refreshPhotoPreview(sid);
+        }
+    }
+    // v3.6: restore critical item states
+    if (draftData.criticalStates) {
+        for (const wrapId in draftData.criticalStates) {
+            const { state, detail } = draftData.criticalStates[wrapId];
+            const itemId = wrapId.replace('wrap_', '');
+            if (state) setCriticalState(itemId, state);
+            const detailEl = document.getElementById(`issue_detail_${itemId}`);
+            if (detailEl && detail) detailEl.value = detail;
         }
     }
     updateProgress();
@@ -1733,6 +1942,44 @@ function buildEmailHtml(data, checklistDetails, allPhotosData, allNotesArr, sect
                     <span style="color:#333;">${sanitizeHTML(stripHTML(item.text))}</span>
                 </li>`).join('')}
         </ul>`).join('');
+
+    // v3.7: Critical items summary block for email
+    const criticalSummaryBlock = (() => {
+        const critItems = [];
+        checklistDetails.forEach(section => {
+            (section.items || []).forEach(item => {
+                if (!item.critical) return;
+                const wrapId = 'wrap_' + item.id;
+                const wrap = document.getElementById(wrapId);
+                const state = wrap ? wrap.dataset.criticalState : '';
+                const detail = state === 'issue'
+                    ? (document.getElementById('issue_detail_' + item.id)?.value?.trim() || '')
+                    : '';
+                critItems.push({ label: sanitizeHTML(stripHTML(item.text)), state, detail });
+            });
+        });
+        if (!critItems.length) return '';
+        const rows = critItems.map(ci => {
+            const stateCell = ci.state === 'confirmed'
+                ? '<td style="padding:6px 10px;color:#006B54;font-weight:700;">✅ All Good</td>'
+                : ci.state === 'issue'
+                    ? '<td style="padding:6px 10px;color:#C1414D;font-weight:700;">⚠️ Issue' + (ci.detail ? '<br><span style=\"font-weight:400;font-size:0.88em;color:#5E503F;\">' + ci.detail + '</span>' : '') + '</td>'
+                    : '<td style="padding:6px 10px;color:#aaa;font-style:italic;">— Not answered</td>';
+            return '<tr><td style="padding:6px 10px;color:#22333B;border-right:1px solid #EAE0D5;">' + ci.label + '</td>' + stateCell + '</tr>';
+        }).join('');
+        const hasIssue = critItems.some(ci => ci.state === 'issue');
+        const headerColor = hasIssue ? '#C1414D' : '#22333B';
+        const headerIcon  = hasIssue ? '⚠️' : '✅';
+        return '<div style="background:#f9f8f5;border:2px solid ' + (hasIssue ? '#C1414D' : '#006B54') + ';border-radius:12px;padding:1.25rem;margin-bottom:1.5rem;">'
+            + '<p style="font-weight:700;color:' + headerColor + ';font-size:1.05em;margin:0 0 0.75rem;">' + headerIcon + ' Critical Items Status</p>'
+            + '<table style="width:100%;border-collapse:collapse;font-size:0.9em;">'
+            + '<tr style="background:#EAE0D5;">'
+            + '<th style="padding:6px 10px;text-align:left;color:#5E503F;font-size:0.78em;text-transform:uppercase;letter-spacing:0.5px;">Item</th>'
+            + '<th style="padding:6px 10px;text-align:left;color:#5E503F;font-size:0.78em;text-transform:uppercase;letter-spacing:0.5px;">Status</th>'
+            + '</tr>'
+            + rows
+            + '</table></div>';
+    })();
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1805,6 +2052,7 @@ function buildEmailHtml(data, checklistDetails, allPhotosData, allNotesArr, sect
           </tr>
         </table>
       </div>
+      ${criticalSummaryBlock}
       ${urgentBlock}
       ${notesBlock}
       <h3 style="color:#22333B;border-top:1px solid #EAE0D5;padding-top:1.25rem;margin-top:1.5rem;margin-bottom:1rem;">📸 Photos by Section</h3>
@@ -1907,6 +2155,17 @@ function handleSubmission() {
     document.getElementById('modal-confirm-action').style.display = 'inline-block';
     document.getElementById('modal-go-back').textContent = 'Go Back & Review';
 
+    // v3.6: block if any critical item has not been explicitly answered
+    const unansweredCritical = document.querySelectorAll('.checklist-item[data-critical-state=""]');
+    if (unansweredCritical.length > 0) {
+        showErrorModal(
+            '⚠️ Critical Items Unanswered',
+            `${unansweredCritical.length} critical item(s) need a response (✅ All Good or ⚠️ Issue Found) before you can submit. Scroll through the form to find and answer them.`
+        );
+        unansweredCritical[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
     const unchecked = document.querySelectorAll('.checklist-item input[type="checkbox"]:not(:checked)');
     if (unchecked.length > 0) {
         document.getElementById('modal-title').textContent = '⚠️ Incomplete Items';
@@ -1976,12 +2235,31 @@ async function proceedWithSubmission() {
             allNotesArr.push({ section: title, text: value, isUrgent });
         });
 
+        // v3.6: append critical-item issue notes as urgent
+        document.querySelectorAll('.checklist-item[data-critical-state="issue"]').forEach(wrap => {
+            const itemId  = wrap.id.replace('wrap_', '');
+            const label   = (wrap.querySelector(`#${itemId}-label`)?.textContent || itemId).trim().replace(/<[^>]*>/g, '');
+            const detail  = (document.getElementById(`issue_detail_${itemId}`)?.value || '').trim();
+            allNotesArr.push({
+                section:  '⚠️ Critical Item Issue',
+                text:     label + (detail ? ' — ' + detail : ''),
+                isUrgent: true
+            });
+        });
+
         // ── Checklist details ──────────────────────────────────
         const checklistDetails = allSectionsData.map(section => {
-            const items = section.items.map(item => ({
-                text:    stripHTML(item.text),
-                checked: !!(document.getElementById(item.id)?.checked)
-            }));
+            const items = section.items.map(item => {
+                let checked;
+                if (item.critical) {
+                    const wrap = document.getElementById(`wrap_${item.id}`);
+                    const s    = wrap ? wrap.dataset.criticalState : '';
+                    checked    = s === 'confirmed' || s === 'issue';
+                } else {
+                    checked    = !!(document.getElementById(item.id)?.checked);
+                }
+                return { text: stripHTML(item.text), checked, critical: !!item.critical };
+            });
 
             if (section.hasMeterPanel) {
                 const elecCurStr  = (document.getElementById('electricMeterReading')?.value || '').trim();
@@ -2139,6 +2417,19 @@ function resetAll() {
         const form = document.getElementById('cleaningForm');
         if (form) form.reset();
         document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        // v3.6: reset critical item states
+        document.querySelectorAll('.checklist-item[data-critical-state]').forEach(wrap => {
+            wrap.dataset.criticalState = '';
+            wrap.classList.remove('checked', 'issue-flagged');
+            wrap.querySelectorAll('.critical-btn').forEach(btn => btn.classList.remove('active'));
+            const itemId = wrap.id.replace('wrap_', '');
+            const issueInput = document.getElementById(`issue_input_${itemId}`);
+            if (issueInput) issueInput.classList.remove('visible');
+            const detailTa = document.getElementById(`issue_detail_${itemId}`);
+            if (detailTa) detailTa.value = '';
+            const bar = document.getElementById(`status_${itemId}`);
+            if (bar) { bar.className = 'critical-status-bar'; bar.innerHTML = ''; }
+        });
         document.querySelectorAll('textarea, input[type="text"], input[type="number"], input[type="date"], input[type="time"]').forEach(el => { el.value = ''; });
         document.querySelectorAll('.photo-preview').forEach(n => n.innerHTML = '');
         for (const k in allPhotos) allPhotos[k] = [];
@@ -2173,6 +2464,19 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDraft();
 
     fetchLastReadings();
+
+    // v3.7: auto-save every 90 seconds silently
+    setInterval(() => {
+        if (isDirty) {
+            saveDraft();
+            const status = document.getElementById('autoSaveStatus');
+            if (status) {
+                status.classList.add('visible');
+                status.querySelector('.status-text').textContent = 'Auto-saved ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                setTimeout(() => status.classList.remove('visible'), 2500);
+            }
+        }
+    }, 90000);
 
     const sdb = document.getElementById('saveDraftBtn');
     if (sdb) {

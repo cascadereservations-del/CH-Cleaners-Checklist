@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  *  CASCADE HIDEAWAY — Cleaning Report Web App Backend
- *  Version: 3.5  |  Updated: 2026
+ *  Version: 3.6  |  Updated: 2026
  * ═══════════════════════════════════════════════════════════════════
  *
  *  SETUP STEPS:
@@ -31,6 +31,15 @@
  *    POST action=init   → create dated subfolder
  *    POST action=upload → save one photo
  *    POST (default)     → full cleaning report → Sheet + Drive + Email
+ *
+ *  CHANGELOG v3.6:
+ *  - NEW:  _buildEmailHtml() now renders a Critical Items Summary table
+ *          at the top of the email body, before the urgent block.
+ *          Table shows each critical item and its outcome (✅ All Good /
+ *          ⚠️ Issue). Header tint is green when all pass, red when any fail.
+ *          Requires front-end to include `critical: !!item.critical` in
+ *          the checklistDetails payload (added to index_v16.html).
+ *  - FIX:  testSubmit() updated to include critical items for table testing.
  *
  *  CHANGELOG v3.5:
  *  - FIX: _buildEmailHtml() now renders Last Guest Name and
@@ -825,6 +834,48 @@ function _buildEmailHtml(d) {
       + '</td>';
   }
 
+  // ── Critical items summary table ──────────────────────────
+  // Shows every critical item with its outcome (✅ All Good or ⚠️ Issue).
+  // Only rendered when checklistDetails contains at least one critical item.
+  let criticalTableBlock = '';
+  const criticalItems = [];
+  (d.checklistDetails || []).forEach(function(section) {
+    (section.items || []).forEach(function(item) {
+      if (item.critical) criticalItems.push({ text: item.text, checked: item.checked });
+    });
+  });
+
+  if (criticalItems.length) {
+    const allCritOk = criticalItems.every(function(i) { return i.checked; });
+    const headerBg  = allCritOk ? '#e6f4ee' : '#fef0f1';
+    const headerCol = allCritOk ? '#006B54' : '#C1414D';
+    const headerIcon = allCritOk ? '✅' : '⚠️';
+
+    criticalTableBlock =
+      '<div style=\"margin-bottom:20px;\">'\
+      + '<p style=\"font-weight:700;color:' + headerCol + ';font-size:1em;margin:0 0 8px;\">'\
+      + headerIcon + ' Critical Items Summary</p>'\
+      + '<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;'\
+      +   'border:1px solid #EAE0D5;border-radius:10px;overflow:hidden;font-size:0.88em;\">'\
+      + '<tr style=\"background:' + headerBg + ';\">'\
+      + '<th style=\"padding:8px 12px;text-align:left;font-size:0.75em;font-weight:700;'\
+      +   'text-transform:uppercase;letter-spacing:0.8px;color:#5E503F;width:70%;\">Item</th>'\
+      + '<th style=\"padding:8px 12px;text-align:center;font-size:0.75em;font-weight:700;'\
+      +   'text-transform:uppercase;letter-spacing:0.8px;color:#5E503F;width:30%;\">Status</th>'\
+      + '</tr>'\
+      + criticalItems.map(function(item, i) {
+          const rowBg  = i % 2 === 0 ? '#ffffff' : '#f9f8f5';
+          const status = item.checked
+            ? '<span style=\"color:#006B54;font-weight:700;\">✅ All Good</span>'
+            : '<span style=\"color:#C1414D;font-weight:700;\">⚠️ Issue</span>';
+          return '<tr style=\"background:' + rowBg + ';border-top:1px solid #EAE0D5;\">'\
+            + '<td style=\"padding:9px 12px;color:#22333B;\">' + _esc(item.text) + '</td>'\
+            + '<td style=\"padding:9px 12px;text-align:center;\">' + status + '</td>'\
+            + '</tr>';
+        }).join('')\
+      + '</table></div>';
+  }
+
   // Urgent block
   let urgentBlock = '';
   if (d.urgentText) {
@@ -966,6 +1017,7 @@ function _buildEmailHtml(d) {
     + '</td>'
     + '</tr></table></div>'
 
+    + criticalTableBlock
     + urgentBlock
     + notesBlock
 
@@ -1073,8 +1125,8 @@ function testSubmit() {
       {
         title: 'Test Section', icon: '🧪',
         items: [
-          { text: 'Test item 1', checked: true },
-          { text: 'Test item 2', checked: true }
+          { text: 'Test item 1', checked: true,  critical: true },
+          { text: 'Test item 2', checked: false, critical: true }
         ]
       }
     ],

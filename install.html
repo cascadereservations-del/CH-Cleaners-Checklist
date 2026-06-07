@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0E1C22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Install Guide">
+<meta name="description" content="Add the Cascade Hideaway Cleaning Checklist to your home screen for one-tap access.">
+<title>Install — Cascade Cleaning Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── DESIGN TOKENS — matches cgindex.html v7.6 palette ── */
+:root {
+  --earthen-darkest:  #0E0C0A;
+  --earthen-slate:    #1F3038;
+  --earthen-topbar:   #0E1C22;
+  --earthen-ivory:    #F0EBE0;
+  --earthen-gold:     #B8962E;
+  --earthen-mocha:    #6C5C4A;
+
+  --surface:          #FFFFFF;
+  --surface-raised:   #F9F5EF;
+  --border:           #E0D6C8;
+  --border-strong:    #C4B8A8;
+  --text-primary:     #1C1814;
+  --text-secondary:   #6C5C4A;
+  --text-muted:       #9C8C7C;
+
+  --success:          #1A6648;
+  --success-bg:       #EBF4EF;
+  --success-border:   #A3CEBB;
+  --warning-bg:       #FEF3E6;
+  --warning-border:   #F0CFA0;
+
+  --gold-dim:         rgba(184,150,46,0.12);
+  --gold-border:      rgba(184,150,46,0.30);
+  --gold-text:        #7A6018;
+
+  --shadow-sm: 0 1px 3px rgba(10,9,8,0.08), 0 1px 2px rgba(10,9,8,0.05);
+  --shadow-md: 0 4px 12px rgba(10,9,8,0.10), 0 2px 4px rgba(10,9,8,0.06);
+
+  --font-d: 'Cormorant Garamond', Georgia, serif;
+  --font-b: 'Raleway', system-ui, sans-serif;
+  --r:      10px;
+  --r-sm:   7px;
+}
+
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font-b);
+  background: var(--earthen-ivory);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── TOP BAR ── */
+.top-bar {
+  background: var(--earthen-topbar);
+  padding: 0 1.25rem;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 12px rgba(10,9,8,0.35), 0 1px 4px rgba(10,9,8,0.20);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.top-bar-title {
+  font-family: var(--font-d);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--earthen-gold);
+  letter-spacing: 0.01em;
+}
+.top-bar-sub {
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(240,235,224,0.55);
+}
+
+/* ── HERO ── */
+.hero {
+  background: var(--earthen-topbar);
+  padding: 2rem 1.25rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: rgba(184,150,46,0.25);
+}
+.hero-eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--earthen-gold);
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  animation: fadeUp 450ms ease-out both;
+}
+.hero-h1 {
+  font-family: var(--font-d);
+  font-size: clamp(2rem, 6vw, 2.6rem);
+  font-weight: 300;
+  color: var(--earthen-ivory);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  animation: fadeUp 450ms ease-out 60ms both;
+}
+.hero-h1 em {
+  color: var(--earthen-gold);
+  font-style: normal;
+}
+.hero-sub {
+  margin-top: 0.65rem;
+  font-size: 0.875rem;
+  color: rgba(240,235,224,0.62);
+  font-weight: 400;
+  line-height: 1.65;
+  animation: fadeUp 450ms ease-out 120ms both;
+}
+
+/* ── BANNERS ── */
+.banner {
+  margin: 1rem 1.25rem 0;
+  border-radius: var(--r);
+  padding: 0.875rem 1rem;
+  display: none;
+  gap: 0.75rem;
+  align-items: flex-start;
+  animation: fadeUp 350ms ease-out both;
+  border-width: 1px;
+  border-style: solid;
+}
+.banner.visible { display: flex; }
+.banner-icon { font-size: 1.25rem; flex-shrink: 0; margin-top: 0.05rem; }
+.banner-body { flex: 1; font-size: 0.845rem; line-height: 1.55; }
+.banner-body strong { display: block; margin-bottom: 0.15rem; font-size: 0.875rem; }
+
+.banner-installed {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success);
+}
+.banner-installed strong { color: var(--success); }
+
+.banner-native {
+  background: var(--gold-dim);
+  border-color: var(--gold-border);
+  color: var(--text-secondary);
+}
+.banner-native strong { color: var(--gold-text); }
+.banner-native .banner-cta {
+  margin-top: 0.65rem;
+  display: inline-block;
+  background: var(--earthen-gold);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 0.5rem 1.1rem;
+  font-family: var(--font-b);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: opacity 150ms ease-out;
+  box-shadow: var(--shadow-sm);
+}
+.banner-native .banner-cta:active { opacity: 0.83; }
+
+/* ── TABS ── */
+.tabs-wrap { padding: 1.25rem 1.25rem 0; }
+.tabs {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 3px;
+  gap: 3px;
+  box-shadow: var(--shadow-sm);
+}
+.tab-btn {
+  flex: 1;
+  padding: 0.55rem 0.4rem;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-b);
+  font-size: 0.775rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 200ms ease-out, color 200ms ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  line-height: 1.2;
+}
+.tab-btn.active {
+  background: var(--earthen-slate);
+  color: var(--earthen-ivory);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── TAB PANELS ── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── STEPS ── */
+.steps {
+  padding: 1.25rem 1.25rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+.step {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem;
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  box-shadow: var(--shadow-sm);
+  animation: fadeUp 450ms ease-out both;
+}
+.step:nth-child(1) { animation-delay: 30ms;  }
+.step:nth-child(2) { animation-delay: 90ms;  }
+.step:nth-child(3) { animation-delay: 150ms; }
+.step:nth-child(4) { animation-delay: 210ms; }
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  border: 1.5px solid var(--gold-border);
+  color: var(--earthen-gold);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.step-body { flex: 1; min-width: 0; }
+.step-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+  line-height: 1.35;
+}
+.step-desc {
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+.step-visual {
+  margin-top: 0.65rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.6rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.sv-icon { font-size: 1.25rem; flex-shrink: 0; }
+.sv-label {
+  font-size: 0.785rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.sv-label strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── NOTE CARD ── */
+.note {
+  margin: 0.5rem 1.25rem 0.25rem;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--r-sm);
+  padding: 0.65rem 0.875rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.note strong { color: var(--earthen-mocha); font-weight: 600; }
+
+/* ── CTA ── */
+.cta-wrap {
+  padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+.cta-rule {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+.cta-eyebrow {
+  text-align: center;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.875rem;
+}
+#btn-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.95rem 1.5rem;
+  background: linear-gradient(135deg, #C8A236 0%, #9E7A1E 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--r);
+  font-family: var(--font-b);
+  font-size: 0.975rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(184,150,46,0.30), var(--shadow-sm);
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+  min-height: 52px;
+}
+#btn-open:active { opacity: 0.88; transform: scale(0.98); }
+.cta-note {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.765rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+/* ── FOOTER ── */
+.footer {
+  background: var(--earthen-topbar);
+  text-align: center;
+  padding: 1.25rem 1.5rem;
+  font-size: 0.73rem;
+  color: rgba(240,235,224,0.45);
+  line-height: 1.7;
+  border-top: 1px solid rgba(184,150,46,0.18);
+}
+.footer a {
+  color: var(--earthen-gold);
+  text-decoration: none;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step, .hero-eyebrow, .hero-h1, .hero-sub,
+  .banner { animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div>
+    <div class="top-bar-title">Cascade Hideaway</div>
+  </div>
+  <div class="top-bar-sub">Staff App</div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <p class="hero-eyebrow">Cleaning Checklist · Install Guide</p>
+  <h1 class="hero-h1">Add to Your<br><em>Home Screen</em></h1>
+  <p class="hero-sub">One-tap access. Works offline.<br>No app store. No login.</p>
+</div>
+
+<!-- ALREADY-INSTALLED BANNER -->
+<div class="banner banner-installed" id="already-installed">
+  <div class="banner-icon">✓</div>
+  <div class="banner-body">
+    <strong>Already installed</strong>
+    Find the Cascade Checklist icon on your home screen and tap it to open.
+  </div>
+</div>
+
+<!-- ANDROID NATIVE INSTALL BANNER -->
+<div class="banner banner-native" id="install-banner">
+  <div class="banner-icon">📲</div>
+  <div class="banner-body">
+    <strong>Install available</strong>
+    Chrome detected the app — add it to your home screen in one tap.
+    <button class="banner-cta" id="btn-native">Install Now</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs-wrap">
+  <div class="tabs" role="tablist" aria-label="Select your device">
+    <button class="tab-btn" id="tab-ios"     role="tab" aria-controls="panel-ios"     onclick="setTab('ios')">
+      🍎 iPhone
+    </button>
+    <button class="tab-btn" id="tab-android" role="tab" aria-controls="panel-android" onclick="setTab('android')">
+      🤖 Android
+    </button>
+    <button class="tab-btn" id="tab-desktop" role="tab" aria-controls="panel-desktop" onclick="setTab('desktop')">
+      💻 Desktop
+    </button>
+  </div>
+</div>
+
+<!-- ═══ iOS ═══ -->
+<section class="tab-panel" id="panel-ios" role="tabpanel" aria-labelledby="tab-ios">
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Open the checklist in Safari</div>
+        <div class="step-desc">Tap the gold button below. The app must open in Safari — Chrome on iPhone cannot install apps to the home screen.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Tap the Share button</div>
+        <div class="step-desc">At the bottom of Safari, tap the Share icon — a square with an arrow pointing up.</div>
+        <div class="step-visual">
+          <span class="sv-icon">📤</span>
+          <span class="sv-label"><strong>Share</strong> — bottom center of Safari, on the toolbar</span>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Tap "Add to Home Screen"</div>
+        <div class="step-desc">Scroll down in the share sheet. Tap "Add to Home Screen" — the option with a plus sign.</div>
+        <div class="step-visual">
+          <span class="sv-icon">➕</span>
+          <span class="sv-label"><strong>Add to Home Screen</strong> — scroll down in the share sheet to find it</span>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Tap "Add" to confirm</div>
+        <div class="step-desc">A preview shows the app name and icon. Tap <strong>Add</strong> in the top-right corner. The checklist icon will appear on your home screen.</div>
+      </div>
+    </div>
+  </div>
+  <p class="note">
+    <strong>Note:</strong> On older iPhones the Share button may appear at the top of the screen. Look for the same square-and-arrow icon.
+  </p>
+</section>
+
+<!-- ═══ ANDROID ═══ -->
+<section class="tab-panel" id="panel-android" role="tabpanel" aria-labelledby="tab-android">
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Open the checklist in Chrome</div>
+        <div class="step-desc">Tap the gold button below. Use Google Chrome for the smoothest install experience.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Watch for the install banner</div>
+        <div class="step-desc">Chrome may show an "Add to Home Screen" or "Install app" banner automatically. Tap it to install immediately.</div>
+        <div class="step-visual">
+          <span class="sv-icon">🔔</span>
+          <span class="sv-label"><strong>Install banner</strong> — appears near the bottom or top of Chrome automatically</span>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Or use the Chrome menu</div>
+        <div class="step-desc">No banner? Tap the three-dot menu in the top-right corner of Chrome.</div>
+        <div class="step-visual">
+          <span class="sv-icon">⋮</span>
+          <span class="sv-label"><strong>Menu</strong> — three vertical dots, top-right corner of Chrome</span>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Tap "Add to Home Screen"</div>
+        <div class="step-desc">Tap "Add to Home Screen" or "Install app" from the menu, then tap <strong>Install</strong> to confirm.</div>
+      </div>
+    </div>
+  </div>
+  <p class="note">
+    <strong>Samsung phone?</strong> Open in Samsung Internet → tap the bookmark icon → "Add page to" → "Home screen".
+  </p>
+</section>
+
+<!-- ═══ DESKTOP ═══ -->
+<section class="tab-panel" id="panel-desktop" role="tabpanel" aria-labelledby="tab-desktop">
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Open the checklist in Chrome or Edge</div>
+        <div class="step-desc">Tap the gold button below. Chrome and Edge both support PWA installation.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Click the install icon in the address bar</div>
+        <div class="step-desc">Look for a small monitor icon or download icon at the right side of the address bar. Click it to install.</div>
+        <div class="step-visual">
+          <span class="sv-icon">🖥</span>
+          <span class="sv-label"><strong>Install icon</strong> — right side of the address/URL bar</span>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Or use the browser menu</div>
+        <div class="step-desc">Click ⋮ menu → "Save and share" → "Install Cascade Hideaway Cleaning Checklist…"</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Click "Install" to confirm</div>
+        <div class="step-desc">The app opens in its own window and a shortcut is added to your taskbar and desktop.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-wrap">
+  <hr class="cta-rule">
+  <p class="cta-eyebrow">Step 1 — Open the app</p>
+  <a id="btn-open"
+     href="https://cascadereservations-del.github.io/CH-Cleaners-Checklist/"
+     target="_blank"
+     rel="noopener noreferrer">
+    Open Checklist App ›
+  </a>
+  <p class="cta-note">Opens in a new tab. Follow the steps above to save the icon to your home screen.</p>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  Cascade Hideaway · General Santos City<br>
+  <a href="mailto:cascadereservations@gmail.com">cascadereservations@gmail.com</a>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var ua         = navigator.userAgent || '';
+  var isIOS      = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  var isAndroid  = /Android/.test(ua);
+  var standalone = window.navigator.standalone === true
+                || window.matchMedia('(display-mode: standalone)').matches;
+
+  /* Already installed */
+  if (standalone) {
+    document.getElementById('already-installed').classList.add('visible');
+  }
+
+  /* Android Chrome native install prompt */
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferred = e;
+    document.getElementById('install-banner').classList.add('visible');
+  });
+
+  document.getElementById('btn-native').addEventListener('click', async function () {
+    if (!deferred) return;
+    deferred.prompt();
+    var result = await deferred.userChoice;
+    deferred = null;
+    document.getElementById('install-banner').classList.remove('visible');
+    if (result.outcome === 'accepted') {
+      document.getElementById('already-installed').classList.add('visible');
+    }
+  });
+
+  /* Tab switching */
+  function setTab(id) {
+    ['ios', 'android', 'desktop'].forEach(function (t) {
+      var btn   = document.getElementById('tab-' + t);
+      var panel = document.getElementById('panel-' + t);
+      var on    = t === id;
+      if (btn)   { btn.classList.toggle('active', on); btn.setAttribute('aria-selected', on ? 'true' : 'false'); }
+      if (panel) { panel.classList.toggle('active', on); }
+    });
+  }
+  window.setTab = setTab;
+
+  /* Auto-select by device */
+  setTab(isIOS ? 'ios' : isAndroid ? 'android' : 'desktop');
+
+  /* iOS: open in same tab so Share button is available */
+  if (isIOS) {
+    var btn = document.getElementById('btn-open');
+    btn.removeAttribute('target');
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      window.location.href = btn.href;
+    });
+  }
+})();
+</script>
+</body>
+</html>

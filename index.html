@@ -3376,9 +3376,34 @@ body.mode-quick .detail-text { display: none; }
 .toast-blur-btn:hover { background: rgba(255,255,255,0.28); }
 .toast-blur-btn.keep  { border-color: rgba(255,255,255,0.2); }
 
+#auth-gate { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:#f3f0ec; }
+#auth-gate[hidden] { display:none; }
+.auth-card { width:min(420px,100%); padding:32px; border:1px solid #d8d0c7; border-radius:16px; background:#fff; box-shadow:0 20px 60px rgba(30,24,20,.12); }
+.auth-card h1 { margin:0 0 8px; font-family:var(--font-display); color:#2d2824; }
+.auth-card p { margin:0 0 22px; color:#6f675f; line-height:1.5; }
+.auth-card label { display:block; margin:14px 0 6px; font-size:.82rem; font-weight:700; color:#4d4640; }
+.auth-card input { width:100%; min-height:46px; box-sizing:border-box; padding:10px 12px; border:1px solid #cfc6bc; border-radius:8px; font:inherit; }
+.auth-card button { width:100%; min-height:48px; margin-top:20px; border:0; border-radius:8px; background:#3e5546; color:#fff; font:700 1rem var(--font-body); cursor:pointer; }
+.auth-card button:disabled { opacity:.6; cursor:wait; }
+#auth-error { min-height:20px; margin-top:12px; color:#9d2f2f; font-size:.86rem; }
+#staff-logout { border:0; background:transparent; color:#6f675f; text-decoration:underline; cursor:pointer; font:600 .72rem var(--font-body); }
+
 </style>
 </head>
 <body class="mode-detail">
+
+<section id="auth-gate" aria-labelledby="auth-title">
+  <form class="auth-card" id="auth-form">
+    <h1 id="auth-title">Staff sign in</h1>
+    <p>Use the cleaner account issued by Cascade. Public sign-up is disabled.</p>
+    <label for="auth-email">Email</label>
+    <input id="auth-email" type="email" autocomplete="username" required>
+    <label for="auth-password">Password</label>
+    <input id="auth-password" type="password" autocomplete="current-password" required>
+    <button id="auth-submit" type="submit">Sign in</button>
+    <div id="auth-error" role="alert" aria-live="polite"></div>
+  </form>
+</section>
 
 <!-- ════════════════════════════════════════════════════════════
   TOP BAR
@@ -4287,6 +4312,8 @@ const EDGE_AVAILABILITY  = 'https://qkgfhsdppslwunarczeq.supabase.co/functions/v
 // v7.0: calendar module — single source of truth for all booking data
 const EDGE_CALENDAR_SYNC = `${EDGE_BASE}/calendar-sync`;
 const PROPERTY_ID        = '6ae230f4-c189-4547-84b1-cb6e0b2cc9bd'; // Cascade Bria
+const AUTH_SESSION_KEY   = 'ch_staff_session_v1';
+let staffSession         = null;
 
 const DRAFT_KEY          = 'ch_draft_v6';
 const DRAFT_VERSION      = 5; // bumped v7.8: extraExpenses added to draft
@@ -4300,6 +4327,101 @@ const PHASE_KEY          = 'ch_phase';
 // FUTURE DEV: Remove once Code.gs is updated with PropertiesService server-side dedup
 // (the submissionId field is already sent in the payload — Code.gs just needs to check it).
 const SUBMITTED_IDS_KEY  = 'ch_submitted_ids';
+
+function saveStaffSession(session) {
+  staffSession = session;
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearStaffSession() {
+  staffSession = null;
+  localStorage.removeItem(AUTH_SESSION_KEY);
+}
+
+async function authRequest(grantType, body) {
+  const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${grantType}`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_ANON, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data.access_token || !data.user?.id) {
+    throw new Error(data.error_description || data.msg || 'Sign-in failed');
+  }
+  saveStaffSession({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Math.floor(Date.now() / 1000) + Number(data.expires_in || 3600),
+    user: { id: data.user.id, email: data.user.email || '' },
+  });
+  return staffSession;
+}
+
+async function requireStaffSession() {
+  if (!staffSession) {
+    try { staffSession = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch { clearStaffSession(); }
+  }
+  if (!staffSession?.access_token) return null;
+  if (Number(staffSession.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return staffSession;
+  if (!staffSession.refresh_token) { clearStaffSession(); return null; }
+  try {
+    return await authRequest('refresh_token', { refresh_token: staffSession.refresh_token });
+  } catch {
+    clearStaffSession();
+    return null;
+  }
+}
+
+async function staffHeaders(json = false) {
+  const session = await requireStaffSession();
+  if (!session) throw new Error('Staff session expired. Sign in again.');
+  return {
+    'apikey': SUPABASE_ANON,
+    'Authorization': `Bearer ${session.access_token}`,
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+  };
+}
+
+async function initStaffAuth() {
+  const gate = el('auth-gate');
+  const form = el('auth-form');
+  const errorEl = el('auth-error');
+  const submit = el('auth-submit');
+  const existing = await requireStaffSession();
+  if (existing) { gate.hidden = true; return true; }
+
+  gate.hidden = false;
+  return await new Promise(resolve => {
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      submit.disabled = true;
+      errorEl.textContent = '';
+      try {
+        await authRequest('password', {
+          email: el('auth-email').value.trim(),
+          password: el('auth-password').value,
+        });
+        gate.hidden = true;
+        resolve(true);
+      } catch (error) {
+        errorEl.textContent = error.message || 'Sign-in failed';
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  });
+}
+
+function installLogoutButton() {
+  const host = el('top-right');
+  if (!host || el('staff-logout')) return;
+  const button = document.createElement('button');
+  button.id = 'staff-logout';
+  button.type = 'button';
+  button.textContent = 'Sign out';
+  button.addEventListener('click', () => { clearStaffSession(); location.reload(); });
+  host.appendChild(button);
+}
 
 const DWELL_DURATION     = 10 * 60; // 600 seconds
 const PHASE_LABELS       = ['Setup', 'Document', 'Arrive & Prep', 'Clean', 'Finish'];
@@ -5199,7 +5321,9 @@ async function fetchPrevReadings() {
   const row      = el('prev-readings-row');
 
   try {
-    const resp = await fetch(`${EDGE_BASE}/last-readings`, { method: 'GET' });
+    const resp = await fetch(`${EDGE_BASE}/last-readings?property_id=${encodeURIComponent(PROPERTY_ID)}`, {
+      method: 'GET', headers: await staffHeaders(),
+    });
     const data = await resp.json();
     if (data.ok !== false && data.electric !== undefined) {
       state.prevElectricReading = data.electric !== null ? parseFloat(data.electric) : null;
@@ -5324,16 +5448,17 @@ async function uploadPhotoDrive(slotOrId, dataUrl, fileName) {
       fileData:    dataUrl,
       fileName,
       mimeType:    'image/jpeg',
-      sessionDate: todayManila(),
+      propertyId:  PROPERTY_ID,
+      submissionId: state.submissionId || (state.submissionId = uuid()),
     });
     const resp = await fetchWithRetry(`${EDGE_BASE}/upload-photo`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await staffHeaders(true),
       body,
     }, 2, 30000); // C4: 2 retries, 30s base timeout (was 1 retry, 45s)
 
     const data = await resp.json();
-    if (data.ok && data.publicUrl) return { fileId: data.path, fileUrl: data.publicUrl };
+    if (data.ok && data.signedUrl) return { fileId: data.path, fileUrl: data.signedUrl };
   } catch (e) {
     state.uploadRetryCount = (state.uploadRetryCount || 0) + 1;
   }
@@ -7429,6 +7554,7 @@ async function proceedWithSubmission() {
   await ensureSessionFolder().catch(() => {});
 
   const payload = buildPayload();
+  payload.propertyId = PROPERTY_ID;
 
   // v6.6: submit-cleaning Edge Function reads electricReading + waterReading at the
   // top level (not inside formData) to write meter_readings row. Add them here.
@@ -7440,7 +7566,7 @@ async function proceedWithSubmission() {
       `${EDGE_BASE}/submit-cleaning`,
       {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await staffHeaders(true),
         body:    JSON.stringify(payload),
       },
       2,       // maxRetries
@@ -7786,9 +7912,9 @@ async function loadSupplyItems() {
   }
 
   try {
-    const url = `${SUPABASE_URL}/rest/v1/inventory_items?is_active=eq.true&is_consumable=eq.true&select=id,name,category,qty_on_hand,reorder_below,consumption_per_booking&order=name.asc`;
+    const url = `${SUPABASE_URL}/rest/v1/inventory_items?property_id=eq.${PROPERTY_ID}&is_active=eq.true&is_consumable=eq.true&select=id,name,category,qty_on_hand,reorder_below,consumption_per_booking&order=name.asc`;
     const resp = await fetch(url, {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}`, 'Accept': 'application/json' },
+      headers: { ...(await staffHeaders()), 'Accept': 'application/json' },
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const items = await resp.json();
@@ -7996,6 +8122,8 @@ async function saveSupplyUsage() {
                     : (item.usedQty || 1),
       session_date: sessionDate,
       logged_by:    loggedBy,
+      property_id:  PROPERTY_ID,
+      submitted_by_user_id: staffSession.user.id,
     }));
 
   try {
@@ -8003,8 +8131,7 @@ async function saveSupplyUsage() {
       const resp = await fetch(`${SUPABASE_URL}/rest/v1/inventory_usage`, {
         method:  'POST',
         headers: {
-          'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}`,
-          'Content-Type': 'application/json', 'Prefer': 'return=minimal',
+          ...(await staffHeaders(true)), 'Prefer': 'return=minimal',
         },
         body: JSON.stringify(rows),
       });
@@ -8352,19 +8479,9 @@ const CALENDAR_CACHE_TTL  = 5 * 60 * 1000; // 5 min client cache
 // Fire-and-forget sync on load — populates calendar_events table
 const CAL_SYNC_KEY = 'ch_cal_last_sync'; // localStorage key for client-side rate gate
 
-function triggerCalendarSync() {
-  if (!navigator.onLine) return;
-  // Client-side gate: skip if synced within 30 minutes (saves network on hot path)
-  const last = parseInt(ls(CAL_SYNC_KEY) || '0', 10);
-  if (Date.now() - last < 30 * 60 * 1000) return;
-  fetch(EDGE_CALENDAR_SYNC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ property_id: PROPERTY_ID }),
-  }).then(() => {
-    ls(CAL_SYNC_KEY, String(Date.now())); // record successful sync time
-  }).catch(() => { /* fail silently */ });
-}
+// Calendar synchronization is server-scheduled. Cleaner devices only read the
+// resulting property-scoped projection and never invoke the sync boundary.
+function triggerCalendarSync() {}
 
 async function fetchBookingForDate(dateStr) {
   if (!dateStr || !navigator.onLine) {
@@ -8402,9 +8519,7 @@ async function queryCalendarRPC(dateStr) {
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
-      'apikey':        SUPABASE_ANON,
-      'Authorization': `Bearer ${SUPABASE_ANON}`,
-      'Content-Type':  'application/json',
+      ...(await staffHeaders(true)),
     },
     body: JSON.stringify({ p_date: dateStr, p_property_id: PROPERTY_ID }),
   });
@@ -8432,7 +8547,7 @@ async function fetchAllCalendarEvents() {
   try {
     const resp = await fetch(
       `${SUPABASE_URL}/rest/v1/calendar_events?property_id=eq.${PROPERTY_ID}&status=neq.cancelled&select=checkin_date,checkout_date,nights,status`,
-      { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` } }
+      { headers: await staffHeaders() }
     );
     if (!resp.ok) return null;
     _allEventsCache = await resp.json();
@@ -8445,7 +8560,7 @@ async function fetchBookingLegacy(dateStr) {
   const now = Date.now();
   if (!_calendarCache || (now - _calendarCache.fetchedAt) > CALENDAR_CACHE_TTL) {
     const resp = await fetch(EDGE_AVAILABILITY, {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` },
+      headers: { 'apikey': SUPABASE_ANON },
     });
     if (!resp.ok) return null;
     _calendarCache = { data: await resp.json(), fetchedAt: now };
@@ -8545,8 +8660,11 @@ function initAutofillBanner() {
 /* ═══════════════════════════════════════════════════════════════
    MAIN INIT
 ═══════════════════════════════════════════════════════════════ */
-function init() {
+async function init() {
   registerServiceWorker();
+
+  await initStaffAuth();
+  installLogoutButton();
 
   // v7.0: trigger calendar sync on load (non-blocking, 30-min rate limited)
   triggerCalendarSync();

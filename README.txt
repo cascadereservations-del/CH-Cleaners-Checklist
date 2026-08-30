@@ -18,3 +18,9 @@ This pack contains icons and files to make your GitHub Pages site installable as
 4. For updates to caching, bump `CACHE_NAME` in `sw.js` (e.g., `ch-checklist-v2`).
 
 > Note: If your app references assets with absolute paths, ensure they include the `/CH-Cleaners-Checklist/` prefix, or use relative `./` paths to avoid 404s under GitHub Pages.
+
+## Named cleaner authentication cutover
+
+This branch requires an owner-provisioned Supabase Auth account. Public sign-up is not available. The PWA stores only the returned access/refresh session, refreshes expired access tokens, attaches the named user token to every private operational call, and provides sign-out.
+
+Deploy only as one coordinated release with the matching backend migration and JWT-enabled `last-readings`, `upload-photo`, and `submit-cleaning` functions. Deploying either side alone blocks cleaners. Before production, prove owner MFA, create the real cleaner account, assign its role and property, and run a full photo/report/inventory smoke test.

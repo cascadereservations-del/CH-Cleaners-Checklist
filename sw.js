@@ -11,7 +11,7 @@
 //   Navigation (HTML page)        → stale-while-revalidate  (instant load + background refresh)
 //   Everything else               → network-first, cache fallback
 
-const CACHE_NAME = 'ch-shell-v2';
+const CACHE_NAME = 'ch-shell-v3-auth';
 
 // App shell: cache these on install for instant offline load
 const SHELL_URLS = [

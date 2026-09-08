@@ -2555,7 +2555,12 @@ body.mode-quick .detail-text { display: none; }
 .p1-summary-chip:active { background: var(--earthen-ivory); }
 
 #preclean-photo-card, #meter-readings-card, #condition-card {
-  scroll-margin-top: 52px; /* clears the sticky summary once it's stuck */
+  /* Opus review measured the real shortfall in Chromium: the sticky bar
+     sits below .phase's own padding-top (which grows at wider breakpoints),
+     so 52px left two of three jump targets 65-95px under the bar. These
+     three values are measured, not guessed — see the two @media overrides
+     below for the 600px/960px tiers. */
+  scroll-margin-top: 118px;
 }
 
 .phase-progress-bar {
@@ -2707,6 +2712,7 @@ body.mode-quick .detail-text { display: none; }
   #btn-next.primary, #btn-submit { min-width: 130px; }
   .item-checkbox { width: 26px; height: 26px; }
   .messenger-btn { min-height: 54px; }
+  #preclean-photo-card, #meter-readings-card, #condition-card { scroll-margin-top: 135px; }
 }
 
 /* Desktop (≥960px) — constrain width, center layout */
@@ -2724,6 +2730,7 @@ body.mode-quick .detail-text { display: none; }
   .card { border-radius: 18px; }
   .checklist-item { border-radius: 14px; }
   .item-row { padding: var(--space-5) var(--space-6); min-height: 68px; }
+  #preclean-photo-card, #meter-readings-card, #condition-card { scroll-margin-top: 148px; }
   .nav-btn { min-height: 52px; }
   .meter-photo-grid { grid-template-columns: 1fr 1fr; gap: var(--space-4); }
 }
@@ -3500,12 +3507,16 @@ body.mode-quick .detail-text { display: none; }
 <header id="top-bar" role="banner">
   <span id="property-name">Cascade Hideaway</span>
 
-  <nav id="phase-stepper" aria-label="Progress through 5 phases">
-    <span class="stepper-seg active" id="dot-0" aria-label="Phase 1: Setup"></span>
-    <span class="stepper-seg" id="dot-1" aria-label="Phase 2: Document"></span>
-    <span class="stepper-seg" id="dot-2" aria-label="Phase 3: Arrive &amp; Prep"></span>
-    <span class="stepper-seg" id="dot-3" aria-label="Phase 4: Clean"></span>
-    <span class="stepper-seg" id="dot-4" aria-label="Phase 5: Finish"></span>
+  <!-- Purely decorative — aria-hidden, not aria-label per segment: a
+       role-less <span> ignores aria-label anyway (would announce as 5
+       nameless "generic" nodes), and the bottom bar's #phase-label-bar
+       already announces the current phase name accessibly. -->
+  <nav id="phase-stepper" aria-hidden="true">
+    <span class="stepper-seg active" id="dot-0"></span>
+    <span class="stepper-seg" id="dot-1"></span>
+    <span class="stepper-seg" id="dot-2"></span>
+    <span class="stepper-seg" id="dot-3"></span>
+    <span class="stepper-seg" id="dot-4"></span>
   </nav>
 
   <div id="top-right">
@@ -3728,14 +3739,14 @@ body.mode-quick .detail-text { display: none; }
          counts without scrolling this long phase, and tap a short one to
          jump straight to it. -->
     <div class="p1-sticky-summary" id="p1-sticky-summary" role="navigation" aria-label="Jump to a section in this phase">
-      <button type="button" class="p1-summary-chip" id="p1-jump-preclean">
-        <span aria-hidden="true">📸</span> <span id="p1-summary-preclean">0/5</span>
+      <button type="button" class="p1-summary-chip" id="p1-jump-preclean" aria-label="Pre-cleaning photos, 0 of 5. Jump to section.">
+        <span aria-hidden="true">📸</span> <span id="p1-summary-preclean" aria-hidden="true">0/5</span>
       </button>
-      <button type="button" class="p1-summary-chip" id="p1-jump-meters">
-        <span aria-hidden="true">⚡💧</span> <span id="p1-summary-meters">0/2</span>
+      <button type="button" class="p1-summary-chip" id="p1-jump-meters" aria-label="Meter photos, 0 of 2. Jump to section.">
+        <span aria-hidden="true">⚡💧</span> <span id="p1-summary-meters" aria-hidden="true">0/2</span>
       </button>
-      <button type="button" class="p1-summary-chip" id="p1-jump-condition">
-        <span aria-hidden="true">🔍</span> <span id="p1-summary-condition">—</span>
+      <button type="button" class="p1-summary-chip" id="p1-jump-condition" aria-label="Unit condition, not checked yet. Jump to section.">
+        <span aria-hidden="true">🔍</span> <span id="p1-summary-condition" aria-hidden="true">—</span>
       </button>
     </div>
 
@@ -6202,12 +6213,20 @@ function updatePhotoCounter() {
 // the same call sites that already update the individual section counts
 // (meter photos, preclean photos, unit condition).
 function updateP1StickySummary() {
+  const precl = state.precleanPhotos.length;
   const preclEl = el('p1-summary-preclean');
-  if (preclEl) preclEl.textContent = `${state.precleanPhotos.length}/${PRECLEAN_PHOTO_MIN}`;
+  if (preclEl) preclEl.textContent = `${precl}/${PRECLEAN_PHOTO_MIN}`;
+  el('p1-jump-preclean')?.setAttribute('aria-label', `Pre-cleaning photos, ${precl} of ${PRECLEAN_PHOTO_MIN}. Jump to section.`);
+
+  const meters = state.meterPhotos.filter(p => p !== null).length;
   const meterEl = el('p1-summary-meters');
-  if (meterEl) meterEl.textContent = `${state.meterPhotos.filter(p => p !== null).length}/2`;
+  if (meterEl) meterEl.textContent = `${meters}/2`;
+  el('p1-jump-meters')?.setAttribute('aria-label', `Meter photos, ${meters} of 2. Jump to section.`);
+
   const condEl = el('p1-summary-condition');
   if (condEl) condEl.textContent = state.conditionStatus ? '✓' : '—';
+  el('p1-jump-condition')?.setAttribute('aria-label',
+    state.conditionStatus ? 'Unit condition, checked. Jump to section.' : 'Unit condition, not checked yet. Jump to section.');
 }
 
 function initP1StickySummary() {

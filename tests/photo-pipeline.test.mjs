@@ -58,5 +58,25 @@ test('the photo path contract is unchanged: same upload-photo endpoint and slot-
 });
 
 test('the retry-all link respects its hidden attribute (regression: author CSS beat [hidden])', () => {
-  assert.match(html, /\.section-retry-link\[hidden\], \.meter-retry-link\[hidden\] \{ display: none; \}/);
+  assert.match(html, /\.section-retry-link\[hidden\] \{ display: none; \}/);
+});
+
+test('a photo record is identified by object identity, not a numeric index that goes stale after a splice (WP2 fixup)', () => {
+  assert.doesNotMatch(html, /function renderSectionThumb\(idx\)/);
+  assert.match(html, /function retrySectionPhoto\(photo\)/);
+  assert.match(html, /const liveIdx = photos\.indexOf\(photo\);/);
+});
+
+test('IndexedDB write failures fall back to an in-memory blob, not a permanently unrecoverable photo (WP2 fixup)', () => {
+  assert.match(html, /if \(photo\._blob\) return blobToDataURL\(photo\._blob\);/);
+  assert.match(html, /idbId: stored \? id : null/);
+});
+
+test('a meter retake releases the previous photo\'s storage instead of leaking it (WP2 fixup)', () => {
+  assert.match(html, /const previous = state\.meterPhotos\[i\];/);
+  assert.match(html, /if \(previous\?\.idbId\) idbDeletePhoto\(previous\.idbId\);/);
+});
+
+test('discarding a draft sweeps any still-pending photo blobs out of IndexedDB (WP2 fixup)', () => {
+  assert.match(html, /function clearDraft\(\) \{[\s\S]{0,700}idbDeletePhoto\(meta\.idbId\)/);
 });

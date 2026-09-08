@@ -1475,11 +1475,11 @@ textarea {
 }
 .photo-status-badge.status-failed { background: #9d2f2f; pointer-events: auto; cursor: pointer; }
 .photo-status-badge.status-done { display: none; } /* the green border on the thumb already says "done" */
-.section-retry-link, .meter-retry-link {
+.section-retry-link {
   display: inline-block; margin-left: var(--space-2); font-size: var(--font-size-xs);
   font-weight: 700; color: #9d2f2f; text-decoration: underline; cursor: pointer;
 }
-.section-retry-link[hidden], .meter-retry-link[hidden] { display: none; }
+.section-retry-link[hidden] { display: none; }
 
 .spc-count {
   font-size: var(--font-size-xs);
@@ -5812,6 +5812,12 @@ async function resolvePhotoDataUrl(photo) {
     const blob = await idbGetPhoto(photo.idbId);
     if (blob) return blobToDataURL(blob);
   }
+  // idbPutPhoto can fail silently (quota, blocked storage, private mode) —
+  // _blob is the same-session in-memory copy kept specifically for that
+  // case, so a photo doesn't become permanently unrecoverable just because
+  // IndexedDB rejected the write. Lost only on a full page reload, at which
+  // point restorePhotoFromMeta()'s own idbId-miss handling takes over.
+  if (photo._blob) return blobToDataURL(photo._blob);
   return null;
 }
 
@@ -5880,17 +5886,13 @@ async function uploadPhotoRecord(photo, slotKey, onStatus) {
     photo.uploaded = true;
     photo.status   = 'done';
     photo.data     = null;
+    photo._blob    = null;
     if (photo.idbId) { await idbDeletePhoto(photo.idbId); photo.idbId = null; }
   } catch {
     photo.status = 'failed';
   }
   onStatus?.();
   saveDraft();
-}
-
-function anyPhotoUploadPending() {
-  const groups = [state.meterPhotos, state.precleanPhotos, state.bedroomPhotos, state.kitchenPhotos, state.aftercleanPhotos];
-  return groups.some(g => (g || []).some(p => p && (p.status === 'queued' || p.status === 'uploading')));
 }
 
 // Draft snapshot for one photo record — never base64/blob, just enough to
@@ -6087,7 +6089,13 @@ function initMeterPhotos() {
         const label   = i === 0 ? 'electric_meter' : 'water_meter';
         const fname   = `${label}_${todayManila()}_${Date.now()}.jpg`;
         const id      = uuid();
-        await idbPutPhoto(id, blob);
+        const stored  = await idbPutPhoto(id, blob);
+
+        // A retake replaces whatever was already in this slot — release its
+        // storage first so retakes don't leak an IndexedDB row or object URL.
+        const previous = state.meterPhotos[i];
+        if (previous?.idbId) idbDeletePhoto(previous.idbId);
+        if (previous?.objectUrl) URL.revokeObjectURL(previous.objectUrl);
 
         if (spinEl) spinEl.style.display = 'none';
         if (statusEl) statusEl.textContent = '';
@@ -6096,7 +6104,9 @@ function initMeterPhotos() {
         if (triggerBtn) triggerBtn.classList.add('has-photo');
 
         state.meterPhotos[i] = {
-          idbId: id, objectUrl: URL.createObjectURL(blob), name: fname,
+          // idbPutPhoto can fail silently (quota, blocked storage); _blob is
+          // the same-session in-memory fallback resolvePhotoDataUrl() uses then.
+          idbId: stored ? id : null, _blob: blob, objectUrl: URL.createObjectURL(blob), name: fname,
           uploaded: false, url: null, fileId: null, data: null, status: 'queued',
         };
         renderMeterThumb();
@@ -6327,23 +6337,32 @@ function initSectionPhotos() {
       retryLink.hidden = true;
       retryLink.addEventListener('click', e => {
         e.preventDefault();
-        state[`${key}Photos`].forEach((p, idx) => { if (p && p.status === 'failed') retrySectionPhoto(idx); });
+        state[`${key}Photos`].forEach(p => { if (p && p.status === 'failed') retrySectionPhoto(p); });
       });
       countEl.insertAdjacentElement('afterend', retryLink);
     }
 
-    function renderSectionThumb(idx) {
-      const photo = state[`${key}Photos`][idx];
-      const wrapEl = thumbsEl?.children[idx];
-      if (photo && wrapEl) renderPhotoThumb(wrapEl, photo, () => retrySectionPhoto(idx), 'section-photo-thumb');
+    // Every function below takes the photo OBJECT, never a numeric index —
+    // an index captured in a closure goes stale the moment an earlier photo
+    // in the array is removed (splice shifts everything after it down by
+    // one), which used to let a queued upload land on the wrong photo, or a
+    // retry re-upload an already-done one while the real failure stayed
+    // failed. `photos.indexOf(photo)` is always resolved fresh, right when
+    // it's actually needed for the `${key}_${idx}` slot key.
+    function renderOnePhoto(photo) {
+      if (photo?._wrapEl) renderPhotoThumb(photo._wrapEl, photo, () => retrySectionPhoto(photo), 'section-photo-thumb');
     }
 
-    function retrySectionPhoto(idx) {
-      const photo = state[`${key}Photos`][idx];
-      if (!photo) return;
+    function retrySectionPhoto(photo) {
+      const photos = state[`${key}Photos`];
+      if (!photo || photo.status === 'uploading' || !photos.includes(photo)) return;
       photo.status = 'queued';
-      renderSectionThumb(idx);
-      enqueuePhotoUpload(() => uploadPhotoRecord(photo, `${key}_${idx}`, () => { renderSectionThumb(idx); updateSectionCount(); }));
+      renderOnePhoto(photo);
+      enqueuePhotoUpload(() => {
+        const liveIdx = photos.indexOf(photo);
+        if (liveIdx < 0) return Promise.resolve(); // removed while queued — nothing to upload
+        return uploadPhotoRecord(photo, `${key}_${liveIdx}`, () => { renderOnePhoto(photo); updateSectionCount(); });
+      });
     }
 
     // v6.8: use per-section sMin/sMax
@@ -6375,27 +6394,27 @@ function initSectionPhotos() {
       updateBottomBar();
     }
 
-    // Appends one thumbnail wrapper (tap-to-remove) for photos[idx] and
-    // renders it. Shared by a fresh capture and a draft restore (WP2).
-    function appendThumbWrap(idx) {
+    // Appends one thumbnail wrapper (tap-to-remove) for `photo` and renders
+    // it. Shared by a fresh capture and a draft restore (WP2).
+    function appendThumbWrap(photo) {
       if (!thumbsEl) return;
       const photos = state[`${key}Photos`];
       const wrap = document.createElement('div');
       wrap.title = 'Tap the photo to remove it';
       wrap.addEventListener('click', e => {
         if (e.target.closest('.photo-status-badge')) return; // badge handles its own click (retry)
-        const liveIdx = Array.from(thumbsEl.children).indexOf(wrap);
+        const liveIdx = photos.indexOf(photo);
         if (liveIdx < 0) return;
-        const removed = photos[liveIdx];
-        if (removed?.idbId) idbDeletePhoto(removed.idbId);
-        if (removed?.objectUrl) URL.revokeObjectURL(removed.objectUrl);
+        if (photo.idbId) idbDeletePhoto(photo.idbId);
+        if (photo.objectUrl) URL.revokeObjectURL(photo.objectUrl);
         photos.splice(liveIdx, 1);
         wrap.remove();
         updateSectionCount();
         saveDraft();
       });
       thumbsEl.appendChild(wrap);
-      renderPhotoThumb(wrap, photos[idx], () => retrySectionPhoto(idx), 'section-photo-thumb');
+      photo._wrapEl = wrap;
+      renderOnePhoto(photo);
     }
 
     // Rebuilds this section's photos from a saved draft (WP2) — remote URLs
@@ -6407,11 +6426,14 @@ function initSectionPhotos() {
       for (const meta of metaList) {
         const photo = await restorePhotoFromMeta(meta);
         if (!photo) continue;
-        const idx = photos.length;
         photos.push(photo);
-        appendThumbWrap(idx);
+        appendThumbWrap(photo);
         if (photo.status === 'queued') {
-          enqueuePhotoUpload(() => uploadPhotoRecord(photo, `${key}_${idx}`, () => { renderSectionThumb(idx); updateSectionCount(); }));
+          enqueuePhotoUpload(() => {
+            const liveIdx = photos.indexOf(photo);
+            if (liveIdx < 0) return Promise.resolve();
+            return uploadPhotoRecord(photo, `${key}_${liveIdx}`, () => { renderOnePhoto(photo); updateSectionCount(); });
+          });
         }
       }
       updateSectionCount();
@@ -6436,20 +6458,26 @@ function initSectionPhotos() {
           if (!keep) return;
         }
 
-        const fname = `${label}_${todayManila()}_${Date.now()}.jpg`;
-        const idx   = photos.length;
-        const id    = uuid();
-        await idbPutPhoto(id, blob);
-        photos.push({
-          idbId: id, objectUrl: URL.createObjectURL(blob), name: fname,
+        const fname  = `${label}_${todayManila()}_${Date.now()}.jpg`;
+        const id     = uuid();
+        const stored = await idbPutPhoto(id, blob);
+        const photo = {
+          // idbPutPhoto can fail silently (quota, blocked storage); _blob is
+          // the same-session in-memory fallback resolvePhotoDataUrl() uses then.
+          idbId: stored ? id : null, _blob: blob, objectUrl: URL.createObjectURL(blob), name: fname,
           uploaded: false, url: null, fileId: null, data: null, status: 'queued',
-        });
+        };
+        photos.push(photo);
 
-        appendThumbWrap(idx);
+        appendThumbWrap(photo);
         updateSectionCount();
         saveDraft();
 
-        enqueuePhotoUpload(() => uploadPhotoRecord(photos[idx], `${key}_${idx}`, () => { renderSectionThumb(idx); updateSectionCount(); }));
+        enqueuePhotoUpload(() => {
+          const liveIdx = photos.indexOf(photo);
+          if (liveIdx < 0) return Promise.resolve();
+          return uploadPhotoRecord(photo, `${key}_${liveIdx}`, () => { renderOnePhoto(photo); updateSectionCount(); });
+        });
 
       } catch {
         showToast('Photo failed — tap to retry', 'error');
@@ -7348,6 +7376,16 @@ function applyDraft(draft) {
 }
 
 function clearDraft() {
+  // A discarded draft ("Start fresh") or one whose unfinished photos got
+  // silently dropped from a submission can still reference IndexedDB blobs
+  // (WP2). Sweep every group's idbId before the draft itself disappears —
+  // otherwise those rows never get deleted.
+  const stale = lsJSON(DRAFT_KEY);
+  if (stale) {
+    ['meterPhotoMeta', 'precleanPhotoMeta', 'bedroomPhotoMeta', 'kitchenPhotoMeta', 'aftercleanPhotoMeta'].forEach(field => {
+      (stale[field] || []).forEach(meta => { if (meta?.idbId) idbDeletePhoto(meta.idbId); });
+    });
+  }
   ls(DRAFT_KEY, null);
   ls(DWELL_KEY, null);
   // Don't clear session folder — keep for current day

@@ -4336,7 +4336,7 @@ const STAFF_DOMAIN = 'staff.cascade.invalid';
 function staffLoginEmail(raw) {
   const v = String(raw || '').trim();
   if (v.includes('@')) return v.toLowerCase();
-  const slug = v.normalize('NFKD').replace(/[^ -]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
+  const slug = v.normalize('NFKD').replace(/[^ -~]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
   return `${slug}@${STAFF_DOMAIN}`;
 }
 

@@ -3343,6 +3343,26 @@ body.mode-quick .detail-text { display: none; }
 .auth-card button:disabled { opacity:.6; cursor:wait; }
 #auth-error { min-height:20px; margin-top:12px; color:#9d2f2f; font-size:.86rem; }
 
+/* WP1b: PIN lock screen — phone-lock-style keypad, dark full-bleed overlay */
+.pin-gate { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:#1c1a18; }
+.pin-gate[hidden] { display:none; }
+.pin-card { width:min(360px,100%); text-align:center; color:#f3f0ec; }
+.pin-card h1 { margin:0 0 8px; font-family:var(--font-display); font-size:1.4rem; }
+.pin-card p { margin:0 0 22px; color:#bdb5ab; font-size:.9rem; line-height:1.4; }
+.pin-dots { display:flex; justify-content:center; gap:16px; margin-bottom:18px; }
+.pin-dot { width:16px; height:16px; border-radius:50%; border:1.5px solid #bdb5ab; background:transparent; transition:background var(--transition-fast, .15s), transform .15s; }
+.pin-dot.filled { background:#f3f0ec; transform:scale(1.1); }
+.pin-error { min-height:20px; margin:0 0 14px; color:#ff8a80; font-size:.86rem; }
+.pin-keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; max-width:280px; margin:0 auto; }
+.pin-key {
+  min-height:64px; border-radius:50%; border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.06); color:#f3f0ec; font:600 1.4rem var(--font-body);
+  cursor:pointer;
+}
+.pin-key:active { background:rgba(255,255,255,0.16); }
+.pin-key-spacer { border:0; background:transparent; cursor:default; }
+.pin-key-back { font-size:1.2rem; }
+
 </style>
 </head>
 <body class="mode-detail">
@@ -3359,6 +3379,57 @@ body.mode-quick .detail-text { display: none; }
     <button id="auth-submit" type="submit">Sign in</button>
     <div id="auth-error" role="alert" aria-live="polite"></div>
   </form>
+</section>
+
+<!-- WP1b: local PIN lock screen — never a network check, never the Supabase
+     password. See PIN_KEY / verifyPin() / showPinLockScreen(). -->
+<section id="pin-lock-gate" class="pin-gate" hidden aria-labelledby="pin-lock-title">
+  <div class="pin-card">
+    <h1 id="pin-lock-title">Enter your PIN</h1>
+    <div class="pin-dots" id="pin-lock-dots" aria-hidden="true">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <p id="pin-lock-error" class="pin-error" role="alert" aria-live="polite"></p>
+    <div class="pin-keypad" id="pin-lock-keypad" role="group" aria-label="PIN keypad">
+      <button type="button" class="pin-key" data-digit="1">1</button>
+      <button type="button" class="pin-key" data-digit="2">2</button>
+      <button type="button" class="pin-key" data-digit="3">3</button>
+      <button type="button" class="pin-key" data-digit="4">4</button>
+      <button type="button" class="pin-key" data-digit="5">5</button>
+      <button type="button" class="pin-key" data-digit="6">6</button>
+      <button type="button" class="pin-key" data-digit="7">7</button>
+      <button type="button" class="pin-key" data-digit="8">8</button>
+      <button type="button" class="pin-key" data-digit="9">9</button>
+      <span class="pin-key pin-key-spacer" aria-hidden="true"></span>
+      <button type="button" class="pin-key" data-digit="0">0</button>
+      <button type="button" class="pin-key pin-key-back" id="pin-lock-back" aria-label="Delete digit">⌫</button>
+    </div>
+  </div>
+</section>
+
+<section id="pin-setup-gate" class="pin-gate" hidden aria-labelledby="pin-setup-title">
+  <div class="pin-card">
+    <h1 id="pin-setup-title">Set a PIN</h1>
+    <p id="pin-setup-sub">Choose a 4-digit PIN to unlock this app quickly next time.</p>
+    <div class="pin-dots" id="pin-setup-dots" aria-hidden="true">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <p id="pin-setup-error" class="pin-error" role="alert" aria-live="polite"></p>
+    <div class="pin-keypad" id="pin-setup-keypad" role="group" aria-label="PIN keypad">
+      <button type="button" class="pin-key" data-digit="1">1</button>
+      <button type="button" class="pin-key" data-digit="2">2</button>
+      <button type="button" class="pin-key" data-digit="3">3</button>
+      <button type="button" class="pin-key" data-digit="4">4</button>
+      <button type="button" class="pin-key" data-digit="5">5</button>
+      <button type="button" class="pin-key" data-digit="6">6</button>
+      <button type="button" class="pin-key" data-digit="7">7</button>
+      <button type="button" class="pin-key" data-digit="8">8</button>
+      <button type="button" class="pin-key" data-digit="9">9</button>
+      <span class="pin-key pin-key-spacer" aria-hidden="true"></span>
+      <button type="button" class="pin-key" data-digit="0">0</button>
+      <button type="button" class="pin-key pin-key-back" id="pin-setup-back" aria-label="Delete digit">⌫</button>
+    </div>
+  </div>
 </section>
 
 <!-- ════════════════════════════════════════════════════════════
@@ -4417,13 +4488,189 @@ function renderKnownLogins() {
   });
 }
 
+// ── PIN lock screen (WP1b) ───────────────────────────────────────────────
+// The Auth password stays long and is typed once per device (the gate
+// above). Immediately after, a local PIN takes over for cold opens: it is
+// never the Supabase password, never leaves the device, and no network call
+// checks it. PBKDF2-SHA-256, 100k iterations, random per-device salt.
+const PIN_KEY        = 'ch_pin_v1';
+const PIN_LENGTH     = 4;
+const PIN_ITERATIONS = 100000;
+const PIN_MAX_FAILS  = 5;
+const SUPPORTS_PIN   = !!(window.crypto?.subtle?.importKey && window.crypto?.subtle?.deriveBits);
+
+function bufToBase64(buf) {
+  let binary = '';
+  new Uint8Array(buf).forEach(b => { binary += String.fromCharCode(b); });
+  return btoa(binary);
+}
+
+function base64ToBuf(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function derivePinHash(pin, saltBytes) {
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: saltBytes, iterations: PIN_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  return bufToBase64(bits);
+}
+
+function getPinRecord() {
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) || 'null'); } catch { return null; }
+}
+
+function savePinRecord(record) { ls(PIN_KEY, JSON.stringify(record)); }
+function clearPinRecord()      { ls(PIN_KEY, null); }
+
+async function setPin(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await derivePinHash(pin, salt);
+  savePinRecord({ salt: bufToBase64(salt.buffer), hash, fails: 0 });
+}
+
+async function verifyPin(pin) {
+  const record = getPinRecord();
+  if (!record) return false;
+  const hash = await derivePinHash(pin, base64ToBuf(record.salt));
+  return hash === record.hash;
+}
+
+// Drives a 4-dot keypad: fills dots as digits are pressed, calls onComplete
+// once PIN_LENGTH digits are in, then always clears the buffer so the same
+// screen can be retried without a page reload.
+function createPinInput({ dotsEl, keypadEl, onComplete }) {
+  let buffer = '';
+  function render() {
+    dotsEl.querySelectorAll('.pin-dot').forEach((d, i) => d.classList.toggle('filled', i < buffer.length));
+  }
+  async function pressDigit(d) {
+    if (buffer.length >= PIN_LENGTH) return;
+    buffer += d;
+    if (navigator.vibrate) { try { navigator.vibrate(10); } catch { /* unsupported */ } }
+    render();
+    if (buffer.length === PIN_LENGTH) {
+      const pin = buffer;
+      buffer = '';
+      await onComplete(pin);
+      render();
+    }
+  }
+  function pressBack() { buffer = buffer.slice(0, -1); render(); }
+  keypadEl.querySelectorAll('.pin-key[data-digit]').forEach(btn => {
+    btn.addEventListener('click', () => pressDigit(btn.dataset.digit));
+  });
+  keypadEl.querySelector('.pin-key-back')?.addEventListener('click', pressBack);
+}
+
+// Shown once, right after a password sign-in, whenever this device has no
+// PIN yet (first-ever sign-in, or after a 5-fail lockout reset it).
+function showPinSetupScreen() {
+  return new Promise(resolve => {
+    const gate    = el('pin-setup-gate');
+    const dotsEl  = el('pin-setup-dots');
+    const errorEl = el('pin-setup-error');
+    const subEl   = el('pin-setup-sub');
+    const keypadEl = el('pin-setup-keypad');
+    let firstPin = null;
+
+    errorEl.textContent = '';
+    subEl.textContent = `Choose a ${PIN_LENGTH}-digit PIN to unlock this app quickly next time.`;
+    gate.hidden = false;
+
+    createPinInput({
+      dotsEl, keypadEl,
+      onComplete: async pin => {
+        if (!firstPin) {
+          firstPin = pin;
+          errorEl.textContent = '';
+          subEl.textContent = 'Enter the same PIN again to confirm.';
+          return;
+        }
+        if (pin !== firstPin) {
+          firstPin = null;
+          errorEl.textContent = "PINs didn't match — start again.";
+          subEl.textContent = `Choose a ${PIN_LENGTH}-digit PIN to unlock this app quickly next time.`;
+          return;
+        }
+        await setPin(pin);
+        gate.hidden = true;
+        resolve();
+      },
+    });
+  });
+}
+
+// Shown on every cold open once a PIN exists for this device. Five wrong
+// PINs in a row clear the PIN record and fall back to the password gate.
+function showPinLockScreen() {
+  return new Promise(resolve => {
+    const gate     = el('pin-lock-gate');
+    const dotsEl   = el('pin-lock-dots');
+    const errorEl  = el('pin-lock-error');
+    const titleEl  = el('pin-lock-title');
+    const keypadEl = el('pin-lock-keypad');
+
+    titleEl.textContent = `Hi ${staffSession?.user?.display_name || 'Staff'} — enter your PIN`;
+    errorEl.textContent = '';
+    gate.hidden = false;
+
+    createPinInput({
+      dotsEl, keypadEl,
+      onComplete: async pin => {
+        if (await verifyPin(pin)) {
+          const record = getPinRecord();
+          if (record) { record.fails = 0; savePinRecord(record); }
+          errorEl.textContent = '';
+          gate.hidden = true;
+          resolve(true);
+          return;
+        }
+        const record = getPinRecord() || { fails: 0 };
+        record.fails = (record.fails || 0) + 1;
+        if (record.fails >= PIN_MAX_FAILS) {
+          clearPinRecord();
+          gate.hidden = true;
+          resolve(false);
+          return;
+        }
+        savePinRecord(record);
+        errorEl.textContent = `Wrong PIN — ${PIN_MAX_FAILS - record.fails} ${PIN_MAX_FAILS - record.fails === 1 ? 'try' : 'tries'} left.`;
+      },
+    });
+  });
+}
+
+async function promptSetPinIfNeeded() {
+  if (!SUPPORTS_PIN || getPinRecord()) return;
+  await showPinSetupScreen();
+}
+
 async function initStaffAuth() {
   const gate = el('auth-gate');
   const form = el('auth-form');
   const errorEl = el('auth-error');
   const submit = el('auth-submit');
   const existing = await requireStaffSession();
-  if (existing && !staleSessionGuardTripped()) { gate.hidden = true; touchLastSeen(); return true; }
+  if (existing && !staleSessionGuardTripped()) {
+    touchLastSeen();
+    if (SUPPORTS_PIN && getPinRecord()) {
+      gate.hidden = true;
+      const unlocked = await showPinLockScreen();
+      if (unlocked) return true;
+      // 5 wrong PINs: record was cleared inside showPinLockScreen — fall
+      // through to the password gate below instead of trusting the device.
+    } else {
+      gate.hidden = true;
+      await promptSetPinIfNeeded();
+      return true;
+    }
+  }
 
   renderKnownLogins();
   gate.hidden = false;
@@ -4441,6 +4688,7 @@ async function initStaffAuth() {
         rememberLogin(typedLogin, staffSession.user.display_name);
         touchLastSeen();
         gate.hidden = true;
+        await promptSetPinIfNeeded();
         resolve(true);
       } catch (error) {
         errorEl.textContent = error.message || 'Sign-in failed';
@@ -4470,6 +4718,9 @@ function renderIdentity() {
 function signOutAndReload(event) {
   event?.preventDefault();
   clearStaffSession();
+  // A PIN left behind for a signed-out device would unlock straight into
+  // whichever cleaner signs in next without ever asking them to set their own.
+  clearPinRecord();
   location.reload();
 }
 

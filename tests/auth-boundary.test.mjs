@@ -62,3 +62,26 @@ test('sign-out only happens from Not-you or the success screen, never idle (WP1)
 test('a session stored before WP1 gets display_name backfilled, not "Staff" (WP1 fixup)', () => {
   assert.match(html, /staffSession\.user\.display_name = deriveDisplayName\(staffSession\.user\)/);
 });
+
+test('PIN is local-only PBKDF2, never the Supabase password (WP1b)', () => {
+  assert.match(html, /PIN_KEY\s*=\s*'ch_pin_v1'/);
+  assert.match(html, /'PBKDF2'/);
+  assert.match(html, /iterations:\s*PIN_ITERATIONS/);
+  assert.match(html, /hash:\s*'SHA-256'/);
+  assert.match(html, /PIN_MAX_FAILS\s*=\s*5/);
+  assert.doesNotMatch(html, /password:\s*pin/i);
+});
+
+test('five wrong PINs clear the PIN record and fall back to the password gate (WP1b)', () => {
+  assert.match(html, /if \(record\.fails >= PIN_MAX_FAILS\) \{[\s\S]{0,60}clearPinRecord\(\);/);
+});
+
+test('a signed-in device with a PIN shows the lock screen before the app, not a network call (WP1b)', () => {
+  assert.match(html, /if \(SUPPORTS_PIN && getPinRecord\(\)\) \{/);
+  assert.match(html, /await showPinLockScreen\(\)/);
+  assert.match(html, /await promptSetPinIfNeeded\(\)/);
+});
+
+test('switching accounts clears the local PIN so the next cleaner sets their own (WP1b)', () => {
+  assert.match(html, /clearStaffSession\(\);\s*\n(\s*\/\/[^\n]*\n)*\s*clearPinRecord\(\);/);
+});

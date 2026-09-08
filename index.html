@@ -5912,10 +5912,16 @@ function photoMeta(p) {
 async function restorePhotoFromMeta(meta) {
   if (!meta) return null;
   const photo = { name: meta.name, url: meta.url || null, fileId: meta.fileId || null, uploaded: meta.uploaded, data: null, idbId: null, objectUrl: null, status: meta.uploaded ? 'done' : 'queued' };
-  if (!meta.uploaded && meta.idbId) {
-    const blob = await idbGetPhoto(meta.idbId);
-    if (blob) { photo.idbId = meta.idbId; photo.objectUrl = URL.createObjectURL(blob); }
-    else photo.status = 'failed'; // the blob didn't survive — nothing left to retry from
+  if (!meta.uploaded) {
+    // _blob only ever lived in memory, so a page reload always loses it —
+    // idbId is the only thing that can survive to be restored from.
+    if (meta.idbId) {
+      const blob = await idbGetPhoto(meta.idbId);
+      if (blob) { photo.idbId = meta.idbId; photo.objectUrl = URL.createObjectURL(blob); }
+      else photo.status = 'failed'; // the blob didn't survive — nothing left to retry from
+    } else {
+      photo.status = 'failed'; // never made it into IndexedDB either — same, nothing to retry from
+    }
   }
   return photo;
 }
@@ -7536,11 +7542,11 @@ async function runPreSubmitFlush() {
   const pending = [];
   sectionKeys.forEach(key => {
     (state[`${key}Photos`] || []).forEach((p, idx) => {
-      if (p && !p.uploaded && (p.data || p.idbId)) pending.push({ key, idx, photo: p });
+      if (p && !p.uploaded && (p.data || p.idbId || p._blob)) pending.push({ key, idx, photo: p });
     });
   });
   state.meterPhotos.forEach((p, idx) => {
-    if (p && !p.uploaded && (p.data || p.idbId)) pending.push({ key: 'meter', idx, photo: p });
+    if (p && !p.uploaded && (p.data || p.idbId || p._blob)) pending.push({ key: 'meter', idx, photo: p });
   });
 
   if (pending.length === 0) {

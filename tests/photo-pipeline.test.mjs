@@ -35,11 +35,13 @@ test('each photo shows a visible upload status, and a per-section retry-all exis
   assert.match(html, /section-retry-link/);
 });
 
-test('a pending upload is detected by data OR an IndexedDB id, not data alone (WP2 pre-submit flush)', () => {
-  // Bug class this guards against: after WP2, a photo whose bytes moved to
-  // IndexedDB has p.data === null, so checking `p.data` alone would make the
-  // pre-submit flush think it has nothing left to retry.
-  assert.match(html, /!p\.uploaded && \(p\.data \|\| p\.idbId\)/);
+test('a pending upload is detected by data, IndexedDB id, or in-memory blob (WP2 pre-submit flush fixup)', () => {
+  // Bug class this guards against: a photo whose bytes moved to IndexedDB
+  // has p.data === null, so checking p.data alone misses it; a photo whose
+  // idbPutPhoto() write failed has p.idbId === null too, so checking only
+  // (p.data || p.idbId) still drops it silently from the submission —
+  // it must also fall back to the in-memory p._blob.
+  assert.match(html, /!p\.uploaded && \(p\.data \|\| p\.idbId \|\| p\._blob\)/);
 });
 
 test('a killed app with pending photos resumes automatically when back online (WP2 / checklist #6)', () => {
@@ -79,4 +81,8 @@ test('a meter retake releases the previous photo\'s storage instead of leaking i
 
 test('discarding a draft sweeps any still-pending photo blobs out of IndexedDB (WP2 fixup)', () => {
   assert.match(html, /function clearDraft\(\) \{[\s\S]{0,700}idbDeletePhoto\(meta\.idbId\)/);
+});
+
+test('restoring a draft photo with no idbId (never made it into IndexedDB) is marked failed, not a blank queued photo (WP2 fixup)', () => {
+  assert.match(html, /photo\.status = 'failed'; \/\/ never made it into IndexedDB either/);
 });

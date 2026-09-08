@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 
 test('no Google Fonts network dependency remains (WP4)', () => {
   // The outbound-email template's inline style (buildEmailHtml) still names
@@ -40,4 +41,15 @@ test('a device-wide reduced-motion preference mutes every animation and transiti
   assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\*, \*::before, \*::after \{/);
   assert.match(html, /animation-duration: 0\.01ms !important;/);
   assert.match(html, /transition-duration: 0\.01ms !important;/);
+});
+
+test('the service worker precaches the self-hosted fonts cache-first, not network-first (WP4 fixup)', () => {
+  // Regression this guards against: same-origin fonts that only match the
+  // generic "everything else" branch get a network round trip on every
+  // online visit before falling back to cache — exactly the slow-3G cost
+  // self-hosting was meant to remove.
+  assert.match(sw, /'\.\/fonts\/cormorant-garamond-600\.woff2'/);
+  assert.match(sw, /'\.\/fonts\/cormorant-garamond-700\.woff2'/);
+  assert.match(sw, /STATIC_ASSET_PATHS/);
+  assert.doesNotMatch(sw, /ch-shell-v3-auth/);
 });

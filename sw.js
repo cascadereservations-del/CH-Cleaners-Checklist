@@ -11,12 +11,14 @@
 //   Navigation (HTML page)        → stale-while-revalidate  (instant load + background refresh)
 //   Everything else               → network-first, cache fallback
 
-const CACHE_NAME = 'ch-shell-v3-auth';
+const CACHE_NAME = 'ch-shell-v4-fonts';
 
 // App shell: cache these on install for instant offline load
 const SHELL_URLS = [
     './',
     './index.html',
+    './fonts/cormorant-garamond-600.woff2',
+    './fonts/cormorant-garamond-700.woff2',
 ];
 
 // CDN hostnames whose responses are safe to serve from cache
@@ -26,6 +28,16 @@ const CDN_HOSTS = [
     'unpkg.com',
     'cdn.jsdelivr.net',
     'cdnjs.cloudflare.com',
+];
+
+// WP4: the two Cormorant Garamond weights moved same-origin, so they no
+// longer match CDN_HOSTS above and would otherwise fall through to the
+// network-first branch — a revalidation round trip per font on every
+// online visit, defeating the point of self-hosting them on slow 3G.
+// Matched by path suffix so a GitHub Pages project subpath still works.
+const STATIC_ASSET_PATHS = [
+    '/fonts/cormorant-garamond-600.woff2',
+    '/fonts/cormorant-garamond-700.woff2',
 ];
 
 // API hostnames that must always go to the network — never cache
@@ -97,6 +109,15 @@ self.addEventListener('fetch', event => {
                     return resp;
                 });
             })
+        );
+        return;
+    }
+
+    // ── 2b. Same-origin static assets — cache-first ───────────
+    // Same reasoning as branch 2, now that these fonts are same-origin.
+    if (STATIC_ASSET_PATHS.some(p => url.pathname.endsWith(p))) {
+        event.respondWith(
+            caches.match(request).then(cached => cached || fetch(request))
         );
         return;
     }

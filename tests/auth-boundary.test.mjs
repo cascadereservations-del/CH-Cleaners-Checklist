@@ -33,8 +33,8 @@ test('photo upload is property and submission scoped', () => {
   assert.doesNotMatch(html, /data\.publicUrl/);
 });
 
-test('service worker cache is bumped for authentication cutover', () => {
-  assert.match(sw, /ch-shell-v3-auth/);
+test('service worker cache name is versioned', () => {
+  assert.match(sw, /const CACHE_NAME = 'ch-shell-v\d+/);
 });
 
 test('identity comes from the staff session, not a typed combobox (WP1)', () => {

@@ -82,6 +82,10 @@ test('a signed-in device with a PIN shows the lock screen before the app, not a 
   assert.match(html, /await promptSetPinIfNeeded\(\)/);
 });
 
-test('switching accounts clears the local PIN so the next cleaner sets their own (WP1b)', () => {
-  assert.match(html, /clearStaffSession\(\);\s*\n(\s*\/\/[^\n]*\n)*\s*clearPinRecord\(\);/);
+test('ending the staff session for any reason also clears the local PIN (WP1b)', () => {
+  // Fixed after Opus review: the PIN must not survive clearStaffSession()
+  // (sign-out, disable/delete, a rejected refresh) — otherwise the next
+  // cleaner to sign in on this device could unlock straight past the PIN
+  // setup screen with the previous cleaner's PIN.
+  assert.match(html, /function clearStaffSession\(\) \{[\s\S]{0,500}clearPinRecord\(\);[\s\S]{0,20}\}/);
 });

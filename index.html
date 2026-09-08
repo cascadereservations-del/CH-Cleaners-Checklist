@@ -3389,7 +3389,7 @@ body.mode-quick .detail-text { display: none; }
     <div class="pin-dots" id="pin-lock-dots" aria-hidden="true">
       <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
     </div>
-    <p id="pin-lock-error" class="pin-error" role="alert" aria-live="polite"></p>
+    <p id="pin-lock-error" class="pin-error" role="alert"></p>
     <div class="pin-keypad" id="pin-lock-keypad" role="group" aria-label="PIN keypad">
       <button type="button" class="pin-key" data-digit="1">1</button>
       <button type="button" class="pin-key" data-digit="2">2</button>
@@ -3414,7 +3414,7 @@ body.mode-quick .detail-text { display: none; }
     <div class="pin-dots" id="pin-setup-dots" aria-hidden="true">
       <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
     </div>
-    <p id="pin-setup-error" class="pin-error" role="alert" aria-live="polite"></p>
+    <p id="pin-setup-error" class="pin-error" role="alert"></p>
     <div class="pin-keypad" id="pin-setup-keypad" role="group" aria-label="PIN keypad">
       <button type="button" class="pin-key" data-digit="1">1</button>
       <button type="button" class="pin-key" data-digit="2">2</button>
@@ -4360,6 +4360,11 @@ function saveStaffSession(session) {
 function clearStaffSession() {
   staffSession = null;
   localStorage.removeItem(AUTH_SESSION_KEY);
+  // A PIN is a device-local shortcut for THIS session. Whenever the session
+  // ends for any reason (sign-out, disable/delete, a rejected refresh), the
+  // shortcut must end with it — otherwise the next cleaner to sign in on
+  // this device inherits the previous one's PIN instead of setting their own.
+  clearPinRecord();
 }
 
 // Sign-in and refresh both return `user.user_metadata.display_name` /
@@ -4497,6 +4502,10 @@ const PIN_KEY        = 'ch_pin_v1';
 const PIN_LENGTH     = 4;
 const PIN_ITERATIONS = 100000;
 const PIN_MAX_FAILS  = 5;
+// 0 = ask on every cold open (current, only implemented mode). A future pass
+// could skip the keypad for opens within N minutes of the last one using the
+// Page Visibility API, without changing verifyPin()/the storage format.
+const PIN_IDLE_MINUTES = 0;
 const SUPPORTS_PIN   = !!(window.crypto?.subtle?.importKey && window.crypto?.subtle?.deriveBits);
 
 function bufToBase64(buf) {
@@ -4546,22 +4555,25 @@ async function verifyPin(pin) {
 // screen can be retried without a page reload.
 function createPinInput({ dotsEl, keypadEl, onComplete }) {
   let buffer = '';
+  let busy = false; // guards against a tap landing mid-verify/mid-derive
   function render() {
     dotsEl.querySelectorAll('.pin-dot').forEach((d, i) => d.classList.toggle('filled', i < buffer.length));
   }
   async function pressDigit(d) {
-    if (buffer.length >= PIN_LENGTH) return;
+    if (busy || buffer.length >= PIN_LENGTH) return;
     buffer += d;
     if (navigator.vibrate) { try { navigator.vibrate(10); } catch { /* unsupported */ } }
     render();
     if (buffer.length === PIN_LENGTH) {
+      busy = true;
       const pin = buffer;
       buffer = '';
       await onComplete(pin);
+      busy = false;
       render();
     }
   }
-  function pressBack() { buffer = buffer.slice(0, -1); render(); }
+  function pressBack() { if (busy) return; buffer = buffer.slice(0, -1); render(); }
   keypadEl.querySelectorAll('.pin-key[data-digit]').forEach(btn => {
     btn.addEventListener('click', () => pressDigit(btn.dataset.digit));
   });
@@ -4717,10 +4729,7 @@ function renderIdentity() {
 
 function signOutAndReload(event) {
   event?.preventDefault();
-  clearStaffSession();
-  // A PIN left behind for a signed-out device would unlock straight into
-  // whichever cleaner signs in next without ever asking them to set their own.
-  clearPinRecord();
+  clearStaffSession(); // also clears the device's PIN — see clearStaffSession()
   location.reload();
 }
 

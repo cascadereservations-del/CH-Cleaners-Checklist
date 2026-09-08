@@ -3401,16 +3401,24 @@ body.mode-quick .detail-text { display: none; }
 .toast-blur-btn:hover { background: rgba(255,255,255,0.28); }
 .toast-blur-btn.keep  { border-color: rgba(255,255,255,0.2); }
 
-#auth-gate { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:#f3f0ec; }
+/* Auth gate: internal-only tool (Lloyd, 2026-09-08) — name + PIN is the
+   whole sign-in, no separate password step. Shares the dark full-bleed
+   .pin-gate/.pin-card look (below) since it's functionally the same kind
+   of screen as the PIN lock/setup gates that follow it. */
+#auth-gate { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:#1c1a18; }
 #auth-gate[hidden] { display:none; }
-.auth-card { width:min(420px,100%); padding:32px; border:1px solid #d8d0c7; border-radius:16px; background:#fff; box-shadow:0 20px 60px rgba(30,24,20,.12); }
-.auth-card h1 { margin:0 0 8px; font-family:var(--font-display); color:#2d2824; }
-.auth-card p { margin:0 0 22px; color:#6f675f; line-height:1.5; }
-.auth-card label { display:block; margin:14px 0 6px; font-size:.82rem; font-weight:700; color:#4d4640; }
-.auth-card input { width:100%; min-height:46px; box-sizing:border-box; padding:10px 12px; border:1px solid #cfc6bc; border-radius:8px; font:inherit; }
-.auth-card button { width:100%; min-height:48px; margin-top:20px; border:0; border-radius:8px; background:#3e5546; color:#fff; font:700 1rem var(--font-body); cursor:pointer; }
-.auth-card button:disabled { opacity:.6; cursor:wait; }
-#auth-error { min-height:20px; margin-top:12px; color:#9d2f2f; font-size:.86rem; }
+.auth-name-select {
+  width:100%; min-height:52px; margin-bottom:18px; box-sizing:border-box;
+  padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.06); color:#f3f0ec; font:600 1rem var(--font-body);
+}
+.auth-name-select option { color:#1c1a18; }
+#auth-name-manual {
+  width:100%; min-height:52px; margin-bottom:18px; box-sizing:border-box;
+  padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.06); color:#f3f0ec; font:inherit;
+}
+#auth-name-manual::placeholder { color:#bdb5ab; }
 
 /* WP1b: PIN lock screen — phone-lock-style keypad, dark full-bleed overlay */
 .pin-gate { position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px; background:#1c1a18; }
@@ -3436,18 +3444,41 @@ body.mode-quick .detail-text { display: none; }
 </head>
 <body class="mode-detail">
 
+<!-- Internal-only tool (Lloyd, 2026-09-08): name + PIN is the whole sign-in,
+     no separate password. The PIN typed here doubles as the local unlock
+     PIN afterward (see setPin() in initStaffAuth()'s submit handler) — one
+     PIN, not two. -->
 <section id="auth-gate" aria-labelledby="auth-title">
-  <form class="auth-card" id="auth-form">
+  <div class="pin-card" id="auth-form">
     <h1 id="auth-title">Staff sign in</h1>
-    <p>Use the cleaner account issued by Cascade. Public sign-up is disabled.</p>
-    <div id="known-logins" class="known-logins" hidden></div>
-    <label for="auth-email">Your name</label>
-    <input id="auth-email" type="text" autocomplete="username" autocapitalize="none" placeholder="e.g. honey" required>
-    <label for="auth-password">Password</label>
-    <input id="auth-password" type="password" autocomplete="current-password" required>
-    <button id="auth-submit" type="submit">Sign in</button>
-    <div id="auth-error" role="alert" aria-live="polite"></div>
-  </form>
+    <label for="auth-name-select" style="display:block;text-align:left;font-size:.82rem;font-weight:700;color:#bdb5ab;margin-bottom:6px;">Your name</label>
+    <select id="auth-name-select" class="auth-name-select">
+      <option value="" disabled selected>Choose your name…</option>
+      <option value="Honey">Honey</option>
+      <option value="Marifel">Marifel</option>
+      <option value="Lloyd">Lloyd</option>
+      <option value="__other__">Other / not listed…</option>
+    </select>
+    <input type="text" id="auth-name-manual" placeholder="Type your name" autocomplete="username" autocapitalize="none" hidden>
+    <div class="pin-dots" id="auth-pin-dots" aria-hidden="true">
+      <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
+    </div>
+    <p id="auth-error" class="pin-error" role="alert"></p>
+    <div class="pin-keypad" id="auth-pin-keypad" role="group" aria-label="PIN keypad">
+      <button type="button" class="pin-key" data-digit="1">1</button>
+      <button type="button" class="pin-key" data-digit="2">2</button>
+      <button type="button" class="pin-key" data-digit="3">3</button>
+      <button type="button" class="pin-key" data-digit="4">4</button>
+      <button type="button" class="pin-key" data-digit="5">5</button>
+      <button type="button" class="pin-key" data-digit="6">6</button>
+      <button type="button" class="pin-key" data-digit="7">7</button>
+      <button type="button" class="pin-key" data-digit="8">8</button>
+      <button type="button" class="pin-key" data-digit="9">9</button>
+      <span class="pin-key pin-key-spacer" aria-hidden="true"></span>
+      <button type="button" class="pin-key" data-digit="0">0</button>
+      <button type="button" class="pin-key pin-key-back" id="auth-pin-back" aria-label="Delete digit">⌫</button>
+    </div>
+  </div>
 </section>
 
 <!-- WP1b: local PIN lock screen — never a network check, never the Supabase
@@ -4556,25 +4587,40 @@ async function staffHeaders(json = false) {
   };
 }
 
-function renderKnownLogins() {
-  const host = el('known-logins');
-  if (!host) return;
+// Every staff name is already visible in the dropdown (internal-only tool),
+// so there's no privacy reason to limit this to "remembered on this
+// device" the way a pre-signin public list would be — this just
+// pre-selects whoever last signed in here, a convenience, not a gate.
+function restoreLastLogin() {
   const list = getKnownLogins();
-  host.innerHTML = '';
-  if (!list.length) { host.hidden = true; return; }
-  host.hidden = false;
-  list.forEach(entry => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'known-login-chip';
-    chip.textContent = entry.label;
-    chip.addEventListener('click', () => {
-      const emailEl = el('auth-email');
-      if (emailEl) emailEl.value = entry.login;
-      el('auth-password')?.focus();
-    });
-    host.appendChild(chip);
+  const last = list[0];
+  if (!last) return;
+  const select = el('auth-name-select');
+  const manual = el('auth-name-manual');
+  if (!select) return;
+  const matches = Array.from(select.options).some(o => o.value === last.login);
+  if (matches) {
+    select.value = last.login;
+  } else {
+    select.value = '__other__';
+    if (manual) { manual.hidden = false; manual.value = last.login; }
+  }
+}
+
+function wireAuthNameSelect() {
+  el('auth-name-select')?.addEventListener('change', e => {
+    const manual = el('auth-name-manual');
+    if (!manual) return;
+    const isOther = e.target.value === '__other__';
+    manual.hidden = !isOther;
+    if (isOther) manual.focus();
   });
+}
+
+function currentAuthName() {
+  const select = el('auth-name-select');
+  if (select?.value === '__other__') return (el('auth-name-manual')?.value || '').trim();
+  return select?.value || '';
 }
 
 // ── PIN lock screen (WP1b) ───────────────────────────────────────────────
@@ -4749,9 +4795,7 @@ async function promptSetPinIfNeeded() {
 
 async function initStaffAuth() {
   const gate = el('auth-gate');
-  const form = el('auth-form');
   const errorEl = el('auth-error');
-  const submit = el('auth-submit');
   const existing = await requireStaffSession();
   if (existing && !staleSessionGuardTripped()) {
     touchLastSeen();
@@ -4760,7 +4804,7 @@ async function initStaffAuth() {
       const unlocked = await showPinLockScreen();
       if (unlocked) return true;
       // 5 wrong PINs: record was cleared inside showPinLockScreen — fall
-      // through to the password gate below instead of trusting the device.
+      // through to the name+PIN gate below instead of trusting the device.
     } else {
       gate.hidden = true;
       await promptSetPinIfNeeded();
@@ -4768,29 +4812,32 @@ async function initStaffAuth() {
     }
   }
 
-  renderKnownLogins();
+  wireAuthNameSelect();
+  restoreLastLogin();
   gate.hidden = false;
   return await new Promise(resolve => {
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      submit.disabled = true;
-      errorEl.textContent = '';
-      const typedLogin = el('auth-email').value;
-      try {
-        await authRequest('password', {
-          email: staffLoginEmail(typedLogin),
-          password: el('auth-password').value,
-        });
-        rememberLogin(typedLogin, staffSession.user.display_name);
-        touchLastSeen();
-        gate.hidden = true;
-        await promptSetPinIfNeeded();
-        resolve(true);
-      } catch (error) {
-        errorEl.textContent = error.message || 'Sign-in failed';
-      } finally {
-        submit.disabled = false;
-      }
+    createPinInput({
+      dotsEl: el('auth-pin-dots'),
+      keypadEl: el('auth-pin-keypad'),
+      onComplete: async pin => {
+        errorEl.textContent = '';
+        const name = currentAuthName();
+        if (!name) { errorEl.textContent = 'Choose your name first.'; return; }
+        try {
+          await authRequest('password', { email: staffLoginEmail(name), password: pin });
+          rememberLogin(name, staffSession.user.display_name);
+          touchLastSeen();
+          // The PIN just typed to sign in doubles as the local unlock PIN —
+          // no separate "set a PIN" step for a fresh sign-in. SUPPORTS_PIN
+          // gates this the same way promptSetPinIfNeeded() already does;
+          // a browser without Web Crypto still gets the network sign-in.
+          if (SUPPORTS_PIN) await setPin(pin);
+          gate.hidden = true;
+          resolve(true);
+        } catch (error) {
+          errorEl.textContent = error.message || 'Sign-in failed';
+        }
+      },
     });
   });
 }

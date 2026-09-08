@@ -45,9 +45,16 @@ test('identity comes from the staff session, not a typed combobox (WP1)', () => 
   assert.match(html, /state\.cleanerName = name;/);
 });
 
-test('the gate shows device-remembered names, never a public staff list (WP1)', () => {
-  assert.match(html, /KNOWN_LOGINS_KEY\s*=\s*'ch_known_logins'/);
-  assert.match(html, /id="known-logins"/);
+test('the sign-in gate is a fixed name dropdown, an explicit internal-only-tool call (Lloyd, 2026-09-08)', () => {
+  // WP1 originally rejected a pre-signin staff-name list as a public-URL
+  // privacy leak. Lloyd overrode that for this specific tool: it's staff-
+  // only, not guest-facing, so a fixed dropdown is fine and simpler than
+  // per-device remembered chips. This test intentionally asserts the new
+  // shape, not the old KNOWN_LOGINS_KEY chip UI (which no longer renders
+  // in the gate — the key itself still exists for a lower purpose, see
+  // restoreLastLogin()).
+  assert.match(html, /id="auth-name-select"/);
+  assert.match(html, /id="auth-name-manual"/);
   assert.doesNotMatch(html, /staff-users\?[^"'`]*list/i);
 });
 
@@ -63,17 +70,31 @@ test('a session stored before WP1 gets display_name backfilled, not "Staff" (WP1
   assert.match(html, /staffSession\.user\.display_name = deriveDisplayName\(staffSession\.user\)/);
 });
 
-test('PIN is local-only PBKDF2, never the Supabase password (WP1b)', () => {
+test('one PIN, two jobs: the Supabase password on sign-in, a local PBKDF2 hash after (Lloyd, 2026-09-08 override)', () => {
+  // Reversed from the original WP1b stance ("PIN never the Supabase
+  // password") on Lloyd's explicit instruction: this is an internal-only
+  // tool, not public-facing, so a 4-digit PIN as the actual Auth
+  // credential is an accepted trade-off. What must still hold: the LOCAL
+  // unlock check (subsequent cold opens) never leaves the device and is
+  // never a plaintext comparison — it's always the same PBKDF2 hash flow
+  // as before.
   assert.match(html, /PIN_KEY\s*=\s*'ch_pin_v1'/);
   assert.match(html, /'PBKDF2'/);
   assert.match(html, /iterations:\s*PIN_ITERATIONS/);
   assert.match(html, /hash:\s*'SHA-256'/);
   assert.match(html, /PIN_MAX_FAILS\s*=\s*5/);
-  assert.doesNotMatch(html, /password:\s*pin/i);
+  // The sign-in gate does send the PIN as the password — deliberately.
+  assert.match(html, /email: staffLoginEmail\(name\), password: pin/);
+  // verifyPin() — the RETURN-VISIT check — must still never touch the network.
+  assert.doesNotMatch(html, /async function verifyPin[\s\S]{0,300}fetch\(/);
 });
 
-test('five wrong PINs clear the PIN record and fall back to the password gate (WP1b)', () => {
+test('five wrong local PINs clear the PIN record and fall back to the name+PIN gate (WP1b)', () => {
   assert.match(html, /if \(record\.fails >= PIN_MAX_FAILS\) \{[\s\S]{0,60}clearPinRecord\(\);/);
+});
+
+test('the sign-in PIN doubles as the local unlock PIN — no separate setup step on first sign-in (2026-09-08)', () => {
+  assert.match(html, /if \(SUPPORTS_PIN\) await setPin\(pin\);/);
 });
 
 test('a signed-in device with a PIN shows the lock screen before the app, not a network call (WP1b)', () => {

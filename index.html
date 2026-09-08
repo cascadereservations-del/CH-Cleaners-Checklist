@@ -408,51 +408,29 @@ body.submitting { pointer-events: none; }
   letter-spacing: 0.01em;
 }
 
-/* Phase stepper dots */
+/* WP5: the header stepper is demoted to a thin segmented line — the bottom
+   nav bar (#bottom-bar, thumb reach) plus each phase's own .phase-progress
+   bar stay the one progress control a cleaner actually reads; this is just
+   an at-a-glance "how far through the 5 phases" strip. */
 #phase-stepper {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 4px;
   flex: 1;
-  justify-content: center;
+  max-width: 160px;
 }
 
-.stepper-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid rgba(198,172,142,0.4);
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: rgba(234,224,213,0.5);
-  transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
-  position: relative;
-  cursor: default;
-  flex-shrink: 0;
-}
-
-.stepper-dot.active {
-  background: var(--earthen-gold);
-  border-color: var(--earthen-gold);
-  color: var(--earthen-darkest);
-  box-shadow: 0 0 0 3px rgba(198,172,142,0.25);
-}
-
-.stepper-dot.completed {
-  background: rgba(198,172,142,0.2);
-  border-color: var(--earthen-gold);
-  color: var(--earthen-gold);
-}
-
-.stepper-line {
-  width: 12px;
-  height: 2px;
+.stepper-seg {
+  height: 4px;
+  border-radius: 2px;
+  flex: 1;
   background: rgba(198,172,142,0.25);
-  flex-shrink: 0;
+  transition: background var(--transition-base);
+}
+
+.stepper-seg.completed,
+.stepper-seg.active {
+  background: var(--earthen-gold);
 }
 
 #top-right {
@@ -2543,6 +2521,43 @@ body.mode-quick .detail-text { display: none; }
   overflow: hidden;
 }
 
+/* WP5: sticky jump summary — .phase itself is the scrolling ancestor
+   (position: absolute; overflow-y: auto), so `top: 0` sticks this at the
+   top of THIS phase's own scrollport, no --top-bar-height offset needed. */
+.p1-sticky-summary {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: var(--space-2);
+  background: var(--earthen-ivory);
+  padding: var(--space-2) 0 var(--space-3);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.p1-summary-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  background: var(--surface);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.p1-summary-chip:active { background: var(--earthen-ivory); }
+
+#preclean-photo-card, #meter-readings-card, #condition-card {
+  scroll-margin-top: 52px; /* clears the sticky summary once it's stuck */
+}
+
 .phase-progress-bar {
   height: 100%;
   background: var(--earthen-gold);
@@ -3486,15 +3501,11 @@ body.mode-quick .detail-text { display: none; }
   <span id="property-name">Cascade Hideaway</span>
 
   <nav id="phase-stepper" aria-label="Progress through 5 phases">
-    <div class="stepper-dot active" id="dot-0" aria-label="Phase 1: Setup" role="img">1</div>
-    <div class="stepper-line"></div>
-    <div class="stepper-dot" id="dot-1" aria-label="Phase 2: Document">2</div>
-    <div class="stepper-line"></div>
-    <div class="stepper-dot" id="dot-2" aria-label="Phase 3: Arrive &amp; Prep">3</div>
-    <div class="stepper-line"></div>
-    <div class="stepper-dot" id="dot-3" aria-label="Phase 4: Clean">4</div>
-    <div class="stepper-line"></div>
-    <div class="stepper-dot" id="dot-4" aria-label="Phase 5: Finish">5</div>
+    <span class="stepper-seg active" id="dot-0" aria-label="Phase 1: Setup"></span>
+    <span class="stepper-seg" id="dot-1" aria-label="Phase 2: Document"></span>
+    <span class="stepper-seg" id="dot-2" aria-label="Phase 3: Arrive &amp; Prep"></span>
+    <span class="stepper-seg" id="dot-3" aria-label="Phase 4: Clean"></span>
+    <span class="stepper-seg" id="dot-4" aria-label="Phase 5: Finish"></span>
   </nav>
 
   <div id="top-right">
@@ -3713,6 +3724,21 @@ body.mode-quick .detail-text { display: none; }
 
     <div class="phase-progress"><div class="phase-progress-bar" id="p1-progress"></div></div>
 
+    <!-- WP5: sticky jump summary — the cleaner can see all three section
+         counts without scrolling this long phase, and tap a short one to
+         jump straight to it. -->
+    <div class="p1-sticky-summary" id="p1-sticky-summary" role="navigation" aria-label="Jump to a section in this phase">
+      <button type="button" class="p1-summary-chip" id="p1-jump-preclean">
+        <span aria-hidden="true">📸</span> <span id="p1-summary-preclean">0/5</span>
+      </button>
+      <button type="button" class="p1-summary-chip" id="p1-jump-meters">
+        <span aria-hidden="true">⚡💧</span> <span id="p1-summary-meters">0/2</span>
+      </button>
+      <button type="button" class="p1-summary-chip" id="p1-jump-condition">
+        <span aria-hidden="true">🔍</span> <span id="p1-summary-condition">—</span>
+      </button>
+    </div>
+
     <!-- Section A: Pre-clean Photos (Feature 3 — in-app, replaces Messenger CTA) -->
     <div class="section-photo-card" id="preclean-photo-card" role="region" aria-label="Pre-cleaning photos — required">
       <div class="spc-header">
@@ -3747,7 +3773,7 @@ body.mode-quick .detail-text { display: none; }
     </div>
 
     <!-- Section B: Meter Readings -->
-    <div class="card" role="region" aria-label="Meter readings">
+    <div class="card" id="meter-readings-card" role="region" aria-label="Meter readings">
       <div class="card-title">⚡💧 Step 2 — Meter Readings</div>
 
       <div id="prev-readings-area">
@@ -3838,7 +3864,7 @@ body.mode-quick .detail-text { display: none; }
     </div>
 
     <!-- Section D: Unit Condition -->
-    <div class="card" role="region" aria-label="Unit condition check">
+    <div class="card" id="condition-card" role="region" aria-label="Unit condition check">
       <div class="card-title">🔍 Step 4 — Unit Condition</div>
       <p style="font-size:var(--font-size-sm);color:var(--text-muted);margin-bottom:var(--space-4);">
         Do a quick check before you start. Did you find any damage or unusual issues?
@@ -5169,18 +5195,11 @@ function goToPhase(newPhase, skipGate = false) {
 
 function updateStepper() {
   for (let i = 0; i < PHASE_COUNT; i++) {
-    const dot = el(`dot-${i}`);
-    if (!dot) continue;
-    dot.classList.remove('active', 'completed');
-    if (i < state.phase) {
-      dot.classList.add('completed');
-      dot.textContent = '✓';
-    } else if (i === state.phase) {
-      dot.classList.add('active');
-      dot.textContent = String(i + 1);
-    } else {
-      dot.textContent = String(i + 1);
-    }
+    const seg = el(`dot-${i}`);
+    if (!seg) continue;
+    seg.classList.remove('active', 'completed');
+    if (i < state.phase) seg.classList.add('completed');
+    else if (i === state.phase) seg.classList.add('active');
   }
 }
 
@@ -6176,6 +6195,31 @@ function updatePhotoCounter() {
   if (badge) {
     badge.classList.toggle('complete', count === 2);
   }
+  updateP1StickySummary();
+}
+
+// WP5: the sticky jump summary at the top of Phase 1 — kept in sync from
+// the same call sites that already update the individual section counts
+// (meter photos, preclean photos, unit condition).
+function updateP1StickySummary() {
+  const preclEl = el('p1-summary-preclean');
+  if (preclEl) preclEl.textContent = `${state.precleanPhotos.length}/${PRECLEAN_PHOTO_MIN}`;
+  const meterEl = el('p1-summary-meters');
+  if (meterEl) meterEl.textContent = `${state.meterPhotos.filter(p => p !== null).length}/2`;
+  const condEl = el('p1-summary-condition');
+  if (condEl) condEl.textContent = state.conditionStatus ? '✓' : '—';
+}
+
+function initP1StickySummary() {
+  const jump = (btnId, targetId) => {
+    el(btnId)?.addEventListener('click', () => {
+      el(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+  jump('p1-jump-preclean', 'preclean-photo-card');
+  jump('p1-jump-meters', 'meter-readings-card');
+  jump('p1-jump-condition', 'condition-card');
+  updateP1StickySummary();
 }
 
 
@@ -6429,6 +6473,7 @@ function initSectionPhotos() {
       if (inputFile) inputFile.disabled = atMax;
       if (capBtn)    capBtn.style.opacity = atMax ? '0.45' : '';
       if (upBtn)     upBtn.style.opacity  = atMax ? '0.45' : '';
+      if (key === 'preclean') updateP1StickySummary();
       updateBottomBar();
     }
 
@@ -6556,6 +6601,7 @@ function initCondition() {
     clearBtn?.setAttribute('aria-pressed', String(status === 'clear'));
     issueBtn?.setAttribute('aria-pressed', String(status === 'issue'));
     if (expandEl) expandEl.classList.toggle('visible', status === 'issue');
+    updateP1StickySummary();
     saveDraft();
   }
 
@@ -9305,6 +9351,9 @@ async function init() {
 
   // Unit condition
   initCondition();
+
+  // Phase 1 sticky jump summary (WP5)
+  initP1StickySummary();
 
   // Dwell timer (restores from localStorage)
   initDwellTimer();

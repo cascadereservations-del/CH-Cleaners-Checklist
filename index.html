@@ -1466,6 +1466,21 @@ textarea {
   box-shadow: 0 4px 12px rgba(0,0,0,0.18);
 }
 
+/* WP2: per-thumbnail upload status badge + section retry-all link */
+.photo-thumb-wrap { position: relative; display: inline-block; }
+.photo-status-badge {
+  position: absolute; left: 3px; bottom: 3px;
+  font-size: 0.62rem; font-weight: 700; padding: 2px 5px; border-radius: 100px;
+  background: rgba(0,0,0,0.65); color: #fff; pointer-events: none; white-space: nowrap;
+}
+.photo-status-badge.status-failed { background: #9d2f2f; pointer-events: auto; cursor: pointer; }
+.photo-status-badge.status-done { display: none; } /* the green border on the thumb already says "done" */
+.section-retry-link, .meter-retry-link {
+  display: inline-block; margin-left: var(--space-2); font-size: var(--font-size-xs);
+  font-weight: 700; color: #9d2f2f; text-decoration: underline; cursor: pointer;
+}
+.section-retry-link[hidden], .meter-retry-link[hidden] { display: none; }
+
 .spc-count {
   font-size: var(--font-size-xs);
   font-weight: 600;
@@ -5600,6 +5615,322 @@ function compressImage(file) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   PHOTO PIPELINE v2 (WP2) — off-main-thread resize + blur, IndexedDB
+   blob store, and a concurrency-capped upload queue. Falls back to the
+   original compressImage()/checkPhotoQuality() main-thread path on any
+   browser or worker that doesn't support OffscreenCanvas.
+═══════════════════════════════════════════════════════════════ */
+const SUPPORTS_OFFTHREAD_PHOTOS =
+  typeof Worker === 'function' &&
+  typeof OffscreenCanvas !== 'undefined' &&
+  typeof createImageBitmap === 'function';
+
+// Same resize + timestamp-burn + Laplacian-blur logic as compressImage() /
+// checkPhotoQuality(), but running entirely inside a worker so a 12 MP
+// camera photo never decodes on the main thread (finding F1/F6).
+const PHOTO_WORKER_SRC = `
+self.onmessage = async (ev) => {
+  const { id, file, maxDim, quality, stamp, blurThreshold, minBytes } = ev.data;
+  try {
+    const probe = await createImageBitmap(file);
+    let w = probe.width, h = probe.height;
+    probe.close();
+    if (w > h) { if (w > maxDim) { h = Math.round(h * maxDim / w); w = maxDim; } }
+    else       { if (h > maxDim) { w = Math.round(w * maxDim / h); h = maxDim; } }
+    const bitmap = await createImageBitmap(file, { resizeWidth: w, resizeHeight: h, resizeQuality: 'medium' });
+    const canvas = new OffscreenCanvas(w, h);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+
+    const fSize = Math.max(13, Math.round(w * 0.022));
+    ctx.font = \`bold \${fSize}px "Courier New", monospace\`;
+    const tw = ctx.measureText(stamp).width;
+    const pad = 5, margin = 6;
+    ctx.fillStyle = 'rgba(0,0,0,0.58)';
+    ctx.fillRect(w - tw - pad*2 - margin, h - fSize - pad*2 - margin, tw + pad*2, fSize + pad*2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(stamp, w - tw - pad - margin, h - pad - margin - 1);
+
+    const SAMPLE = 128;
+    const sampleCanvas = new OffscreenCanvas(SAMPLE, SAMPLE);
+    const sctx = sampleCanvas.getContext('2d');
+    sctx.drawImage(canvas, 0, 0, SAMPLE, SAMPLE);
+    const { data } = sctx.getImageData(0, 0, SAMPLE, SAMPLE);
+    const gray = new Float32Array(SAMPLE * SAMPLE);
+    for (let i = 0; i < SAMPLE * SAMPLE; i++) {
+      const p = i * 4;
+      gray[i] = 0.299 * data[p] + 0.587 * data[p+1] + 0.114 * data[p+2];
+    }
+    let sum = 0, sumSq = 0, count = 0;
+    for (let y = 1; y < SAMPLE - 1; y++) {
+      for (let x = 1; x < SAMPLE - 1; x++) {
+        const idx = y * SAMPLE + x;
+        const lap = gray[idx-SAMPLE] + gray[idx+SAMPLE] + gray[idx-1] + gray[idx+1] - 4 * gray[idx];
+        sum += lap; sumSq += lap * lap; count++;
+      }
+    }
+    const mean = sum / count;
+    const variance = sumSq / count - mean * mean;
+
+    const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+    self.postMessage({ id, ok: true, blob, blurry: variance < blurThreshold, tooSmall: blob.size < minBytes });
+  } catch (err) {
+    self.postMessage({ id, ok: false, error: String((err && err.message) || err) });
+  }
+};
+`;
+
+let _photoWorker = null;
+let _photoWorkerReqId = 0;
+const _photoWorkerPending = new Map();
+
+function getPhotoWorker() {
+  if (_photoWorker) return _photoWorker;
+  try {
+    const blob = new Blob([PHOTO_WORKER_SRC], { type: 'application/javascript' });
+    _photoWorker = new Worker(URL.createObjectURL(blob));
+    _photoWorker.onmessage = ev => {
+      const resolver = _photoWorkerPending.get(ev.data.id);
+      if (resolver) { _photoWorkerPending.delete(ev.data.id); resolver(ev.data); }
+    };
+  } catch { _photoWorker = null; }
+  return _photoWorker;
+}
+
+function photoTimestamp() {
+  return new Date().toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+}
+
+function dataURLtoBlob(dataUrl) {
+  const [meta, b64] = dataUrl.split(',');
+  const mime = /data:(.*?);base64/.exec(meta)?.[1] || 'image/jpeg';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Off-main-thread resize + timestamp burn-in + blur check. Same output shape
+// ({blob, blurry, tooSmall}) whether it ran in the worker or fell back to
+// the original main-thread compressImage()/checkPhotoQuality() pipeline.
+async function processPhoto(file) {
+  const MAX = 960, QUALITY = 0.65;
+  if (SUPPORTS_OFFTHREAD_PHOTOS) {
+    const worker = getPhotoWorker();
+    if (worker) {
+      try {
+        const id = ++_photoWorkerReqId;
+        const result = await new Promise((resolve, reject) => {
+          _photoWorkerPending.set(id, resolve);
+          worker.postMessage({
+            id, file, maxDim: MAX, quality: QUALITY, stamp: photoTimestamp(),
+            blurThreshold: BLUR_THRESHOLD, minBytes: MIN_PHOTO_BYTES,
+          });
+          setTimeout(() => {
+            if (_photoWorkerPending.has(id)) { _photoWorkerPending.delete(id); reject(new Error('photo worker timeout')); }
+          }, 15000);
+        });
+        if (result.ok) return { blob: result.blob, blurry: result.blurry, tooSmall: result.tooSmall };
+      } catch { /* fall through to the main-thread path below */ }
+    }
+  }
+  const dataUrl = await compressImage(file);
+  const quality = await checkPhotoQuality(dataUrl);
+  return { blob: dataURLtoBlob(dataUrl), blurry: quality.blurry, tooSmall: quality.tooSmall };
+}
+
+// IndexedDB blob store (F3) — a captured photo's compressed bytes live here,
+// not as a base64 string on the JS heap or in the localStorage draft, until
+// the upload succeeds and the record is deleted.
+const PHOTO_DB_NAME = 'ch_photos_v1';
+const PHOTO_STORE   = 'photos';
+let _photoDbPromise = null;
+
+function openPhotoDB() {
+  if (!('indexedDB' in window)) return Promise.resolve(null);
+  if (_photoDbPromise) return _photoDbPromise;
+  _photoDbPromise = new Promise(resolve => {
+    try {
+      const req = indexedDB.open(PHOTO_DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(PHOTO_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+  return _photoDbPromise;
+}
+
+async function idbPutPhoto(id, blob) {
+  const db = await openPhotoDB();
+  if (!db) return false;
+  return new Promise(resolve => {
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).put(blob, id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
+  });
+}
+
+async function idbGetPhoto(id) {
+  const db = await openPhotoDB();
+  if (!db) return null;
+  return new Promise(resolve => {
+    const tx = db.transaction(PHOTO_STORE, 'readonly');
+    const req = tx.objectStore(PHOTO_STORE).get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function idbDeletePhoto(id) {
+  const db = await openPhotoDB();
+  if (!db) return;
+  await new Promise(resolve => {
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function resolvePhotoDataUrl(photo) {
+  if (photo.data) return photo.data;
+  if (photo.idbId) {
+    const blob = await idbGetPhoto(photo.idbId);
+    if (blob) return blobToDataURL(blob);
+  }
+  return null;
+}
+
+// Upload queue (F4) — capture-time uploads and the pre-submit flush both
+// enqueue here instead of firing independent concurrent fetches.
+const PHOTO_UPLOAD_CONCURRENCY = 2;
+const photoUploadQueue = { items: [], active: 0 };
+
+function enqueuePhotoUpload(run) {
+  photoUploadQueue.items.push(run);
+  pumpPhotoUploadQueue();
+}
+
+function pumpPhotoUploadQueue() {
+  while (photoUploadQueue.active < PHOTO_UPLOAD_CONCURRENCY && photoUploadQueue.items.length) {
+    const run = photoUploadQueue.items.shift();
+    photoUploadQueue.active++;
+    Promise.resolve().then(run).finally(() => {
+      photoUploadQueue.active--;
+      pumpPhotoUploadQueue();
+    });
+  }
+}
+
+function photoStatusLabel(status) {
+  switch (status) {
+    case 'queued':    return '⏳ Queued';
+    case 'uploading': return '⏫ Uploading…';
+    case 'failed':    return '⚠ Failed — tap to retry';
+    case 'done':      return '✓ Uploaded';
+    default:          return '';
+  }
+}
+
+// Renders (or re-renders) one photo thumbnail with its status badge.
+// `photo` must carry `.objectUrl` (freshly captured) or `.url` (restored
+// from a prior upload) to show, and `.status`.
+function renderPhotoThumb(wrapEl, photo, onRetry, imgClass = 'photo-thumb') {
+  if (!wrapEl) return;
+  wrapEl.className = 'photo-thumb-wrap';
+  const src = photo.objectUrl || photo.url || '';
+  const status = photo.status || 'done';
+  wrapEl.innerHTML = `
+    <img class="${imgClass}" src="${src}" alt="Photo">
+    <span class="photo-status-badge status-${status}"${status === 'failed' ? ' role="button" tabindex="0"' : ''}>${photoStatusLabel(status)}</span>
+  `;
+  if (status === 'failed' && onRetry) {
+    const badge = wrapEl.querySelector('.photo-status-badge');
+    badge.addEventListener('click', e => { e.stopPropagation(); onRetry(); });
+  }
+}
+
+// Uploads one photo record via the existing JSON endpoint (WP3 will add a
+// raw-body path), updating its status and re-rendering its thumbnail at
+// each step. `photo` is the live state.*Photos[idx] / meterPhotos[i] object.
+async function uploadPhotoRecord(photo, slotKey, onStatus) {
+  photo.status = 'uploading';
+  onStatus?.();
+  try {
+    const dataUrl = await resolvePhotoDataUrl(photo);
+    if (!dataUrl) throw new Error('photo data unavailable');
+    const result = await uploadPhotoDrive(slotKey, dataUrl, photo.name);
+    if (!result) throw new Error('upload failed');
+    photo.url      = result.fileUrl;
+    photo.fileId   = result.fileId;
+    photo.uploaded = true;
+    photo.status   = 'done';
+    photo.data     = null;
+    if (photo.idbId) { await idbDeletePhoto(photo.idbId); photo.idbId = null; }
+  } catch {
+    photo.status = 'failed';
+  }
+  onStatus?.();
+  saveDraft();
+}
+
+function anyPhotoUploadPending() {
+  const groups = [state.meterPhotos, state.precleanPhotos, state.bedroomPhotos, state.kitchenPhotos, state.aftercleanPhotos];
+  return groups.some(g => (g || []).some(p => p && (p.status === 'queued' || p.status === 'uploading')));
+}
+
+// Draft snapshot for one photo record — never base64/blob, just enough to
+// find the pending blob in IndexedDB (idbId) or the already-uploaded URL.
+function photoMeta(p) {
+  if (!p) return null;
+  return {
+    name: p.name, url: p.url || '', fileId: p.fileId || '', uploaded: p.uploaded || false,
+    status: p.status || (p.uploaded ? 'done' : 'queued'), idbId: p.idbId || null,
+  };
+}
+
+// Rebuilds one photo record from its draft meta (WP2). Uploaded photos show
+// their remote URL; still-pending ones fetch the blob back from IndexedDB
+// and re-enter the upload queue — this is the "resumes after an app kill"
+// half of the contract (the other half is the `online` listener below).
+async function restorePhotoFromMeta(meta) {
+  if (!meta) return null;
+  const photo = { name: meta.name, url: meta.url || null, fileId: meta.fileId || null, uploaded: meta.uploaded, data: null, idbId: null, objectUrl: null, status: meta.uploaded ? 'done' : 'queued' };
+  if (!meta.uploaded && meta.idbId) {
+    const blob = await idbGetPhoto(meta.idbId);
+    if (blob) { photo.idbId = meta.idbId; photo.objectUrl = URL.createObjectURL(blob); }
+    else photo.status = 'failed'; // the blob didn't survive — nothing left to retry from
+  }
+  return photo;
+}
+
+window.addEventListener('online', () => {
+  const groups = ['meterPhotos', 'precleanPhotos', 'bedroomPhotos', 'kitchenPhotos', 'aftercleanPhotos'];
+  groups.forEach(key => {
+    (state[key] || []).forEach((p, idx) => {
+      if (p && p.status === 'failed') {
+        p.status = 'queued';
+        enqueuePhotoUpload(() => uploadPhotoRecord(p, `${key.replace('Photos','')}_${idx}`, saveDraft));
+      }
+    });
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════
    FETCH WITH RETRY
 ═══════════════════════════════════════════════════════════════ */
 async function fetchWithRetry(url, options, maxRetries = 2, timeoutMs = 30000, onRetry = null) {
@@ -5667,6 +5998,10 @@ async function uploadPhotoDrive(slotOrId, dataUrl, fileName) {
 /* ═══════════════════════════════════════════════════════════════
    METER PHOTO HANDLING
 ═══════════════════════════════════════════════════════════════ */
+// Populated per-slot by initMeterPhotos() so applyDraft() (WP2) can restore
+// meter photos without reaching into the per-slot closures.
+const METER_PHOTO_API = {};
+
 function initMeterPhotos() {
   // Dialog state
   let _activeMeterIndex = -1;
@@ -5717,42 +6052,61 @@ function initMeterPhotos() {
     // Single button opens dialog
     triggerBtn?.addEventListener('click', () => openPhotoDialog(i));
 
+    function renderMeterThumb() {
+      if (prevWrap && state.meterPhotos[i]) renderPhotoThumb(prevWrap, state.meterPhotos[i], retryMeterUpload);
+    }
+
+    function retryMeterUpload() {
+      const photo = state.meterPhotos[i];
+      if (!photo || photo.status !== 'failed') return;
+      photo.status = 'queued';
+      renderMeterThumb();
+      enqueuePhotoUpload(() => uploadPhotoRecord(photo, `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
+    }
+
+    async function restoreMeterFromDraft(meta) {
+      const photo = await restorePhotoFromMeta(meta);
+      if (!photo) return;
+      state.meterPhotos[i] = photo;
+      if (triggerBtn) triggerBtn.classList.add('has-photo');
+      renderMeterThumb();
+      updatePhotoCounter();
+      if (photo.status === 'queued') {
+        enqueuePhotoUpload(() => uploadPhotoRecord(photo, `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
+      }
+    }
+    METER_PHOTO_API[i] = { restoreFromDraft: restoreMeterFromDraft };
+
     async function handleFile(file) {
       if (!file) return;
       if (spinEl) spinEl.style.display = 'block';
       if (statusEl) statusEl.textContent = '⟳ Processing…';
 
       try {
-        const dataUrl = await compressImage(file);
+        const { blob } = await processPhoto(file);
         const label   = i === 0 ? 'electric_meter' : 'water_meter';
         const fname   = `${label}_${todayManila()}_${Date.now()}.jpg`;
+        const id      = uuid();
+        await idbPutPhoto(id, blob);
 
-        // Show thumb
-        if (prevWrap) {
-          prevWrap.innerHTML = `<img class="photo-thumb" src="${dataUrl}" alt="${i === 0 ? 'Electric' : 'Water'} meter photo">`;
-        }
         if (spinEl) spinEl.style.display = 'none';
-        if (statusEl) statusEl.textContent = '✓ Photo added';
+        if (statusEl) statusEl.textContent = '';
 
         // Mark trigger button as has-photo
         if (triggerBtn) triggerBtn.classList.add('has-photo');
 
-        state.meterPhotos[i] = { data: dataUrl, name: fname, uploaded: false, url: null, fileId: null };
+        state.meterPhotos[i] = {
+          idbId: id, objectUrl: URL.createObjectURL(blob), name: fname,
+          uploaded: false, url: null, fileId: null, data: null, status: 'queued',
+        };
+        renderMeterThumb();
 
         updatePhotoCounter();
         updateBottomBar();
         updateProgress(1);
         saveDraft();
 
-        // Fire-and-forget upload
-        uploadPhotoDrive(i, dataUrl, fname).then(result => {
-          if (result && state.meterPhotos[i]) {
-            state.meterPhotos[i].url    = result.fileUrl;
-            state.meterPhotos[i].fileId = result.fileId;
-            state.meterPhotos[i].uploaded = true;
-            saveDraft();
-          }
-        }).catch(() => { /* keep .data fallback */ });
+        enqueuePhotoUpload(() => uploadPhotoRecord(state.meterPhotos[i], `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
 
       } catch (err) {
         if (spinEl) spinEl.style.display = 'none';
@@ -5920,6 +6274,11 @@ function showSmallPhotoWarning(fileInput) {
    Feature 1: MIN/MAX constants   Feature 2: blur quality check
    Feature 3: preclean + afterclean sections added
 ═══════════════════════════════════════════════════════════════ */
+// Populated per-section by initSectionPhotos() so applyDraft() (WP2) can
+// restore bedroom/kitchen/preclean/afterclean photos without reaching into
+// each section's private closures.
+const SECTION_PHOTO_API = {};
+
 function initSectionPhotos() {
   const SECTIONS = [
     // Feature 3: pre-clean section — per-section min/max (v6.8)
@@ -5956,11 +6315,44 @@ function initSectionPhotos() {
 
     if (!inputCap && !inputFile) return;
 
+    // Retry-all link (F5) — inserted once, shown only while this section has
+    // at least one failed upload.
+    let retryLink = null;
+    function ensureRetryLink() {
+      if (retryLink || !countEl) return;
+      retryLink = document.createElement('a');
+      retryLink.href = '#';
+      retryLink.className = 'section-retry-link';
+      retryLink.textContent = '↺ Retry failed';
+      retryLink.hidden = true;
+      retryLink.addEventListener('click', e => {
+        e.preventDefault();
+        state[`${key}Photos`].forEach((p, idx) => { if (p && p.status === 'failed') retrySectionPhoto(idx); });
+      });
+      countEl.insertAdjacentElement('afterend', retryLink);
+    }
+
+    function renderSectionThumb(idx) {
+      const photo = state[`${key}Photos`][idx];
+      const wrapEl = thumbsEl?.children[idx];
+      if (photo && wrapEl) renderPhotoThumb(wrapEl, photo, () => retrySectionPhoto(idx), 'section-photo-thumb');
+    }
+
+    function retrySectionPhoto(idx) {
+      const photo = state[`${key}Photos`][idx];
+      if (!photo) return;
+      photo.status = 'queued';
+      renderSectionThumb(idx);
+      enqueuePhotoUpload(() => uploadPhotoRecord(photo, `${key}_${idx}`, () => { renderSectionThumb(idx); updateSectionCount(); }));
+    }
+
     // v6.8: use per-section sMin/sMax
     function updateSectionCount() {
+      ensureRetryLink();
       const photos = state[`${key}Photos`];
       const n = photos.length;
       const uploadedN = photos.filter(p => p && p.uploaded).length;
+      const hasFailed = photos.some(p => p && p.status === 'failed');
       if (countEl) {
         if (n > 0 && uploadedN < n) {
           countEl.textContent = `${n} / ${sMax} photos — ${uploadedN} uploaded`;
@@ -5974,6 +6366,7 @@ function initSectionPhotos() {
           countEl.classList.remove('uploading');
         }
       }
+      if (retryLink) retryLink.hidden = !hasFailed;
       const atMax = n >= sMax;
       if (inputCap)  inputCap.disabled  = atMax;
       if (inputFile) inputFile.disabled = atMax;
@@ -5982,6 +6375,49 @@ function initSectionPhotos() {
       updateBottomBar();
     }
 
+    // Appends one thumbnail wrapper (tap-to-remove) for photos[idx] and
+    // renders it. Shared by a fresh capture and a draft restore (WP2).
+    function appendThumbWrap(idx) {
+      if (!thumbsEl) return;
+      const photos = state[`${key}Photos`];
+      const wrap = document.createElement('div');
+      wrap.title = 'Tap the photo to remove it';
+      wrap.addEventListener('click', e => {
+        if (e.target.closest('.photo-status-badge')) return; // badge handles its own click (retry)
+        const liveIdx = Array.from(thumbsEl.children).indexOf(wrap);
+        if (liveIdx < 0) return;
+        const removed = photos[liveIdx];
+        if (removed?.idbId) idbDeletePhoto(removed.idbId);
+        if (removed?.objectUrl) URL.revokeObjectURL(removed.objectUrl);
+        photos.splice(liveIdx, 1);
+        wrap.remove();
+        updateSectionCount();
+        saveDraft();
+      });
+      thumbsEl.appendChild(wrap);
+      renderPhotoThumb(wrap, photos[idx], () => retrySectionPhoto(idx), 'section-photo-thumb');
+    }
+
+    // Rebuilds this section's photos from a saved draft (WP2) — remote URLs
+    // render immediately; still-pending photos come back from IndexedDB and
+    // re-enter the upload queue.
+    async function restoreSectionFromDraft(metaList) {
+      if (!Array.isArray(metaList) || !metaList.length) return;
+      const photos = state[`${key}Photos`];
+      for (const meta of metaList) {
+        const photo = await restorePhotoFromMeta(meta);
+        if (!photo) continue;
+        const idx = photos.length;
+        photos.push(photo);
+        appendThumbWrap(idx);
+        if (photo.status === 'queued') {
+          enqueuePhotoUpload(() => uploadPhotoRecord(photo, `${key}_${idx}`, () => { renderSectionThumb(idx); updateSectionCount(); }));
+        }
+      }
+      updateSectionCount();
+    }
+    SECTION_PHOTO_API[key] = { restoreFromDraft: restoreSectionFromDraft };
+
     async function handleSectionFile(file, fromInput) {
       if (!file) return;
       const photos = state[`${key}Photos`];
@@ -5989,55 +6425,31 @@ function initSectionPhotos() {
         showToast(`Max ${sMax} photos for this section`, 'warning'); return;
       }
       try {
-        const dataUrl = await compressImage(file);
-
-        // Feature 2: blur + size quality check
-        const quality = await checkPhotoQuality(dataUrl);
-        if (quality.tooSmall) {
+        const { blob, blurry, tooSmall } = await processPhoto(file);
+        if (tooSmall) {
           // Soft warning — not a hard reject. Plain surfaces (white walls, tiles,
           // bedsheets) compress small legitimately after 960px/0.65 compression.
           const keep = await showSmallPhotoWarning(fromInput);
           if (!keep) return;
-        } else if (quality.blurry) {
+        } else if (blurry) {
           const keep = await showBlurWarning(fromInput);
           if (!keep) return;
         }
 
         const fname = `${label}_${todayManila()}_${Date.now()}.jpg`;
         const idx   = photos.length;
-        photos.push({ data: dataUrl, name: fname, uploaded: false, url: null, fileId: null });
+        const id    = uuid();
+        await idbPutPhoto(id, blob);
+        photos.push({
+          idbId: id, objectUrl: URL.createObjectURL(blob), name: fname,
+          uploaded: false, url: null, fileId: null, data: null, status: 'queued',
+        });
 
-        // Render thumb
-        if (thumbsEl) {
-          const img = document.createElement('img');
-          img.src = dataUrl;
-          img.className = 'section-photo-thumb';
-          img.alt = `${label} photo ${idx + 1}`;
-          img.title = 'Tap to remove';
-          img.addEventListener('click', () => {
-            const liveIdx = Array.from(thumbsEl.children).indexOf(img);
-            if (liveIdx >= 0) photos.splice(liveIdx, 1);
-            img.remove();
-            updateSectionCount();
-            saveDraft();
-          });
-          thumbsEl.appendChild(img);
-        }
-
+        appendThumbWrap(idx);
         updateSectionCount();
         saveDraft();
 
-        // Fire-and-forget upload to Supabase Storage
-        uploadPhotoDrive(`${key}_${idx}`, dataUrl, fname).then(result => {
-          if (result && photos[idx]) {
-            photos[idx].url      = result.fileUrl;
-            photos[idx].fileId   = result.fileId;
-            photos[idx].uploaded = true;
-            photos[idx].data     = null; // strip base64 — Fix A3
-            updateSectionCount(); // refresh upload count badge
-            saveDraft();
-          }
-        }).catch(() => { /* upload failed — pre-submit flush will retry */ });
+        enqueuePhotoUpload(() => uploadPhotoRecord(photos[idx], `${key}_${idx}`, () => { renderSectionThumb(idx); updateSectionCount(); }));
 
       } catch {
         showToast('Photo failed — tap to retry', 'error');
@@ -6805,18 +7217,13 @@ function saveDraft() {
     extraExpenses:   collectExtraExpenses(),
     sessionFolderId: state.sessionFolderId,
     sessionFolderUrl: state.sessionFolderUrl,
-    // Strip base64 from issue flags — save only metadata
-    meterPhotoMeta: state.meterPhotos.map(p => p
-      ? { name: p.name, url: p.url || '', fileId: p.fileId || '', uploaded: p.uploaded || false }
-      : null
-    ),
-    // Feature 3: preclean / afterclean photo metadata
-    precleanPhotoMeta:  state.precleanPhotos.map(p => ({
-      name: p.name, url: p.url || '', fileId: p.fileId || '', uploaded: p.uploaded || false
-    })),
-    aftercleanPhotoMeta: state.aftercleanPhotos.map(p => ({
-      name: p.name, url: p.url || '', fileId: p.fileId || '', uploaded: p.uploaded || false
-    })),
+    // Strip base64/blob refs from photo state — save only metadata + the
+    // IndexedDB key (WP2), so a killed app can find the still-pending blob.
+    meterPhotoMeta:      state.meterPhotos.map(photoMeta),
+    precleanPhotoMeta:   state.precleanPhotos.map(photoMeta),
+    bedroomPhotoMeta:    state.bedroomPhotos.map(photoMeta),
+    kitchenPhotoMeta:    state.kitchenPhotos.map(photoMeta),
+    aftercleanPhotoMeta: state.aftercleanPhotos.map(photoMeta),
   };
 
   // Strip base64 from issue flags
@@ -6887,15 +7294,6 @@ function applyDraft(draft) {
     });
   }
 
-  // Restore meter photo metadata (no base64 — show placeholder if uploaded)
-  if (draft.meterPhotoMeta) {
-    draft.meterPhotoMeta.forEach((meta, i) => {
-      if (meta) {
-        state.meterPhotos[i] = { name: meta.name, url: meta.url, fileId: meta.fileId, uploaded: meta.uploaded, data: null };
-      }
-    });
-  }
-
   // Restore condition
   if (draft.conditionStatus) {
     if (draft.conditionStatus === 'clear')  el('cond-clear-btn')?.click();
@@ -6925,65 +7323,19 @@ function applyDraft(draft) {
     if (display) display.style.display = 'block';
   }
 
-  // Restore photo placeholders (uploaded photos get placeholder thumbs)
-  [0, 1].forEach(i => {
-    const photo = state.meterPhotos[i];
-    if (photo && (photo.url || photo.uploaded)) {
-      const trigBtn  = el(`meter-photo-${i}-btn`);
-      const prevWrap = el(`meter-photo-${i}-preview-wrap`);
-      const statusEl = el(`meter-photo-${i}-status`);
-      if (trigBtn)  trigBtn.classList.add('has-photo');
-      if (statusEl) statusEl.textContent = '✓ Uploaded';
-      if (prevWrap && photo.url) {
-        prevWrap.innerHTML = `<img class="photo-thumb" src="${photo.url}" alt="Meter photo ${i+1}" loading="lazy">`;
-      }
-    }
-  });
-
+  // Restore meter + section photos (WP2). Already-uploaded photos show their
+  // remote URL immediately; still-pending ones come back from IndexedDB and
+  // re-enter the upload queue — the "survives an app kill" half of the
+  // contract (the `online` listener covers the other half). Async and
+  // fire-and-forget: each restore updates its own thumbnail once the
+  // IndexedDB read resolves, which init() has already made possible by
+  // calling initMeterPhotos()/initSectionPhotos() before this runs.
+  if (draft.meterPhotoMeta) {
+    draft.meterPhotoMeta.forEach((meta, i) => { METER_PHOTO_API[i]?.restoreFromDraft(meta); });
+  }
   updatePhotoCounter();
-
-  // Restore preclean / afterclean photo placeholders (Feature 3)
-  ['preclean', 'afterclean'].forEach(key => {
-    const meta = draft[`${key}PhotoMeta`];
-    if (!Array.isArray(meta)) return;
-    meta.forEach((m, idx) => {
-      if (!m || (!m.url && !m.uploaded)) return;
-      const photo = { name: m.name, url: m.url, fileId: m.fileId, uploaded: m.uploaded, data: null };
-      state[`${key}Photos`].push(photo);
-      const thumbsEl = el(`${key}-photo-thumbs`);
-      if (thumbsEl && m.url) {
-        const img = document.createElement('img');
-        img.src = m.url;
-        img.className = 'section-photo-thumb';
-        img.alt = `${key} photo ${idx + 1}`;
-        img.title = 'Tap to remove';
-        const photosArr = state[`${key}Photos`];
-        img.addEventListener('click', () => {
-          const liveIdx = Array.from(thumbsEl.children).indexOf(img);
-          if (liveIdx >= 0) photosArr.splice(liveIdx, 1);
-          img.remove();
-          const countEl = el(`${key}-photo-count`);
-          if (countEl) {
-            const n = photosArr.length;
-            countEl.textContent = `${n} / ${SECTION_PHOTO_MAX} photos attached`;
-            countEl.classList.toggle('has-photos', n > 0);
-            countEl.classList.toggle('min-met', n >= SECTION_PHOTO_MIN);
-          }
-          saveDraft();
-        });
-        thumbsEl.appendChild(img);
-      }
-      // Update count display
-      const countEl = el(`${key}-photo-count`);
-      if (countEl) {
-        const n = state[`${key}Photos`].length;
-        const rMin = key === 'preclean' ? PRECLEAN_PHOTO_MIN : key === 'afterclean' ? AFTERCLEAN_PHOTO_MIN : SECTION_PHOTO_MIN;
-        const rMax = key === 'preclean' ? PRECLEAN_PHOTO_MAX : key === 'afterclean' ? AFTERCLEAN_PHOTO_MAX : SECTION_PHOTO_MAX;
-        countEl.textContent = `${n} / ${rMax} photos attached`;
-        countEl.classList.toggle('has-photos', n > 0);
-        countEl.classList.toggle('min-met', n >= rMin);
-      }
-    });
+  ['preclean', 'bedroom', 'kitchen', 'afterclean'].forEach(key => {
+    SECTION_PHOTO_API[key]?.restoreFromDraft(draft[`${key}PhotoMeta`]);
   });
 
   // Go to saved phase
@@ -7134,28 +7486,23 @@ function initSubmitModal() {
    Runs up to 3 concurrent uploads. Shows a non-blocking status overlay.
    After flush (or timeout), proceeds to proceedWithSubmission regardless —
    un-uploadable photos are simply excluded from payload (Fix A1). */
+// Re-uploads any photo not yet uploaded before submit, blocking on the
+// result. A photo counts as pending if it has either a live dataURL or a
+// blob still sitting in IndexedDB (WP2) — checking .data alone would miss
+// every photo whose bytes moved to IndexedDB after capture. Routes through
+// the same concurrency-2 queue as capture-time uploads (uploadPhotoRecord)
+// rather than a separate ad hoc batch loop.
 async function runPreSubmitFlush() {
-  const allSections = [
-    { key: 'preclean',   label: 'Pre-clean',   min: PRECLEAN_PHOTO_MIN },
-    { key: 'afterclean', label: 'After-clean',  min: AFTERCLEAN_PHOTO_MIN },
-    { key: 'bedroom',    label: 'Bedroom',      min: 0 },
-    { key: 'kitchen',    label: 'Kitchen',      min: 0 },
-  ];
+  const sectionKeys = ['preclean', 'afterclean', 'bedroom', 'kitchen'];
 
-  // Build a flat list of pending uploads
   const pending = [];
-  allSections.forEach(({ key, label }) => {
+  sectionKeys.forEach(key => {
     (state[`${key}Photos`] || []).forEach((p, idx) => {
-      if (p && !p.uploaded && p.data) {
-        pending.push({ key, label, idx, photo: p });
-      }
+      if (p && !p.uploaded && (p.data || p.idbId)) pending.push({ key, idx, photo: p });
     });
   });
-  // Also meter photos
   state.meterPhotos.forEach((p, idx) => {
-    if (p && !p.uploaded && p.data) {
-      pending.push({ key: 'meter', label: 'Meter', idx, photo: p });
-    }
+    if (p && !p.uploaded && (p.data || p.idbId)) pending.push({ key: 'meter', idx, photo: p });
   });
 
   if (pending.length === 0) {
@@ -7163,31 +7510,17 @@ async function runPreSubmitFlush() {
     return;
   }
 
-  // Show flush overlay
   showFlushOverlay(pending.length);
 
   let done = 0;
-  const CONCURRENCY = 3;
-
-  async function uploadOne({ key, idx, photo }) {
-    try {
-      const result = await uploadPhotoDrive(`${key}_${idx}`, photo.data, photo.name);
-      if (result) {
-        photo.url      = result.fileUrl;
-        photo.fileId   = result.fileId;
-        photo.uploaded = true;
-        photo.data     = null;
-        saveDraft();
-      }
-    } catch { /* non-fatal */ }
-    done++;
-    updateFlushOverlay(done, pending.length);
-  }
-
-  // Run in batches of CONCURRENCY
-  for (let i = 0; i < pending.length; i += CONCURRENCY) {
-    await Promise.all(pending.slice(i, i + CONCURRENCY).map(uploadOne));
-  }
+  await Promise.all(pending.map(({ key, idx, photo }) => new Promise(resolve => {
+    enqueuePhotoUpload(async () => {
+      await uploadPhotoRecord(photo, `${key}_${idx}`, null);
+      done++;
+      updateFlushOverlay(done, pending.length);
+      resolve();
+    });
+  })));
 
   hideFlushOverlay();
   proceedWithSubmission();

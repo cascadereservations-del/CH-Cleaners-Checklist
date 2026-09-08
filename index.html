@@ -831,11 +831,9 @@ textarea {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   CLEANER COMBOBOX
+   IDENTITY CHIP (Phase 0 — read-only, driven by the staff session)
 ═══════════════════════════════════════════════════════════════ */
-.combobox-wrap { position: relative; }
-
-.combobox-display {
+.identity-chip {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -848,18 +846,9 @@ textarea {
   border-radius: 8px;
   padding: var(--space-3) var(--space-4);
   min-height: 52px;
-  cursor: pointer;
-  user-select: none;
-  transition: border-color var(--transition-fast);
 }
 
-.combobox-display:focus-within,
-.combobox-display.open {
-  border-color: var(--earthen-slate);
-  box-shadow: 0 0 0 3px rgba(34,51,59,0.12);
-}
-
-.combobox-display .cleaner-avatar {
+.identity-chip .cleaner-avatar {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -873,65 +862,32 @@ textarea {
   flex-shrink: 0;
 }
 
-.combobox-options {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  background: var(--surface);
-  border: 1.5px solid var(--earthen-slate);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-  z-index: 200;
-  display: none;
-}
-
-.combobox-options.open { display: block; }
-
-.combobox-option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  cursor: pointer;
-  min-height: 48px;
-  transition: background var(--transition-fast);
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.combobox-option:hover { background: var(--earthen-ivory); }
-.combobox-option:active { background: var(--earthen-gold); }
-
-.combobox-option .opt-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--earthen-gold);
-  color: var(--earthen-darkest);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.combobox-option.manual-entry {
+.switch-account-link {
+  display: inline-block;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
-  font-style: italic;
-  border-top: 1px solid var(--border);
+  text-decoration: underline;
 }
 
-.combobox-manual-input {
-  display: none;
+.known-logins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 14px;
 }
 
-.combobox-manual-input.visible {
-  display: block;
-  margin-top: var(--space-3);
+.known-login-chip {
+  border: 1px solid #cfc6bc;
+  border-radius: 100px;
+  padding: 6px 14px;
+  background: #f6f3ef;
+  color: #2d2824;
+  font: 600 0.86rem var(--font-body);
+  cursor: pointer;
 }
+
+.known-login-chip:active { background: #ece6de; }
 
 /* ═══════════════════════════════════════════════════════════════
    NIGHTS BADGE
@@ -3396,6 +3352,7 @@ body.mode-quick .detail-text { display: none; }
   <form class="auth-card" id="auth-form">
     <h1 id="auth-title">Staff sign in</h1>
     <p>Use the cleaner account issued by Cascade. Public sign-up is disabled.</p>
+    <div id="known-logins" class="known-logins" hidden></div>
     <label for="auth-email">Your name</label>
     <input id="auth-email" type="text" autocomplete="username" autocapitalize="none" placeholder="e.g. honey" required>
     <label for="auth-password">Password</label>
@@ -3527,36 +3484,13 @@ body.mode-quick .detail-text { display: none; }
     <div class="zone-divider"><span class="zone-label">🧹 Cleaner</span></div>
 
     <div class="field-group">
-      <label class="field-label" for="cleaner-display">Your name <span class="required">*</span></label>
-      <div class="combobox-wrap" id="cleaner-combobox">
-        <div class="combobox-display" id="cleaner-display" tabindex="0" role="combobox"
-             aria-expanded="false" aria-haspopup="listbox" aria-label="Select your name"
-             aria-controls="cleaner-options">
-          <div class="cleaner-avatar" id="cleaner-avatar">–</div>
-          <span id="cleaner-display-text" style="flex:1;color:var(--text-muted);">Select your name…</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <div class="combobox-options" id="cleaner-options" role="listbox" aria-label="Cleaner names">
-          <div class="combobox-option" data-value="Marifel" role="option" tabindex="-1">
-            <div class="opt-avatar">M</div> Marifel
-          </div>
-          <div class="combobox-option" data-value="Honey" role="option" tabindex="-1">
-            <div class="opt-avatar">H</div> Honey
-          </div>
-          <div class="combobox-option" data-value="Lloyd" role="option" tabindex="-1">
-            <div class="opt-avatar">L</div> Lloyd
-          </div>
-          <div class="combobox-option manual-entry" data-value="__manual__" role="option" tabindex="-1">
-            ✏️ Type manually…
-          </div>
-        </div>
-        <div class="combobox-manual-input" id="manual-name-wrap">
-          <input type="text" id="manual-cleaner-name" placeholder="Enter your name" autocomplete="name"
-                 aria-label="Enter your name manually" maxlength="60">
-        </div>
-        <!-- Hidden actual value field -->
-        <input type="hidden" id="cleanerName" name="cleanerName">
+      <label class="field-label">Signed in as</label>
+      <div class="identity-chip" id="identity-chip">
+        <div class="cleaner-avatar" id="cleaner-avatar">–</div>
+        <span id="identity-name-text">–</span>
       </div>
+      <a href="#" id="switch-account-link" class="switch-account-link">Not you? Switch account</a>
+      <input type="hidden" id="cleanerName" name="cleanerName">
     </div>
 
     <div class="field-group">
@@ -4268,6 +4202,7 @@ body.mode-quick .detail-text { display: none; }
       📦 Check Inventory
     </button>
   </div>
+  <a href="#" id="success-sign-out-link" class="switch-account-link">Sign out</a>
 </div>
 
 <script>
@@ -4320,8 +4255,15 @@ const DRAFT_VERSION      = 5; // bumped v7.8: extraExpenses added to draft
 const VIEW_KEY           = 'ch_view_mode';
 const DWELL_KEY          = 'ch_dwell_start';
 const SESSION_FOLDER_KEY = 'ch_session_folder';
-const LAST_CLEANER_KEY   = 'ch_last_cleaner';
 const PHASE_KEY          = 'ch_phase';
+// Device-local remembered logins for the sign-in gate (WP1). Never a public
+// staff list: each device only ever remembers names that signed in on it.
+const KNOWN_LOGINS_KEY   = 'ch_known_logins';
+const KNOWN_LOGINS_MAX   = 5;
+const LAST_SEEN_KEY      = 'ch_last_seen';
+// 0 = off (default). Owner constraint 1 forbids re-prompting a signed-in
+// device; set to a day count only if Lloyd asks for the optional guard.
+const SESSION_STALE_DAYS_GUARD = 0;
 // Client-side dedup guard [FD-002]: tracks submissionIds that completed successfully
 // so the pendingOnlineRetry handler cannot double-submit the same session.
 // FUTURE DEV: Remove once Code.gs is updated with PropertiesService server-side dedup
@@ -4350,6 +4292,43 @@ function clearStaffSession() {
   localStorage.removeItem(AUTH_SESSION_KEY);
 }
 
+// Sign-in and refresh both return `user.user_metadata.display_name` /
+// `user.app_metadata.display_name` when staff-users set one at create time.
+// Mailbox logins (owner/admin) predate that field, so fall back to the
+// e-mail local part until Lloyd runs the one-line SQL update (D-033 §1.1).
+function deriveDisplayName(user) {
+  const meta = user.user_metadata?.display_name || user.app_metadata?.display_name;
+  if (meta) return String(meta).trim();
+  const local = String(user.email || '').split('@')[0];
+  const spaced = local.replace(/[._]+/g, ' ').trim();
+  return spaced.replace(/\b\w/g, c => c.toUpperCase()) || 'Staff';
+}
+
+function getKnownLogins() {
+  try { return JSON.parse(localStorage.getItem(KNOWN_LOGINS_KEY) || '[]'); } catch { return []; }
+}
+
+function rememberLogin(login, label) {
+  const loginTrim = String(login || '').trim();
+  if (!loginTrim) return;
+  let list = getKnownLogins().filter(e => (e.login || '').toLowerCase() !== loginTrim.toLowerCase());
+  list.unshift({ login: loginTrim, label: label || loginTrim });
+  list = list.slice(0, KNOWN_LOGINS_MAX);
+  ls(KNOWN_LOGINS_KEY, JSON.stringify(list));
+}
+
+function touchLastSeen() { ls(LAST_SEEN_KEY, String(Date.now())); }
+
+// Off by default (SESSION_STALE_DAYS_GUARD = 0). When enabled, a device that
+// has not opened the app in N days sees the sign-in gate again on next open —
+// the session itself is untouched, this only decides whether to show it.
+function staleSessionGuardTripped() {
+  if (!SESSION_STALE_DAYS_GUARD) return false;
+  const last = Number(ls(LAST_SEEN_KEY) || 0);
+  if (!last) return false;
+  return (Date.now() - last) > SESSION_STALE_DAYS_GUARD * 86400000;
+}
+
 class AuthRejectedError extends Error {
   constructor(message, status) { super(message); this.name = 'AuthRejectedError'; this.status = status; }
 }
@@ -4372,7 +4351,7 @@ async function authRequest(grantType, body) {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: Math.floor(Date.now() / 1000) + Number(data.expires_in || 3600),
-    user: { id: data.user.id, email: data.user.email || '' },
+    user: { id: data.user.id, email: data.user.email || '', display_name: deriveDisplayName(data.user) },
   });
   return staffSession;
 }
@@ -4411,25 +4390,50 @@ async function staffHeaders(json = false) {
   };
 }
 
+function renderKnownLogins() {
+  const host = el('known-logins');
+  if (!host) return;
+  const list = getKnownLogins();
+  host.innerHTML = '';
+  if (!list.length) { host.hidden = true; return; }
+  host.hidden = false;
+  list.forEach(entry => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'known-login-chip';
+    chip.textContent = entry.label;
+    chip.addEventListener('click', () => {
+      const emailEl = el('auth-email');
+      if (emailEl) emailEl.value = entry.login;
+      el('auth-password')?.focus();
+    });
+    host.appendChild(chip);
+  });
+}
+
 async function initStaffAuth() {
   const gate = el('auth-gate');
   const form = el('auth-form');
   const errorEl = el('auth-error');
   const submit = el('auth-submit');
   const existing = await requireStaffSession();
-  if (existing) { gate.hidden = true; return true; }
+  if (existing && !staleSessionGuardTripped()) { gate.hidden = true; touchLastSeen(); return true; }
 
+  renderKnownLogins();
   gate.hidden = false;
   return await new Promise(resolve => {
     form.addEventListener('submit', async event => {
       event.preventDefault();
       submit.disabled = true;
       errorEl.textContent = '';
+      const typedLogin = el('auth-email').value;
       try {
         await authRequest('password', {
-          email: staffLoginEmail(el('auth-email').value),
+          email: staffLoginEmail(typedLogin),
           password: el('auth-password').value,
         });
+        rememberLogin(typedLogin, staffSession.user.display_name);
+        touchLastSeen();
         gate.hidden = true;
         resolve(true);
       } catch (error) {
@@ -4441,15 +4445,31 @@ async function initStaffAuth() {
   });
 }
 
-function installLogoutButton() {
-  const host = el('top-right');
-  if (!host || el('staff-logout')) return;
-  const button = document.createElement('button');
-  button.id = 'staff-logout';
-  button.type = 'button';
-  button.textContent = 'Sign out';
-  button.addEventListener('click', () => { clearStaffSession(); location.reload(); });
-  host.appendChild(button);
+// Session-derived identity: the Phase 0 chip, and the two places a cleaner
+// can actually sign out from (WP1 — the header button and the name
+// combobox both went away).
+function renderIdentity() {
+  const name = staffSession?.user?.display_name || 'Staff';
+  state.cleanerName = name;
+  const hidden = el('cleanerName');
+  if (hidden) hidden.value = name;
+  const avatarEl = el('cleaner-avatar');
+  if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
+  const textEl = el('identity-name-text');
+  if (textEl) textEl.textContent = name;
+  updateBottomBar();
+  updateProgress(0);
+}
+
+function signOutAndReload(event) {
+  event?.preventDefault();
+  clearStaffSession();
+  location.reload();
+}
+
+function wireIdentityControls() {
+  el('switch-account-link')?.addEventListener('click', signOutAndReload);
+  el('success-sign-out-link')?.addEventListener('click', signOutAndReload);
 }
 
 const DWELL_DURATION     = 10 * 60; // 600 seconds
@@ -5055,122 +5075,6 @@ function initSwipe() {
       goToPhase(state.phase - 1, true);
     }
   }, { passive: true });
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   COMBOBOX (Cleaner name selector)
-═══════════════════════════════════════════════════════════════ */
-function initCombobox() {
-  const display      = el('cleaner-display');
-  const options      = el('cleaner-options');
-  const manualWrap   = el('manual-name-wrap');
-  const manualInput  = el('manual-cleaner-name');
-  const hiddenInput  = el('cleanerName');
-  const avatarEl     = el('cleaner-avatar');
-  const displayText  = el('cleaner-display-text');
-
-  if (!display || !options) return;
-
-  // Restore last used name
-  const last = ls(LAST_CLEANER_KEY);
-  if (last) selectCleaner(last);
-
-  function openDropdown() {
-    options.classList.add('open');
-    display.setAttribute('aria-expanded', 'true');
-    display.classList.add('open');
-  }
-
-  function closeDropdown() {
-    options.classList.remove('open');
-    display.setAttribute('aria-expanded', 'false');
-    display.classList.remove('open');
-  }
-
-  display.addEventListener('click', e => {
-    e.stopPropagation();
-    options.classList.contains('open') ? closeDropdown() : openDropdown();
-  });
-
-  display.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
-    if (e.key === 'Escape') closeDropdown();
-  });
-
-  document.addEventListener('click', e => {
-    if (!el('cleaner-combobox')?.contains(e.target)) closeDropdown();
-  });
-
-  options.querySelectorAll('.combobox-option').forEach(opt => {
-    opt.addEventListener('click', () => {
-      const val = opt.dataset.value;
-      closeDropdown();
-      if (val === '__manual__') {
-        if (manualWrap) manualWrap.classList.add('visible');
-        if (manualInput) manualInput.focus();
-        setCleanerDisplay('', '✏️', '✏️ Manual entry');
-        if (hiddenInput) hiddenInput.value = '';
-      } else {
-        if (manualWrap) manualWrap.classList.remove('visible');
-        selectCleaner(val);
-      }
-    });
-    opt.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.click(); }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const next = opt.nextElementSibling;
-        if (next && next.classList.contains('combobox-option')) next.focus();
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prev = opt.previousElementSibling;
-        if (prev && prev.classList.contains('combobox-option')) prev.focus();
-        else display.focus();
-      }
-      if (e.key === 'Escape') { closeDropdown(); display.focus(); }
-    });
-  });
-
-  if (manualInput) {
-    manualInput.addEventListener('input', () => {
-      const v = manualInput.value.trim();
-      if (hiddenInput) hiddenInput.value = v;
-      state.cleanerName = v;
-      if (avatarEl) avatarEl.textContent = v ? v.charAt(0).toUpperCase() : '✏️';
-      if (displayText) displayText.textContent = v || 'Type your name…';
-      if (displayText) displayText.style.color = v ? 'var(--text-primary)' : 'var(--text-muted)';
-      ls(LAST_CLEANER_KEY, v);
-      updateBottomBar();
-      updateProgress(0);
-    });
-  }
-
-  // Watch hiddenInput for changes from anywhere
-  if (hiddenInput) {
-    hiddenInput.addEventListener('input', () => {
-      state.cleanerName = hiddenInput.value;
-      updateBottomBar();
-      updateProgress(0);
-    });
-  }
-}
-
-function selectCleaner(name) {
-  const hiddenInput  = el('cleanerName');
-  const avatarEl     = el('cleaner-avatar');
-  const displayText  = el('cleaner-display-text');
-
-  state.cleanerName = name;
-  if (hiddenInput) hiddenInput.value = name;
-  if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
-  if (displayText) {
-    displayText.textContent = name;
-    displayText.style.color = 'var(--text-primary)';
-  }
-  ls(LAST_CLEANER_KEY, name);
-  updateBottomBar();
-  updateProgress(0);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -6679,7 +6583,8 @@ function loadDraft() {
 function applyDraft(draft) {
   // Restore form values
   const set = (id, val) => { const e = el(id); if (e) e.value = val || ''; };
-  set('cleanerName',          draft.cleanerName);
+  // cleanerName is not restored from the draft — it always comes from the
+  // signed-in session (renderIdentity), never from a saved draft.
   set('cleaningDate',         draft.cleaningDate);
   set('checkInDate',          draft.checkInDate);
   set('checkOutDate',         draft.checkOutDate);
@@ -6724,9 +6629,6 @@ function applyDraft(draft) {
       }
     });
   }
-
-  // Restore cleaner display
-  if (draft.cleanerName) selectCleaner(draft.cleanerName);
 
   // Restore condition
   if (draft.conditionStatus) {
@@ -8693,7 +8595,8 @@ async function init() {
   registerServiceWorker();
 
   await initStaffAuth();
-  installLogoutButton();
+  renderIdentity();
+  wireIdentityControls();
 
   // v7.0: trigger calendar sync on load (non-blocking, 30-min rate limited)
   triggerCalendarSync();
@@ -8706,9 +8609,6 @@ async function init() {
 
   // Inject submit button into bottom bar
   createSubmitButton();
-
-  // Combobox
-  initCombobox();
 
   // Phase 0 form (auto-fills dates/time)
   initSetupForm();

@@ -36,3 +36,24 @@ test('photo upload is property and submission scoped', () => {
 test('service worker cache is bumped for authentication cutover', () => {
   assert.match(sw, /ch-shell-v3-auth/);
 });
+
+test('identity comes from the staff session, not a typed combobox (WP1)', () => {
+  assert.doesNotMatch(html, /combobox-option/);
+  assert.doesNotMatch(html, /selectCleaner\(/);
+  assert.match(html, /identity-chip/);
+  assert.match(html, /display_name: deriveDisplayName\(data\.user\)/);
+  assert.match(html, /state\.cleanerName = name;/);
+});
+
+test('the gate shows device-remembered names, never a public staff list (WP1)', () => {
+  assert.match(html, /KNOWN_LOGINS_KEY\s*=\s*'ch_known_logins'/);
+  assert.match(html, /id="known-logins"/);
+  assert.doesNotMatch(html, /staff-users\?[^"'`]*list/i);
+});
+
+test('sign-out only happens from Not-you or the success screen, never idle (WP1)', () => {
+  assert.match(html, /id="switch-account-link"/);
+  assert.match(html, /id="success-sign-out-link"/);
+  assert.match(html, /SESSION_STALE_DAYS_GUARD = 0/);
+  assert.doesNotMatch(html, /id="staff-logout"/);
+});

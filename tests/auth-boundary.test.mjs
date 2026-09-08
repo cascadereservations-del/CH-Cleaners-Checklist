@@ -56,4 +56,9 @@ test('sign-out only happens from Not-you or the success screen, never idle (WP1)
   assert.match(html, /id="success-sign-out-link"/);
   assert.match(html, /SESSION_STALE_DAYS_GUARD = 0/);
   assert.doesNotMatch(html, /id="staff-logout"/);
+  assert.doesNotMatch(html, /#staff-logout/);
+});
+
+test('a session stored before WP1 gets display_name backfilled, not "Staff" (WP1 fixup)', () => {
+  assert.match(html, /staffSession\.user\.display_name = deriveDisplayName\(staffSession\.user\)/);
 });

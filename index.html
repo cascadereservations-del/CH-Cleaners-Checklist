@@ -3342,7 +3342,6 @@ body.mode-quick .detail-text { display: none; }
 .auth-card button { width:100%; min-height:48px; margin-top:20px; border:0; border-radius:8px; background:#3e5546; color:#fff; font:700 1rem var(--font-body); cursor:pointer; }
 .auth-card button:disabled { opacity:.6; cursor:wait; }
 #auth-error { min-height:20px; margin-top:12px; color:#9d2f2f; font-size:.86rem; }
-#staff-logout { border:0; background:transparent; color:#6f675f; text-decoration:underline; cursor:pointer; font:600 .72rem var(--font-body); }
 
 </style>
 </head>
@@ -3484,7 +3483,7 @@ body.mode-quick .detail-text { display: none; }
     <div class="zone-divider"><span class="zone-label">🧹 Cleaner</span></div>
 
     <div class="field-group">
-      <label class="field-label">Signed in as</label>
+      <div class="field-label">Signed in as</div>
       <div class="identity-chip" id="identity-chip">
         <div class="cleaner-avatar" id="cleaner-avatar">–</div>
         <span id="identity-name-text">–</span>
@@ -4361,6 +4360,13 @@ async function requireStaffSession() {
     try { staffSession = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch { clearStaffSession(); }
   }
   if (!staffSession?.access_token) return null;
+  // Backfill display_name on sessions stored before WP1 (identity-from-session
+  // shipped after these devices last signed in) — otherwise the chip and the
+  // payload's cleanerName read "Staff" until the next silent token refresh.
+  if (staffSession.user && !staffSession.user.display_name) {
+    staffSession.user.display_name = deriveDisplayName(staffSession.user);
+    saveStaffSession(staffSession);
+  }
   if (Number(staffSession.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return staffSession;
   if (!staffSession.refresh_token) { clearStaffSession(); return null; }
   if (refreshInFlight) return refreshInFlight;

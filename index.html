@@ -4328,6 +4328,8 @@ const PHASE_KEY          = 'ch_phase';
 // (the submissionId field is already sent in the payload — Code.gs just needs to check it).
 const SUBMITTED_IDS_KEY  = 'ch_submitted_ids';
 
+let refreshInFlight = null;
+
 function saveStaffSession(session) {
   staffSession = session;
   localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
@@ -4338,6 +4340,10 @@ function clearStaffSession() {
   localStorage.removeItem(AUTH_SESSION_KEY);
 }
 
+class AuthRejectedError extends Error {
+  constructor(message, status) { super(message); this.name = 'AuthRejectedError'; this.status = status; }
+}
+
 async function authRequest(grantType, body) {
   const resp = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${grantType}`, {
     method: 'POST',
@@ -4346,7 +4352,11 @@ async function authRequest(grantType, body) {
   });
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok || !data.access_token || !data.user?.id) {
-    throw new Error(data.error_description || data.msg || 'Sign-in failed');
+    const message = data.error_description || data.msg || 'Sign-in failed';
+    // 400/401/403 mean Auth rejected the credentials or the refresh token.
+    // Anything else (5xx, gateway) is transient and must not end the session.
+    if ([400, 401, 403].includes(resp.status)) throw new AuthRejectedError(message, resp.status);
+    throw new Error(message);
   }
   saveStaffSession({
     access_token: data.access_token,
@@ -4364,12 +4374,21 @@ async function requireStaffSession() {
   if (!staffSession?.access_token) return null;
   if (Number(staffSession.expires_at || 0) > Math.floor(Date.now() / 1000) + 60) return staffSession;
   if (!staffSession.refresh_token) { clearStaffSession(); return null; }
-  try {
-    return await authRequest('refresh_token', { refresh_token: staffSession.refresh_token });
-  } catch {
-    clearStaffSession();
-    return null;
-  }
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      return await authRequest('refresh_token', { refresh_token: staffSession.refresh_token });
+    } catch (error) {
+      // Only a definite rejection from Auth ends the session. Offline, DNS,
+      // timeouts and 5xx keep the stored session so the cleaner never sees the
+      // sign-in screen because of a bad signal; the next call retries the refresh.
+      if (error instanceof AuthRejectedError) { clearStaffSession(); return null; }
+      return staffSession;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 async function staffHeaders(json = false) {

@@ -83,8 +83,19 @@ test('one PIN, two jobs: the Supabase password on sign-in, a local PBKDF2 hash a
   assert.match(html, /iterations:\s*PIN_ITERATIONS/);
   assert.match(html, /hash:\s*'SHA-256'/);
   assert.match(html, /PIN_MAX_FAILS\s*=\s*5/);
-  // The sign-in gate does send the PIN as the password — deliberately.
-  assert.match(html, /email: staffLoginEmail\(name\), password: pin/);
+  // The sign-in gate does send the PIN as the password — deliberately —
+  // but WP7 prefixes it with a fixed '8888' so the 8-char Supabase Auth
+  // minimum is satisfied without lowering the project-wide policy.
+  assert.match(html, /email: staffLoginEmail\(name\), password: staffAuthPassword\(pin\)/);
+  assert.match(html, /const STAFF_PIN_PREFIX = '8888';/);
+  assert.match(html, /function staffAuthPassword\(pin\) \{ return STAFF_PIN_PREFIX \+ pin; \}/);
+  // The prefix is an Auth-policy detail only: the LOCAL unlock PIN stays the
+  // bare 4 digits, so setPin/verifyPin must never see the prefixed string.
+  assert.match(html, /if \(SUPPORTS_PIN\) await setPin\(pin\);/);
+  assert.doesNotMatch(html, /setPin\(staffAuthPassword/);
+  assert.doesNotMatch(html, /verifyPin\(staffAuthPassword/);
+  // A malformed PIN never reaches Supabase as a broken 8-char string.
+  assert.match(html, /if \(!STAFF_PIN_RE\.test\(pin\)\)/);
   // verifyPin() — the RETURN-VISIT check — must still never touch the network.
   assert.doesNotMatch(html, /async function verifyPin[\s\S]{0,300}fetch\(/);
 });

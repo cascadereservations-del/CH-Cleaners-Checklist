@@ -4478,6 +4478,15 @@ let refreshInFlight = null;
 // Staff sign in with a name. The Auth account behind it is <slug>@staff.cascade.invalid
 // (created by the admin dashboard); a full e-mail is accepted for mailbox logins.
 const STAFF_DOMAIN = 'staff.cascade.invalid';
+// WP7 — Supabase Auth enforces a project-wide 8-character minimum password.
+// Rather than weakening that policy to fit a 4-digit PIN, every staff Auth
+// password is this fixed prefix + the 4 digits (8 chars exactly). Staff and
+// Lloyd only ever see or type the 4 digits; the prefix is applied in code on
+// both sides (here, and in admin-dashboard when the password is first set).
+// The LOCAL unlock PIN is unaffected — it stays the bare 4 digits.
+const STAFF_PIN_PREFIX = '8888';
+const STAFF_PIN_RE = /^\d{4}$/;
+function staffAuthPassword(pin) { return STAFF_PIN_PREFIX + pin; }
 function staffLoginEmail(raw) {
   const v = String(raw || '').trim();
   if (v.includes('@')) return v.toLowerCase();
@@ -4841,8 +4850,9 @@ async function initStaffAuth() {
         errorEl.textContent = '';
         const name = currentAuthName();
         if (!name) { errorEl.textContent = 'Choose your name first.'; return; }
+        if (!STAFF_PIN_RE.test(pin)) { errorEl.textContent = 'Enter your 4-digit PIN.'; return; }
         try {
-          await authRequest('password', { email: staffLoginEmail(name), password: pin });
+          await authRequest('password', { email: staffLoginEmail(name), password: staffAuthPassword(pin) });
           rememberLogin(name, staffSession.user.display_name);
           touchLastSeen();
           // The PIN just typed to sign in doubles as the local unlock PIN —

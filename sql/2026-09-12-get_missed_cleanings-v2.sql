@@ -22,6 +22,8 @@
 -- (confirmation_code is gone, source and days_overdue are new). Update the
 -- missed-cleaning reminder and turnover-verifier together with this.
 
+begin;
+
 create or replace function public.get_missed_cleanings(
   p_property_id uuid default null,
   p_lookback    integer default 14
@@ -78,3 +80,5 @@ comment on function public.get_missed_cleanings(uuid, integer) is
 -- v1 took a single uuid argument. Drop it so callers cannot silently keep
 -- resolving to the old yesterday-only behaviour.
 drop function if exists public.get_missed_cleanings(uuid);
+
+commit;

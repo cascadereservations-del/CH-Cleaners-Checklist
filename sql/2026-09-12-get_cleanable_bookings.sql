@@ -17,6 +17,8 @@
 -- turnover. A long stay can legitimately need more than one report, so
 -- already_reported is matched per (stay, cleaning_type), not per stay.
 
+begin;
+
 create or replace function public.get_cleanable_bookings(
   p_date        date,
   p_property_id uuid default '6ae230f4-c189-4547-84b1-cb6e0b2cc9bd'::uuid,
@@ -102,3 +104,5 @@ grant execute on function public.get_cleanable_bookings(date, uuid, integer, int
 
 comment on function public.get_cleanable_bookings(date, uuid, integer, integer) is
   'Stays a cleaner may still file a report for on a given date. SECURITY DEFINER because calendar_events is owner/admin only; re-checks read_operations itself.';
+
+commit;

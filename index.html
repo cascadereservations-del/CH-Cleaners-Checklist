@@ -6,6 +6,27 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.0 — Drawn icons, no CDN (2026-09-13):          ║
+  ║  - ~100 emoji-as-icons became one inline SVG sprite in the   ║
+  ║    manual's idiom: 24x24, no fill, currentColor stroke, so   ║
+  ║    an icon takes the colour of the text it sits in. Eight    ║
+  ║    paths are lifted verbatim from manual/index.html.         ║
+  ║  - Emoji KEPT where they are voice, not iconography: the     ║
+  ║    Messenger/Telegram templates and the submission email     ║
+  ║    (inline SVG does not render in a mail client), and the    ║
+  ║    alarm toggle, whose label is written via textContent.     ║
+  ║  - REMOVED the Lucide CDN script and its emoji fallback map. ║
+  ║    icon() had no callers and initIcons() rendered nothing —  ║
+  ║    the page fetched a third-party script from unpkg on every ║
+  ║    load for nothing.                                         ║
+  ║  - Stay picker: a calendar row with no guest name now reads  ║
+  ║    "Blocked / maintenance window" instead of "Guest name not ║
+  ║    on the calendar". Client-side only, no SQL change.        ║
+  ║  - FD-002 CLOSED: the live Apps Script has had server-side   ║
+  ║    dedup since before 2026-09-12 (D-085). The client guard   ║
+  ║    is KEPT as a second net — the server's window is a 72h    ║
+  ║    TTL and a duplicate report is not worth 15 fewer lines.   ║
+  ║                                                              ║
   ║  CHANGELOG v7.9 — Manual design language (2026-09-12):       ║
   ║  - The palette is now the Operations Manual's Design System  ║
   ║    v2.1 :root, carried under this file's existing            ║
@@ -289,19 +310,10 @@
 }
 </style>
 
-<!-- Lucide icons — pinned 0.344.0 -->
-<script>
-window.LUCIDE_FALLBACK = {
-  'user':'👤','gauge':'⚡','camera':'📷','search':'🔍','timer':'⏳',
-  'bed-double':'🛏️','droplets':'💧','sparkles':'✨','calendar-days':'🗓️',
-  'send':'📤','check':'✓','alert-triangle':'⚠️','chevron-right':'›',
-  'chevron-left':'‹','loader-2':'⟳','wifi-off':'📵','check-circle':'✅',
-  'x-circle':'✗','trash-2':'🗑️','refresh-cw':'↺','arrow-right':'→',
-  'arrow-left':'←','clock':'🕐','zap':'⚡','leaf':'🌿','key':'🔑'
-};
-</script>
-<script defer src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"
-        onerror="window._lucideFailed=true"></script>
+<!-- The Lucide CDN script and its emoji fallback map were removed on
+     2026-09-13. icon() had no callers and initIcons() rendered nothing, so
+     the page was fetching a third-party script from unpkg on every load for
+     no reason. Icons are now the inline #ch-icons sprite below. -->
 
 <style>
 /* ═══════════════════════════════════════════════════════════════
@@ -3647,9 +3659,73 @@ body.mode-quick .detail-text { display: none; }
   font-size: .78rem;
   color: var(--text-secondary);
 }
+/* ── Drawn icon set (2026-09-13) ──────────────────────────────────────────
+   Emoji-as-icons are gone: they render as a different typeface per platform,
+   they carry colour this palette does not control, and next to the manual's
+   drawn set they read as a different product. Same idiom as the manual —
+   24x24 box, no fill, currentColor stroke — so an icon simply takes the
+   colour of the text it sits in. Eight of these paths are lifted verbatim
+   from manual/index.html so the shared concepts are literally the same
+   drawing. Emoji still appear where they are VOICE, not iconography: the
+   Messenger and Telegram message templates, and the submission email, where
+   inline SVG would not render in a mail client anyway. */
+.ch-ico {
+  width: 1.05em;
+  height: 1.05em;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.16em;
+}
+.ch-ico.lg { width: 1.3em; height: 1.3em; }
+.ch-ico.gold { color: var(--earthen-gold); }
 </style>
 </head>
 <body class="mode-detail">
+
+<!-- Drawn icon set. i-info, i-lock, i-wrench, i-check, i-box, i-search,
+     i-shower and i-pan are lifted verbatim from the Operations Manual's
+     sprite so the shared concepts are the same drawing in both tools. -->
+<svg id="ch-icons" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden;">
+  <defs>
+    <g id="i-info"><circle cx="12" cy="12" r="8.8"/><path d="M12 16.4v-4.8"/><path d="M12 8.2h.01"/></g>
+    <g id="i-lock"><rect x="4.6" y="10.4" width="14.8" height="10.2" rx="2"/><path d="M8 10.4V7.6a4 4 0 0 1 8 0v2.8"/><path d="M12 14.6v2.2"/></g>
+    <g id="i-wrench"><path d="M14.9 6.4a1 1 0 0 0 0 1.4l1.3 1.3a1 1 0 0 0 1.4 0l3.1-3.1a5.5 5.5 0 0 1-7.3 7.3l-5.9 5.9a2 2 0 0 1-2.8-2.8l5.9-5.9a5.5 5.5 0 0 1 7.3-7.3z"/></g>
+    <g id="i-check"><path d="m4.5 12.5 5 5 10-11"/></g>
+    <g id="i-box"><path d="M3.4 7.6 12 3.2l8.6 4.4v8.8L12 20.8l-8.6-4.4z"/><path d="M3.4 7.6 12 12l8.6-4.4"/><path d="M12 12v8.8"/></g>
+    <g id="i-search"><circle cx="11" cy="11" r="6.6"/><path d="m20.5 20.5-4.8-4.8"/></g>
+    <g id="i-shower"><path d="M4.4 20.6V8.2a3.4 3.4 0 0 1 6.8 0"/><path d="M11.2 8.2h8.4l-1.6 4.2h-5.2z"/><path d="M14 16.4h.01"/><path d="M17 18.6h.01"/><path d="M15.4 20.8h.01"/></g>
+    <g id="i-pan"><rect x="3.4" y="7.6" width="17.2" height="13" rx="2"/><circle cx="8.4" cy="12.4" r="2.2"/><circle cx="15.6" cy="12.4" r="2.2"/><path d="M7 3.4v2.8"/><path d="M17 3.4v2.8"/></g>
+
+    <g id="i-alert"><path d="M10.6 4 3.3 17.4A1.6 1.6 0 0 0 4.7 20h14.6a1.6 1.6 0 0 0 1.4-2.6L13.4 4a1.6 1.6 0 0 0-2.8 0z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></g>
+    <g id="i-check-circle"><circle cx="12" cy="12" r="8.8"/><path d="m8 12.2 2.8 2.8L16 9.6"/></g>
+    <g id="i-shield"><path d="M12 3.2 5 6v5.6c0 4.3 2.9 7.7 7 9.2 4.1-1.5 7-4.9 7-9.2V6z"/><path d="M9.4 12.2h5.2"/><path d="M12 9.6v5.2"/></g>
+    <g id="i-camera"><path d="M3.4 8.8a1.6 1.6 0 0 1 1.6-1.6h2.2l1.4-2.2h6.8l1.4 2.2H19a1.6 1.6 0 0 1 1.6 1.6v9a1.6 1.6 0 0 1-1.6 1.6H5a1.6 1.6 0 0 1-1.6-1.6z"/><circle cx="12" cy="13" r="3.4"/></g>
+    <g id="i-image"><rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2"/><circle cx="8.6" cy="9.6" r="1.7"/><path d="m4.2 17.4 4.8-4.6 3.4 3.2 3-2.8 4.4 4.2"/></g>
+    <g id="i-broom"><path d="M12 2.8v8.4"/><path d="M7.4 11.2h9.2l1.7 8.2a1 1 0 0 1-1 1.2H6.7a1 1 0 0 1-1-1.2z"/><path d="M9.9 11.8v8.8"/><path d="M14.1 11.8v8.8"/></g>
+    <g id="i-refresh"><path d="M20.4 12a8.4 8.4 0 1 1-2.5-6"/><path d="M20.6 4v4.6H16"/></g>
+    <g id="i-bell"><path d="M18 9.4a6 6 0 1 0-12 0c0 5.2-2 6.8-2 6.8h16s-2-1.6-2-6.8"/><path d="M13.7 19.6a2 2 0 0 1-3.4 0"/></g>
+    <g id="i-calendar"><rect x="3.6" y="5.4" width="16.8" height="15" rx="2"/><path d="M3.6 10h16.8"/><path d="M8.4 3.4v3.6"/><path d="M15.6 3.4v3.6"/></g>
+    <g id="i-x"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></g>
+    <g id="i-moon"><path d="M20.4 14.2A8.8 8.8 0 0 1 9.8 3.6a8.8 8.8 0 1 0 10.6 10.6z"/></g>
+    <g id="i-sun"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2"/><path d="M12 19.2v2.2"/><path d="M2.6 12h2.2"/><path d="M19.2 12h2.2"/><path d="m5.4 5.4 1.6 1.6"/><path d="m17 17 1.6 1.6"/><path d="m18.6 5.4-1.6 1.6"/><path d="M7 17l-1.6 1.6"/></g>
+    <g id="i-bolt"><path d="M13.4 2.6 4.6 13.4h6.2l-.8 8 8.8-10.8h-6.2z"/></g>
+    <g id="i-drop"><path d="M12 3.2s6.2 6 6.2 10.2a6.2 6.2 0 0 1-12.4 0C5.8 9.2 12 3.2 12 3.2z"/></g>
+    <g id="i-eye"><path d="M2.4 12S6 5.6 12 5.6 21.6 12 21.6 12 18 18.4 12 18.4 2.4 12 2.4 12z"/><circle cx="12" cy="12" r="3"/></g>
+    <g id="i-door"><path d="M5.6 20.6V4.6a1 1 0 0 1 1-1h8.8a1 1 0 0 1 1 1v16"/><path d="M3.6 20.6h16.8"/><path d="M13.4 12.4h.01"/></g>
+    <g id="i-bed"><path d="M3.4 19.6V8.4"/><path d="M3.4 12.6h17.2a2 2 0 0 1 2 2v5"/><path d="M3.4 16.4h19.2"/><path d="M6.4 12.6V9.4a1 1 0 0 1 1-1h5.6a1 1 0 0 1 1 1v3.2"/></g>
+    <g id="i-sofa"><path d="M4.6 11.4V8.2a2 2 0 0 1 2-2h10.8a2 2 0 0 1 2 2v3.2"/><path d="M3 13.4a2 2 0 0 1 4 0v2.4h10v-2.4a2 2 0 0 1 4 0v5.2H3z"/><path d="M7 15.8h10"/></g>
+    <g id="i-toilet"><path d="M5.4 3.6v7.4"/><path d="M4 11h15.4a6.4 6.4 0 0 1-4.6 6.1l.9 3.3H8.8l.9-3.3A6.4 6.4 0 0 1 4 11z"/><path d="M5.4 6.6h3.2"/></g>
+    <g id="i-receipt"><path d="M5.4 3.6h13.2v17.4l-2.2-1.5-2.2 1.5-2.2-1.5-2.2 1.5-2.2-1.5-2.2 1.5z"/><path d="M8.6 8.4h6.8"/><path d="M8.6 12.4h6.8"/></g>
+    <g id="i-clipboard"><path d="M9 4.6H7a1.6 1.6 0 0 0-1.6 1.6v13a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-13A1.6 1.6 0 0 0 17 4.6h-2"/><rect x="9" y="2.8" width="6" height="3.6" rx="1"/><path d="M8.8 11.4h6.4"/><path d="M8.8 15.4h4.4"/></g>
+    <g id="i-phone"><rect x="6.4" y="2.6" width="11.2" height="18.8" rx="2.2"/><path d="M10.6 18.4h2.8"/></g>
+    <g id="i-wifi-off"><path d="M3 3.6 21 21.4"/><path d="M12 18.4h.01"/><path d="M8.2 14.6a5.4 5.4 0 0 1 5-1.4"/><path d="M4.8 11.2a10.2 10.2 0 0 1 4-2.4"/><path d="M13.4 8.8a10.2 10.2 0 0 1 5.8 2.4"/></g>
+    <g id="i-plus"><path d="M12 5.4v13.2"/><path d="M5.4 12h13.2"/></g>
+  </defs>
+</svg>
 
 <!-- Internal-only tool (Lloyd, 2026-09-08): name + PIN is the whole sign-in,
      no separate password. The PIN typed here doubles as the local unlock
@@ -3780,7 +3856,7 @@ body.mode-quick .detail-text { display: none; }
 
 <!-- Offline banner -->
 <div id="offline-banner" role="status" aria-live="polite">
-  📵 No signal — report saved, will retry when connected
+  <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wifi-off"/></svg> No signal — report saved, will retry when connected
 </div>
 
 <!-- Quick/Detail view toggle -->
@@ -3809,23 +3885,23 @@ body.mode-quick .detail-text { display: none; }
     <div class="feature-guide collapsed" id="feature-guide" role="region" aria-label="Feature guide — what the symbols mean">
       <div class="feature-guide-header" id="fg-header" tabindex="0"
            role="button" aria-expanded="false" aria-controls="fg-body">
-        <span class="fg-title">ℹ️ How to use this checklist</span>
+        <span class="fg-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-info"/></svg> How to use this checklist</span>
         <span class="fg-chevron" aria-hidden="true">▾</span>
       </div>
       <div class="feature-guide-body" id="fg-body">
 
         <div class="fg-item">
-          <div class="fg-badge-col"><span style="font-size:1.3rem;">⚠</span></div>
-          <div class="fg-desc"><strong>Triangle button</strong> — Tap the ⚠ on the right side of a task to report an issue or damage. A note and photo field will appear.</div>
+          <div class="fg-badge-col"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg></div>
+          <div class="fg-desc"><strong>Triangle button</strong> — Tap the <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> on the right side of a task to report an issue or damage. A note and photo field will appear.</div>
         </div>
 
         <div class="fg-item">
-          <div class="fg-badge-col"><span class="critical-badge">⚠ Critical</span></div>
+          <div class="fg-badge-col"><span class="critical-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Critical</span></div>
           <div class="fg-desc"><strong>Red "Critical" badge</strong> — This task is safety-critical. Do not skip it.</div>
         </div>
 
         <div class="fg-item">
-          <div class="fg-badge-col"><span class="disinfect-badge">🦠 Disinfect</span></div>
+          <div class="fg-badge-col"><span class="disinfect-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg> Disinfect</span></div>
           <div class="fg-desc"><strong>Blue "Disinfect" badge</strong> — Use a disinfectant product for this task.</div>
         </div>
 
@@ -3852,28 +3928,28 @@ body.mode-quick .detail-text { display: none; }
         </div>
 
         <div class="fg-item">
-          <div class="fg-badge-col" style="font-size:1.1rem;">📸</div>
-          <div class="fg-desc"><strong>Photo reminders</strong> — Take at least 5 pre-clean photos (bed, kitchen, CR, equipment close-up, utensils) and 5 after-clean photos when done. Use 📷 Capture or 🖼 Upload. Photos go directly to Telegram when you submit — no Messenger needed.</div>
+          <div class="fg-badge-col"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></div>
+          <div class="fg-desc"><strong>Photo reminders</strong> — Take at least 5 pre-clean photos (bed, kitchen, CR, equipment close-up, utensils) and 5 after-clean photos when done. Use Capture or Upload. Photos go directly to Telegram when you submit — no Messenger needed.</div>
         </div>
 
         <div class="fg-item">
-          <div class="fg-badge-col" style="font-size:1.3rem;">📦</div>
+          <div class="fg-badge-col"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg></div>
           <div class="fg-desc"><strong>Supply log</strong> — After cleaning, tap <em>Log Supply Usage</em> in the Clean phase. Log everyday items with +/− buttons; liquids in ml (auto-converted to units). Required before you can go to Finish.</div>
         </div>
 
         <div class="fg-item">
-          <div class="fg-badge-col" style="font-size:1.1rem;">🔒</div>
+          <div class="fg-badge-col"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg></div>
           <div class="fg-desc"><strong>Confirm &amp; Leave</strong> — The last 4 checks before leaving. All must be confirmed or flagged with an issue. The checklist cannot be submitted until all 4 are done.</div>
         </div>
 
         <button class="fg-got-it" id="fg-got-it-btn" type="button">
-          ✓ Got it — collapse this guide
+          <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Got it — collapse this guide
         </button>
       </div>
     </div>
 
     <!-- Zone: Cleaner -->
-    <div class="zone-divider"><span class="zone-label">🧹 Cleaner</span></div>
+    <div class="zone-divider"><span class="zone-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-broom"/></svg> Cleaner</span></div>
 
     <div class="field-group">
       <div class="field-label">Signed in as</div>
@@ -3891,36 +3967,36 @@ body.mode-quick .detail-text { display: none; }
     </div>
 
     <!-- Zone: Cleaning Type -->
-    <div class="zone-divider" style="margin-top:var(--space-8);"><span class="zone-label">🧹 Cleaning Type</span></div>
+    <div class="zone-divider" style="margin-top:var(--space-8);"><span class="zone-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-broom"/></svg> Cleaning Type</span></div>
     <div class="field-group">
       <div class="ctype-group" role="group" aria-label="Select cleaning type">
         <button class="ctype-btn selected" id="ctype-turnover" type="button" data-type="turnover" aria-pressed="true">
-          <span class="ctype-icon">🔄</span>
+          <span class="ctype-icon"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-refresh"/></svg></span>
           <span class="ctype-label">Turnover</span>
         </button>
         <button class="ctype-btn midstay" id="ctype-midstay" type="button" data-type="mid_stay" aria-pressed="false">
-          <span class="ctype-icon">🛎️</span>
+          <span class="ctype-icon"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bell"/></svg></span>
           <span class="ctype-label">Mid-Stay</span>
         </button>
         <button class="ctype-btn deep" id="ctype-deepclean" type="button" data-type="deep_clean" aria-pressed="false">
-          <span class="ctype-icon">🧹</span>
+          <span class="ctype-icon"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-broom"/></svg></span>
           <span class="ctype-label">Deep Clean</span>
         </button>
         <button class="ctype-btn emergency" id="ctype-emergency" type="button" data-type="emergency" aria-pressed="false">
-          <span class="ctype-icon">🔧</span>
+          <span class="ctype-icon"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-wrench"/></svg></span>
           <span class="ctype-label">Emergency</span>
         </button>
       </div>
     </div>
     <div id="midstay-context">
       <div class="midstay-banner" role="status">
-        <span>🛎️</span>
+        <span><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bell"/></svg></span>
         <div><strong>Mid-Stay Clean</strong> — guest is still staying. This is a scheduled light refresh, not a checkout turnover. Meter readings are optional. Photograph each major area (bed/living, bathroom, kitchen, floors) before and after, and note anything used or needed.</div>
       </div>
     </div>
     <div id="emergency-context">
       <div class="emergency-banner" role="alert">
-        <span>🚨</span>
+        <span><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg></span>
         <div><strong>Emergency / Repairs mode</strong> — meter readings, photos, and guest name not required. Describe the issue and document with photos if safe.</div>
       </div>
       <div class="field-group">
@@ -3929,7 +4005,7 @@ body.mode-quick .detail-text { display: none; }
       </div>
     </div>
     <!-- Zone: Guest Stay -->
-    <div class="zone-divider" style="margin-top:var(--space-4);"><span class="zone-label">📅 Guest Stay</span></div>
+    <div class="zone-divider" style="margin-top:var(--space-4);"><span class="zone-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg> Guest Stay</span></div>
     <div class="field-group">
       <label class="field-label" for="cleaningDate">Cleaning date <span class="required">*</span></label>
       <input type="date" id="cleaningDate" name="cleaningDate" aria-required="true">
@@ -3948,27 +4024,27 @@ body.mode-quick .detail-text { display: none; }
       <div class="field-group" style="margin-bottom:0;" id="checkin-field-wrap">
         <label class="field-label" for="checkInDate">Check-in date</label>
         <input type="date" id="checkInDate" name="checkInDate">
-        <span class="field-autofilled-badge" id="checkin-autofill-badge">📅 autofilled</span>
+        <span class="field-autofilled-badge" id="checkin-autofill-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg> autofilled</span>
       </div>
       <div class="field-group" style="margin-bottom:0;" id="checkout-field-wrap">
         <label class="field-label" for="checkOutDate">Check-out date</label>
         <input type="date" id="checkOutDate" name="checkOutDate">
-        <span class="field-autofilled-badge" id="checkout-autofill-badge">📅 autofilled</span>
+        <span class="field-autofilled-badge" id="checkout-autofill-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg> autofilled</span>
       </div>
     </div>
 
     <!-- Airbnb booking autofill banner -->
     <div id="booking-autofill-banner" role="status" aria-live="polite">
-      <span class="bab-icon">📅</span>
+      <span class="bab-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg></span>
       <div class="bab-text">
         <strong id="bab-title">Booking found on Airbnb calendar</strong>
         <span id="bab-detail">Dates autofilled — tap to override if incorrect.</span>
       </div>
-      <button class="bab-dismiss" id="bab-dismiss" type="button" aria-label="Dismiss autofill banner">✕</button>
+      <button class="bab-dismiss" id="bab-dismiss" type="button" aria-label="Dismiss autofill banner"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
 
     <div id="nights-display" style="display:none; margin-bottom:var(--space-4);">
-      <span class="nights-badge" id="nights-badge">🌙 — nights</span>
+      <span class="nights-badge" id="nights-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-moon"/></svg> — nights</span>
     </div>
 
     <div class="field-group">
@@ -3980,7 +4056,7 @@ body.mode-quick .detail-text { display: none; }
       Please fill in your name, cleaning date and guest name to continue.
     </p>
 
-    <div id="autosave-indicator" aria-live="polite">✓ Draft saved</div>
+    <div id="autosave-indicator" aria-live="polite"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Draft saved</div>
 
   </section><!-- /phase-0 -->
 
@@ -4001,40 +4077,40 @@ body.mode-quick .detail-text { display: none; }
          jump straight to it. -->
     <div class="p1-sticky-summary" id="p1-sticky-summary" role="navigation" aria-label="Jump to a section in this phase">
       <button type="button" class="p1-summary-chip" id="p1-jump-preclean" aria-label="Pre-cleaning photos, 0 of 5. Jump to section.">
-        <span aria-hidden="true">📸</span> <span id="p1-summary-preclean" aria-hidden="true">0/5</span>
+        <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> <span id="p1-summary-preclean" aria-hidden="true">0/5</span>
       </button>
       <button type="button" class="p1-summary-chip" id="p1-jump-meters" aria-label="Meter photos, 0 of 2. Jump to section.">
-        <span aria-hidden="true">⚡💧</span> <span id="p1-summary-meters" aria-hidden="true">0/2</span>
+        <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bolt"/></svg><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-drop"/></svg> <span id="p1-summary-meters" aria-hidden="true">0/2</span>
       </button>
       <button type="button" class="p1-summary-chip" id="p1-jump-condition" aria-label="Unit condition, not checked yet. Jump to section.">
-        <span aria-hidden="true">🔍</span> <span id="p1-summary-condition" aria-hidden="true">—</span>
+        <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg> <span id="p1-summary-condition" aria-hidden="true">—</span>
       </button>
     </div>
 
     <!-- Section A: Pre-clean Photos (Feature 3 — in-app, replaces Messenger CTA) -->
     <div class="section-photo-card" id="preclean-photo-card" role="region" aria-label="Pre-cleaning photos — required">
       <div class="spc-header">
-        <div class="spc-title">📸 Pre-Cleaning Photos</div>
-        <span class="spc-required-badge">⚠ Required &nbsp;·&nbsp; minimum 5 photos</span>
+        <div class="spc-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Pre-Cleaning Photos</div>
+        <span class="spc-required-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Required &nbsp;·&nbsp; minimum 5 photos</span>
       </div>
       <p class="spc-hint">Document every area before you touch anything — aim for 10-12 photos. Multiple angles per area gives the best protection. Minimum 5 to proceed.</p>
       <div class="preclean-guide" aria-label="Required photo areas — cover each area">
-        <span class="pcg-chip"><span class="pcg-emoji">🛏</span><span class="pcg-label">Bedroom</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🛋</span><span class="pcg-label">Living Area</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🍳</span><span class="pcg-label">Kitchen</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">📦</span><span class="pcg-label">Appliances</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🚿</span><span class="pcg-label">Bathroom</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🚪</span><span class="pcg-label">Entrance</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bed"/></svg></span><span class="pcg-label">Bedroom</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sofa"/></svg></span><span class="pcg-label">Living Area</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pan"/></svg></span><span class="pcg-label">Kitchen</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg></span><span class="pcg-label">Appliances</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shower"/></svg></span><span class="pcg-label">Bathroom</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg></span><span class="pcg-label">Entrance</span></span>
       </div>
       <div class="photo-option-btns">
         <button class="photo-option-btn" id="preclean-photo-capture" type="button" aria-label="Capture pre-cleaning photo with camera">
-          <span class="poi">📷</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
           <span>Capture Photo</span>
           <input type="file" id="preclean-photo-cap" accept="image/*" capture="environment"
                  aria-label="Take pre-cleaning photo with camera">
         </button>
         <button class="photo-option-btn" id="preclean-photo-upload" type="button" aria-label="Upload pre-cleaning photo from gallery">
-          <span class="poi">🖼</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg></span>
           <span>Upload Photo</span>
           <input type="file" id="preclean-photo-file" accept="image/*" multiple
                  aria-label="Upload pre-cleaning photo from gallery">
@@ -4046,18 +4122,18 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Section B: Meter Readings -->
     <div class="card" id="meter-readings-card" role="region" aria-label="Meter readings">
-      <div class="card-title">⚡💧 Step 2 — Meter Readings</div>
+      <div class="card-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bolt"/></svg><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-drop"/></svg> Step 2 — Meter Readings</div>
 
       <div id="prev-readings-area">
         <div class="prev-readings-skeleton" id="prev-skeleton" aria-hidden="true"></div>
         <div class="prev-readings-row" id="prev-readings-row" style="display:none;">
           <div class="prev-reading-chip">
-            <div class="prc-label">⚡ Previous Electric</div>
+            <div class="prc-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bolt"/></svg> Previous Electric</div>
             <div class="prc-value" id="prev-elec-val">—</div>
             <div class="prc-date" id="prev-elec-date">—</div>
           </div>
           <div class="prev-reading-chip">
-            <div class="prc-label">💧 Previous Water</div>
+            <div class="prc-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-drop"/></svg> Previous Water</div>
             <div class="prc-value" id="prev-water-val">—</div>
             <div class="prc-date" id="prev-water-date">—</div>
           </div>
@@ -4066,13 +4142,13 @@ body.mode-quick .detail-text { display: none; }
 
       <div class="field-row">
         <div class="field-group" style="margin-bottom:0;">
-          <label class="field-label" for="electricMeterReading">⚡ Electric (kWh) <span class="required">*</span></label>
+          <label class="field-label" for="electricMeterReading"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bolt"/></svg> Electric (kWh) <span class="required">*</span></label>
           <input type="number" id="electricMeterReading" name="electricMeterReading"
                  placeholder="0.00" step="0.01" min="0"
                  aria-required="true" aria-describedby="elec-delta">
         </div>
         <div class="field-group" style="margin-bottom:0;">
-          <label class="field-label" for="waterMeterReading">💧 Water (m³) <span class="required">*</span></label>
+          <label class="field-label" for="waterMeterReading"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-drop"/></svg> Water (m³) <span class="required">*</span></label>
           <input type="number" id="waterMeterReading" name="waterMeterReading"
                  placeholder="0.000" step="0.001" min="0"
                  aria-required="true" aria-describedby="water-delta">
@@ -4090,7 +4166,7 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Section C: Meter Photos -->
     <div class="card" role="region" aria-label="Meter photos upload — required">
-      <div class="card-title">📷 Step 3 — Meter Photos <span style="color:var(--error);font-weight:700;">(Required)</span></div>
+      <div class="card-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Step 3 — Meter Photos <span style="color:var(--error);font-weight:700;">(Required)</span></div>
       <p style="font-size:var(--font-size-sm);color:var(--text-muted);margin-bottom:var(--space-4);">
         Take one photo of each meter. Photos upload automatically — no internet needed to continue.
       </p>
@@ -4100,7 +4176,7 @@ body.mode-quick .detail-text { display: none; }
         <div>
           <p style="font-size:var(--font-size-xs);font-weight:700;color:var(--text-secondary);margin-bottom:var(--space-2);text-transform:uppercase;letter-spacing:0.06em;">⚡ Electric meter</p>
           <button class="meter-photo-single-btn" id="meter-photo-0-btn" type="button" aria-label="Add electric meter photo">
-            <span class="mpsb-icon">📷</span>
+            <span class="mpsb-icon"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
             <span>Add Photo</span>
             <span class="mpsb-status" id="meter-photo-0-status"></span>
           </button>
@@ -4116,7 +4192,7 @@ body.mode-quick .detail-text { display: none; }
         <div>
           <p style="font-size:var(--font-size-xs);font-weight:700;color:var(--text-secondary);margin-bottom:var(--space-2);text-transform:uppercase;letter-spacing:0.06em;">💧 Water meter</p>
           <button class="meter-photo-single-btn" id="meter-photo-1-btn" type="button" aria-label="Add water meter photo">
-            <span class="mpsb-icon">📷</span>
+            <span class="mpsb-icon"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
             <span>Add Photo</span>
             <span class="mpsb-status" id="meter-photo-1-status"></span>
           </button>
@@ -4137,7 +4213,7 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Section D: Unit Condition -->
     <div class="card" id="condition-card" role="region" aria-label="Unit condition check">
-      <div class="card-title">🔍 Step 4 — Unit Condition</div>
+      <div class="card-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg> Step 4 — Unit Condition</div>
       <p style="font-size:var(--font-size-sm);color:var(--text-muted);margin-bottom:var(--space-4);">
         Do a quick check before you start. Did you find any damage or unusual issues?
       </p>
@@ -4145,13 +4221,13 @@ body.mode-quick .detail-text { display: none; }
       <div class="condition-buttons" role="group" aria-label="Unit condition">
         <button class="condition-btn" id="cond-clear-btn" type="button"
                 aria-pressed="false" aria-label="All clear — no damage or issues found">
-          <span class="cb-icon">✅</span>
+          <span class="cb-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-circle"/></svg></span>
           <span class="cb-label">All Clear</span>
           <span class="cb-sub">No damage or issues</span>
         </button>
         <button class="condition-btn" id="cond-issue-btn" type="button"
                 aria-pressed="false" aria-label="Found something — describe the issue">
-          <span class="cb-icon">⚠️</span>
+          <span class="cb-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg></span>
           <span class="cb-label">Found Something</span>
           <span class="cb-sub">Take photo &amp; describe</span>
         </button>
@@ -4168,7 +4244,7 @@ body.mode-quick .detail-text { display: none; }
         <div style="position:relative;display:inline-block;">
           <button class="issue-photo-btn" type="button"
                   style="background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);border-radius:8px;padding:var(--space-2) var(--space-4);font-family:var(--font-body);font-size:var(--font-size-sm);font-weight:600;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:var(--space-2);">
-            📷 Add photo (optional)
+            <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Add photo (optional)
             <input type="file" id="conditionPhoto" accept="image/*"
                    aria-label="Condition issue photo" style="position:absolute;inset:0;opacity:0;cursor:pointer;min-height:unset;border:none;padding:0;">
           </button>
@@ -4177,7 +4253,7 @@ body.mode-quick .detail-text { display: none; }
       </div>
 
       <div id="meter-nudge" role="status" aria-live="polite" hidden>
-        <div class="mn-head"><span aria-hidden="true">👀</span> <strong>Worth a second look</strong></div>
+        <div class="mn-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> <strong>Worth a second look</strong></div>
         <ul class="mn-list" id="meter-nudge-list"></ul>
         <p class="mn-foot">If it is right as typed, carry on — this never blocks your report.</p>
       </div>
@@ -4210,7 +4286,7 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Arrive items (rendered by JS) -->
     <div class="checklist-section" id="arrive-items" role="region" aria-label="Arrive items">
-      <div class="subsection-header">🚪 Arrive</div>
+      <div class="subsection-header"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg> Arrive</div>
       <!-- JS renders items here -->
     </div>
 
@@ -4258,25 +4334,25 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- 3A: Bedroom & Living Room -->
     <div class="checklist-section" id="bedroom-items" role="region" aria-label="Bedroom and living room items">
-      <div class="subsection-header">🛏️ Bedroom &amp; Living Room</div>
+      <div class="subsection-header"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bed"/></svg> Bedroom &amp; Living Room</div>
       <!-- JS renders items here -->
     </div>
 
     <div class="section-photo-card" id="bedroom-photo-card" role="region" aria-label="Bedroom and living room photos — optional">
       <div class="spc-header">
-        <div class="spc-title">📸 Bedroom &amp; Living Room Photos</div>
+        <div class="spc-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Bedroom &amp; Living Room Photos</div>
         <span class="spc-optional-badge">Optional</span>
       </div>
       <p class="spc-optional-hint">Not required to proceed — add photos here only if you want extra documentation for this area. Pre-clean and after-clean photos above are the main record.</p>
       <div class="photo-option-btns">
         <button class="photo-option-btn" id="bedroom-photo-capture" type="button" aria-label="Capture bedroom photo">
-          <span class="poi">📷</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
           <span>Capture Photo</span>
           <input type="file" id="bedroom-photo-cap" accept="image/*" capture="environment"
                  aria-label="Take bedroom photo with camera">
         </button>
         <button class="photo-option-btn" id="bedroom-photo-upload" type="button" aria-label="Upload bedroom photo">
-          <span class="poi">🖼</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg></span>
           <span>Upload Photo</span>
           <input type="file" id="bedroom-photo-file" accept="image/*" multiple
                  aria-label="Upload bedroom photo from gallery">
@@ -4288,25 +4364,25 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- 3B: Kitchen & Bathroom -->
     <div class="checklist-section" id="kitchen-items" role="region" aria-label="Kitchen and bathroom items">
-      <div class="subsection-header">🍳 Kitchen &amp; Bathroom</div>
+      <div class="subsection-header"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pan"/></svg> Kitchen &amp; Bathroom</div>
       <!-- JS renders items here -->
     </div>
 
     <div class="section-photo-card" id="kitchen-photo-card" role="region" aria-label="Kitchen and bathroom photos — optional">
       <div class="spc-header">
-        <div class="spc-title">📸 Kitchen &amp; Bathroom Photos</div>
+        <div class="spc-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Kitchen &amp; Bathroom Photos</div>
         <span class="spc-optional-badge">Optional</span>
       </div>
       <p class="spc-optional-hint">Not required to proceed — add photos here only if you want extra documentation for this area. Pre-clean and after-clean photos above are the main record.</p>
       <div class="photo-option-btns">
         <button class="photo-option-btn" id="kitchen-photo-capture" type="button" aria-label="Capture kitchen photo">
-          <span class="poi">📷</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
           <span>Capture Photo</span>
           <input type="file" id="kitchen-photo-cap" accept="image/*" capture="environment"
                  aria-label="Take kitchen photo with camera">
         </button>
         <button class="photo-option-btn" id="kitchen-photo-upload" type="button" aria-label="Upload kitchen photo">
-          <span class="poi">🖼</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg></span>
           <span>Upload Photo</span>
           <input type="file" id="kitchen-photo-file" accept="image/*" multiple
                  aria-label="Upload kitchen photo from gallery">
@@ -4318,20 +4394,20 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Feature 4: Log Supply Usage card -->
     <div class="card supply-usage-trigger-card" id="supply-usage-trigger-card" role="region" aria-label="Log supply usage — required">
-      <div class="card-title">📦 Log Supply Usage</div>
+      <div class="card-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg> Log Supply Usage</div>
       <p style="font-size:var(--font-size-sm);color:var(--text-muted);line-height:1.55;margin-bottom:var(--space-4);">
         Record what you used or refilled. Takes 30 seconds — required before you can move to the Finish phase.
       </p>
       <button class="supply-usage-open-btn" id="btn-open-supply-usage" type="button"
               aria-label="Open supply usage log" aria-haspopup="dialog">
-        📦 Open Supply Log
+        <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg> Open Supply Log
       </button>
     </div>
 
     <!-- v7.8: Additional Expenses card — cleaner logs out-of-pocket / incurred costs.
          Routed to finance only; amount + description required per line. -->
     <div class="card extra-exp-card" id="extra-exp-card" role="region" aria-label="Additional expenses — optional">
-      <div class="card-title">🧾 Additional Expenses</div>
+      <div class="card-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-receipt"/></svg> Additional Expenses</div>
       <p style="font-size:var(--font-size-sm);color:var(--text-muted);line-height:1.55;margin-bottom:var(--space-4);">
         Did you spend on anything for the unit during this clean (e.g. a replacement item, tricycle to buy supplies, a small repair part)? Add it here so it can be reimbursed. Leave empty if none.
       </p>
@@ -4361,14 +4437,14 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Final Cleaning -->
     <div class="checklist-section" id="final-cleaning-items" role="region" aria-label="Final cleaning items">
-      <div class="subsection-header">🧹 Final Cleaning</div>
+      <div class="subsection-header"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-broom"/></svg> Final Cleaning</div>
       <!-- JS renders items here -->
     </div>
 
     <!-- Confirm & Leave -->
-    <div class="section-divider section-divider-required">🔒 Confirm &amp; Leave <span class="req-tag">All 4 required</span></div>
+    <div class="section-divider section-divider-required"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg> Confirm &amp; Leave <span class="req-tag">All 4 required</span></div>
     <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.5;font-weight:500;">
-      Almost done! Confirm each of the four items below — all must be checked before submitting. Tap ✅ Confirmed or ⚠ Issue Found for each.
+      Almost done! Confirm each of the four items below — all must be checked before submitting. Tap Confirmed or Issue Found for each.
     </p>
 
     <div id="confirm-leave-items" role="region" aria-label="Confirm and leave items — required">
@@ -4376,19 +4452,19 @@ body.mode-quick .detail-text { display: none; }
     </div>
 
     <!-- Power & Safety scenario card -->
-    <div class="section-divider section-divider-safety">⚡ Power &amp; Safety</div>
+    <div class="section-divider section-divider-safety"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bolt"/></svg> Power &amp; Safety</div>
 
     <div class="scenario-card" role="note" aria-label="Power and safety instructions">
       <div class="sc-header">Power &amp; Safety Instructions</div>
       <div class="scenario-row">
-        <span class="sc-icon">☀️</span>
+        <span class="sc-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sun"/></svg></span>
         <div class="sc-body">
           <div class="sc-title">Guest arriving TODAY (before 2 PM)</div>
           <div class="sc-desc">Leave fridge ON, water heater ON. All lights OFF.</div>
         </div>
       </div>
       <div class="scenario-row">
-        <span class="sc-icon">🌙</span>
+        <span class="sc-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-moon"/></svg></span>
         <div class="sc-body">
           <div class="sc-title">Guest arriving LATER or no guest today</div>
           <div class="sc-desc">Turn everything OFF. Flip water heater breaker OFF. Leave WiFi and camera circuits ON.</div>
@@ -4406,12 +4482,12 @@ body.mode-quick .detail-text { display: none; }
       <input type="checkbox" id="weekly-toggle" name="weeklyToggle"
              aria-controls="weekly-section"
              aria-expanded="false">
-      <span class="weekly-toggle-label" id="weekly-toggle-label">📋 Include weekly deep maintenance tasks this session?</span>
+      <span class="weekly-toggle-label" id="weekly-toggle-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clipboard"/></svg> Include weekly deep maintenance tasks this session?</span>
     </label>
 
     <!-- Weekly tasks section (hidden until toggled) -->
     <div id="weekly-section" role="region" aria-label="Weekly deep maintenance tasks" aria-hidden="true">
-      <div class="section-divider">📋 Weekly Deep Maintenance</div>
+      <div class="section-divider"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clipboard"/></svg> Weekly Deep Maintenance</div>
       <div id="weekly-items-list">
         <!-- JS renders items here -->
       </div>
@@ -4420,27 +4496,27 @@ body.mode-quick .detail-text { display: none; }
     <!-- After-clean Photos — Feature 3 (in-app, replaces Messenger) -->
     <div class="section-photo-card" id="afterclean-photo-card" role="region" aria-label="After-cleaning photos — required">
       <div class="spc-header">
-        <div class="spc-title">📸 After-Cleaning Photos</div>
-        <span class="spc-required-badge">⚠ Required &nbsp;·&nbsp; minimum 5 photos</span>
+        <div class="spc-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> After-Cleaning Photos</div>
+        <span class="spc-required-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Required &nbsp;·&nbsp; minimum 5 photos</span>
       </div>
       <p class="spc-hint">Show every area clean and ready — aim for 12-14 photos with multiple angles — the Cascade standard. These go directly to Telegram when you submit.</p>
       <div class="preclean-guide" aria-label="After-clean photo areas — cover each area">
-        <span class="pcg-chip"><span class="pcg-emoji">🛏</span><span class="pcg-label">Bedroom</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🛋</span><span class="pcg-label">Living Room</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🍳</span><span class="pcg-label">Kitchen</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🚿</span><span class="pcg-label">Bathroom</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🚽</span><span class="pcg-label">Toilet / CR</span></span>
-        <span class="pcg-chip"><span class="pcg-emoji">🚪</span><span class="pcg-label">Entrance</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bed"/></svg></span><span class="pcg-label">Bedroom</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-sofa"/></svg></span><span class="pcg-label">Living Room</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pan"/></svg></span><span class="pcg-label">Kitchen</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shower"/></svg></span><span class="pcg-label">Bathroom</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-toilet"/></svg></span><span class="pcg-label">Toilet / CR</span></span>
+        <span class="pcg-chip"><span class="pcg-emoji"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-door"/></svg></span><span class="pcg-label">Entrance</span></span>
       </div>
       <div class="photo-option-btns">
         <button class="photo-option-btn" id="afterclean-photo-capture" type="button" aria-label="Capture after-cleaning photo with camera">
-          <span class="poi">📷</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
           <span>Capture Photo</span>
           <input type="file" id="afterclean-photo-cap" accept="image/*" capture="environment"
                  aria-label="Take after-cleaning photo with camera">
         </button>
         <button class="photo-option-btn" id="afterclean-photo-upload" type="button" aria-label="Upload after-cleaning photo from gallery">
-          <span class="poi">🖼</span>
+          <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg></span>
           <span>Upload Photo</span>
           <input type="file" id="afterclean-photo-file" accept="image/*" multiple
                  aria-label="Upload after-cleaning photo from gallery">
@@ -4475,7 +4551,7 @@ body.mode-quick .detail-text { display: none; }
     <div id="date-confirm-context" style="display:none;background:var(--surface-raised);border:1px solid var(--border);border-radius:8px;padding:var(--space-3) var(--space-4);font-size:var(--font-size-xs);color:var(--text-secondary);line-height:1.5;margin-bottom:var(--space-4);"></div>
     <div class="modal-actions">
       <button class="modal-btn secondary" id="date-confirm-cancel" type="button">← Change Date</button>
-      <button class="modal-btn primary" id="date-confirm-proceed" type="button">✓ Proceed Anyway</button>
+      <button class="modal-btn primary" id="date-confirm-proceed" type="button"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Proceed Anyway</button>
     </div>
   </div>
 </div>
@@ -4489,11 +4565,11 @@ body.mode-quick .detail-text { display: none; }
     <div class="pcs-handle"></div>
     <div class="pcs-title" id="pcs-title">Add meter photo</div>
     <button class="pcs-btn" id="pcs-take" type="button">
-      <span class="pcs-btn-icon">📷</span>
+      <span class="pcs-btn-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
       <span>Take Photo with Camera</span>
     </button>
     <button class="pcs-btn" id="pcs-upload" type="button">
-      <span class="pcs-btn-icon">🖼️</span>
+      <span class="pcs-btn-icon"><svg class="ch-ico lg" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-image"/></svg></span>
       <span>Choose from Gallery</span>
     </button>
     <button class="pcs-cancel" id="pcs-cancel" type="button">Cancel</button>
@@ -4509,8 +4585,8 @@ body.mode-quick .detail-text { display: none; }
   <div class="sus-panel">
     <div class="sus-handle"></div>
     <div class="sus-header">
-      <div class="sus-title" id="sus-title-el">📦 Log Supply Usage</div>
-      <button class="sus-close" id="sus-close-btn" type="button" aria-label="Close supply usage log">✕</button>
+      <div class="sus-title" id="sus-title-el"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg> Log Supply Usage</div>
+      <button class="sus-close" id="sus-close-btn" type="button" aria-label="Close supply usage log"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-x"/></svg></button>
     </div>
     <div class="sus-list" id="sus-list" role="list" aria-label="Supply items">
       <div class="sus-loading" id="sus-loading" aria-live="polite">Loading supplies…</div>
@@ -4579,7 +4655,7 @@ body.mode-quick .detail-text { display: none; }
       <br>Cleaner: <strong id="submit-modal-cleaner"></strong>
     </p>
     <div id="submit-modal-issues" style="display:none;background:var(--warning-bg);border:1px solid #fcd34d;border-radius:8px;padding:var(--space-3) var(--space-4);font-size:var(--font-size-sm);color:var(--warning);margin-bottom:var(--space-4);">
-      ⚠️ <span id="submit-modal-issue-count"></span> issue(s) reported — these will be included in the email.
+      <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> <span id="submit-modal-issue-count"></span> issue(s) reported — these will be included in the email.
     </div>
     <div id="submit-modal-upload-warn" style="display:none;background:rgba(201,150,58,0.10);border:1px solid rgba(201,150,58,0.4);border-radius:8px;padding:var(--space-3) var(--space-4);font-size:var(--font-size-sm);color:var(--earthen-mocha);margin-bottom:var(--space-4);line-height:1.5;">
       ⏫ <strong><span id="submit-modal-upload-count"></span> photo(s) still uploading.</strong> Tapping Submit Now will attempt to upload them first — keep the app open.
@@ -4588,10 +4664,10 @@ body.mode-quick .detail-text { display: none; }
       ⏱ Note: The dwell timer was not started. Chemicals may not have had enough soak time.
     </div>
     <div id="submit-modal-exp" style="display:none;background:var(--surface-raised);border:1px solid var(--border);border-radius:8px;padding:var(--space-3) var(--space-4);font-size:var(--font-size-sm);color:var(--earthen-mocha);margin-bottom:var(--space-4);line-height:1.5;">
-      🧾 <strong><span id="submit-modal-exp-count"></span> expense(s)</strong> logged, total ₱<span id="submit-modal-exp-total"></span>. These will be sent for reimbursement.
+      <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-receipt"/></svg> <strong><span id="submit-modal-exp-count"></span> expense(s)</strong> logged, total ₱<span id="submit-modal-exp-total"></span>. These will be sent for reimbursement.
     </div>
     <div id="submit-modal-exp-warn" style="display:none;background:var(--error-bg);border:1px solid rgba(184,40,46,0.3);border-radius:8px;padding:var(--space-3) var(--space-4);font-size:var(--font-size-sm);color:var(--error);margin-bottom:var(--space-4);line-height:1.5;">
-      ⚠️ An expense has an amount but no description. Add a description or remove the amount — it will not be sent without one.
+      <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> An expense has an amount but no description. Add a description or remove the amount — it will not be sent without one.
     </div>
     <div class="modal-actions">
       <button class="modal-btn secondary" id="btn-submit-cancel" type="button">
@@ -4614,13 +4690,13 @@ body.mode-quick .detail-text { display: none; }
     <strong id="success-cleaner-name"></strong> · <span id="success-date"></span><br>
     Time taken: <strong id="success-elapsed"></strong>
   </div>
-  <p class="success-telegram-note">📲 Report + photos sent to Telegram OPS group</p>
+  <p class="success-telegram-note"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-phone"/></svg> Report + photos sent to Telegram OPS group</p>
   <div class="success-actions">
     <button class="success-action-btn reset" id="success-btn-reset" type="button">
       ↺ Start New Report
     </button>
     <button class="success-action-btn secondary" id="success-btn-inventory" type="button">
-      📦 Check Inventory
+      <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg> Check Inventory
     </button>
   </div>
   <a href="#" id="success-sign-out-link" class="switch-account-link">Sign out</a>
@@ -4686,10 +4762,18 @@ const LAST_SEEN_KEY      = 'ch_last_seen';
 // 0 = off (default). Owner constraint 1 forbids re-prompting a signed-in
 // device; set to a day count only if Lloyd asks for the optional guard.
 const SESSION_STALE_DAYS_GUARD = 0;
-// Client-side dedup guard [FD-002]: tracks submissionIds that completed successfully
-// so the pendingOnlineRetry handler cannot double-submit the same session.
-// FUTURE DEV: Remove once Code.gs is updated with PropertiesService server-side dedup
-// (the submissionId field is already sent in the payload — Code.gs just needs to check it).
+// Client-side dedup guard [FD-002 — CLOSED 2026-09-13]: tracks submissionIds
+// that completed successfully so the pendingOnlineRetry handler cannot
+// double-submit the same session.
+// The condition this was waiting on is met: the live Apps Script has had
+// server-side dedup (_dedupKey / _isDuplicate / _markSeen over
+// PropertiesService) since before 2026-09-12 — see D-085, it was in the
+// editor and not in the repo. This guard is therefore no longer the only
+// thing standing between a retry and a double write.
+// It is KEPT anyway, deliberately. The server's dedup window is a 72-hour
+// TTL (DEDUP_TTL_MS in Code.gs); this one costs a localStorage key and
+// prevents a duplicate report — the wrong thing to trade for fifteen fewer
+// lines. Delete it only if it starts getting in the way.
 const SUBMITTED_IDS_KEY  = 'ch_submitted_ids';
 
 let refreshInFlight = null;
@@ -5322,13 +5406,6 @@ function esc(str) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-function icon(name) {
-  if (window._lucideFailed || !window.lucide) {
-    return window.LUCIDE_FALLBACK[name] || '';
-  }
-  return `<i data-lucide="${name}"></i>`;
-}
-
 function manilaNow() {
   return new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
 }
@@ -5399,15 +5476,6 @@ function lsJSON(key, val) {
     catch { return null; }
   }
   try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* quota */ }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LUCIDE ICON INIT
-═══════════════════════════════════════════════════════════════ */
-function initIcons() {
-  if (window.lucide && !window._lucideFailed) {
-    try { window.lucide.createIcons(); } catch(e) { /* ignore */ }
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -7314,21 +7382,21 @@ function buildItemHTML(item) {
 
   let textHTML = esc(item.text);
   if (item.disinfect) {
-    textHTML += ` <span class="disinfect-badge">🦠 Disinfect</span>`;
+    textHTML += ` <span class="disinfect-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield"/></svg> Disinfect</span>`;
   }
   if (item.biweekly) {
     textHTML = textHTML.replace(/^BIWEEKLY:\s*/i, '');
     textHTML = `<span class="biweekly-badge">Biweekly</span> ${textHTML}`;
   }
   if (item.critical) {
-    textHTML += ` <span class="critical-badge">⚠ Critical</span>`;
+    textHTML += ` <span class="critical-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Critical</span>`;
   }
 
   const flagBtnHTML = showFlag
     ? `<button class="flag-btn" type="button" data-item-id="${item.id}"
          aria-label="Flag an issue with: ${esc(item.text)}"
          aria-expanded="false"
-         title="Flag issue">⚠</button>`
+         title="Flag issue"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg></button>`
     : '';
 
   const issueExpandHTML = showFlag ? `
@@ -7344,7 +7412,7 @@ function buildItemHTML(item) {
       <div style="position:relative;display:inline-block;">
         <button class="issue-photo-btn" type="button"
                 aria-label="Add photo for this issue (optional)">
-          📷 Add photo
+          <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Add photo
           <input type="file" class="issue-photo-input-${item.id}"
                  accept="image/*"
                  aria-label="Issue photo for ${esc(item.text)}"
@@ -7434,12 +7502,12 @@ function renderConfirmItems() {
           <button class="confirm-btn" id="conf-ok-${item.id}" type="button"
                   data-item="${item.id}" data-state="confirmed"
                   aria-pressed="false">
-            ✅ Confirmed
+            <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-circle"/></svg> Confirmed
           </button>
           <button class="confirm-btn" id="conf-issue-${item.id}" type="button"
                   data-item="${item.id}" data-state="issue"
                   aria-pressed="false">
-            ⚠ Issue Found
+            <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Issue Found
           </button>
         </div>
       </div>
@@ -7827,8 +7895,9 @@ function initOfflineDetection() {
   window.addEventListener('online', () => {
     updateOnlineStatus();
     if (state.pendingOnlineRetry && !state.isSubmitting) {
-      // Client-side dedup guard [FD-002]: skip retry if this session already succeeded.
-      // Prevents double-write when Code.gs v3.6 lacks server-side submissionId dedup.
+      // Dedup guard [FD-002]: skip retry if this session already succeeded.
+      // The live Apps Script also dedups on submissionId (72h TTL); this is
+      // the second net, not the only one.
       try {
         const done = JSON.parse(localStorage.getItem(SUBMITTED_IDS_KEY) || '[]');
         if (state.submissionId && done.includes(state.submissionId)) {
@@ -9744,7 +9813,10 @@ let _stayRpcMissing = false;
 
 function stayLabel(b) {
   const nights = b.nights ? `${b.nights} night${b.nights !== 1 ? 's' : ''}` : '';
-  const who    = b.guest_name || 'Guest name not on the calendar';
+  // A calendar row with no guest name is a blocked / maintenance window, not
+  // a stay whose name went missing. Saying so is the difference between a
+  // cleaner thinking the data is broken and a cleaner reading the calendar.
+  const who    = b.guest_name || 'Blocked / maintenance window';
   const when   = b.kind === 'mid_stay'
     ? `staying ${b.checkin_date} → ${b.checkout_date}`
     : b.kind === 'checkin'
@@ -9845,7 +9917,7 @@ function applyStayPick() {
   if (hint) {
     hint.textContent = b.guest_name
       ? `Reporting on ${b.guest_name}'s stay — dates and name filled in.`
-      : 'Dates filled in. The calendar has no name for this stay, so type it yourself.';
+      : 'Dates filled in. This is a blocked window with no guest on the calendar — type a name or a short note.';
     hint.className = b.guest_name ? 'ok' : 'warn';
   }
   updateBottomBar(); updateProgress(0); saveDraft();
@@ -10128,9 +10200,6 @@ async function init() {
   initInventoryUsage();
   initCleaningType();    // v7.8: was defined but never called — ctype buttons were inert
   initExtraExpenses();   // v7.8: additional expenses card
-
-  // Initialize Lucide icons
-  initIcons();
 
   // Check for saved draft — LAST so all DOM is ready
   checkAndShowDraftModal();

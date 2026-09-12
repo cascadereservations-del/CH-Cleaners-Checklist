@@ -96,3 +96,15 @@ test('the last phase asks for the SmartLife automation to be switched on', () =>
                                 html.indexOf('const WEEKLY_ITEMS'));
   assert.ok(powerBlock.includes('check_smartlife_waiting'));
 });
+
+test('the picker loads for a date that was already on the field (no change event)', () => {
+  // The regression this guards: loadCleanableBookings was wired only to the
+  // cleaning-date change event, but the date arrives pre-filled from a draft
+  // or as today, and assigning .value fires nothing. The picker therefore
+  // never appeared on the path every cleaner actually takes.
+  assert.match(html, /dateStr = dateStr \|\| el\('cleaningDate'\)\?\.value \|\| '';/);
+  // Called at init for whatever date is already there...
+  assert.match(html, /fetchPrevReadings\(\);[\s\S]{0,400}loadCleanableBookings\(\);/);
+  // ...and again when a restored draft rewrites it.
+  assert.match(html, /if \(draft\.cleaningDate\) setTimeout\(\(\) => loadCleanableBookings\(draft\.cleaningDate\), 0\);/);
+});

@@ -7857,6 +7857,8 @@ function applyDraft(draft) {
   // cleanerName is not restored from the draft — it always comes from the
   // signed-in session (renderIdentity), never from a saved draft.
   set('cleaningDate',         draft.cleaningDate);
+  // Restoring a draft sets the date silently; reload the stay list for it.
+  if (draft.cleaningDate) setTimeout(() => loadCleanableBookings(draft.cleaningDate), 0);
   set('checkInDate',          draft.checkInDate);
   set('checkOutDate',         draft.checkOutDate);
   set('lastGuestName',        draft.lastGuestName);
@@ -9652,6 +9654,8 @@ function stayLabel(b) {
 }
 
 async function loadCleanableBookings(dateStr) {
+  // Callable with no argument: the date is often already on the field.
+  dateStr = dateStr || el('cleaningDate')?.value || '';
   const wrap = el('stay-pick-wrap');
   const sel  = el('stayPick');
   const hint = el('stay-pick-hint');
@@ -10014,6 +10018,11 @@ async function init() {
 
   // Fetch previous meter readings (non-blocking)
   fetchPrevReadings();
+
+  // The cleaning date is usually pre-filled, and assigning .value fires no
+  // 'change' event -- without this the stay picker never loads on the normal
+  // path. Non-blocking; it hides itself if the RPC is absent.
+  loadCleanableBookings();
 
   // Feature 4: Inventory usage log
   initInventoryUsage();

@@ -5,6 +5,25 @@
   ║  index.html  v7.8  |  2026-06-15                             ║
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
+  ║                                                              ║
+  ║  CHANGELOG v7.9 — Manual design language (2026-09-12):       ║
+  ║  - The palette is now the Operations Manual's Design System  ║
+  ║    v2.1 :root, carried under this file's existing            ║
+  ║    --earthen-* names so the whole sheet followed untouched.  ║
+  ║    Cards are ivory, not white; chrome is mahogany, not teal. ║
+  ║  - The sign-in / PIN / setup gates REVERSE the dark frosted  ║
+  ║    glass of 2026-09-08 (ff16feb) for the manual's light      ║
+  ║    gate: linen ground, parchment card, gold logo mark,       ║
+  ║    Cormorant headline, stone-bordered keys. Lloyd's call.    ║
+  ║  - Body type stays the system stack, display stays the       ║
+  ║    self-hosted Cormorant subset (WP4). No webfont added.     ║
+  ║  - FIX: the 2026-09-12 JOB 2 CSS referenced --radius-md,     ║
+  ║    --text-1/2/3 and --ok, none of which existed here, so     ║
+  ║    the stay picker, the tenured button and the meter nudge   ║
+  ║    lost their radius and colour. Defined as aliases.         ║
+  ║  - FIX: .field-row used 1fr, floored by a date input's       ║
+  ║    min-content width, pushing check-out off a 375px screen.  ║
+  ║    Now minmax(0,1fr).                                        ║
   ║  CHANGELOG v7.8 — Mid-Stay Clean + system sync:             ║
   ║  - NEW cleaning type "Mid-Stay Clean" (data-type=mid_stay).  ║
   ║    4th option; selector now 2x2 grid. Guest is still in the  ║
@@ -237,7 +256,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#22333B">
+<meta name="theme-color" content="#1C1006">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CH Checklist">
@@ -289,25 +308,28 @@ window.LUCIDE_FALLBACK = {
    DESIGN TOKENS
 ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* Luxury palette — Aman / Six Senses / Alila register */
-  --earthen-darkest:  #0E0C0A;   /* deep warm black */
-  --earthen-slate:    #1F3038;   /* deep teal — primary chrome */
-  --earthen-ivory:    #F0EBE0;   /* warm linen parchment */
-  --earthen-gold:     #B8962E;   /* burnished antique gold */
-  --earthen-mocha:    #6C5C4A;   /* warm travertine mid-tone */
+  /* Palette — Operations Manual Design System v2.1 (2026-09-12).
+     The checklist and the manual are one product, so the values below are
+     the manual's :root, kept under this file's existing --earthen-* names
+     so every rule in the 418 KB sheet follows without being touched. */
+  --earthen-darkest:  #1C1006;   /* mahogany — dark surfaces ONLY, never prose */
+  --earthen-slate:    #2A1B0A;   /* walnut — primary chrome (was deep teal) */
+  --earthen-ivory:    #F0E9D8;   /* linen — page ground, text on mahogany */
+  --earthen-gold:     #C9963A;   /* bronze */
+  --earthen-mocha:    #6B5242;   /* warm mid-tone — captions, metadata */
 
   /* Semantic */
-  --surface:          #FFFFFF;
-  --surface-raised:   #F9F5EF;   /* barely-warm card lift */
-  --border:           #E0D6C8;
-  --border-strong:    #C4B8A8;
-  --text-primary:     #1C1814;
-  --text-secondary:   #6C5C4A;
-  --text-muted:       #9C8C7C;
+  --surface:          #F7F2E4;   /* ivory — card surface, no cold white */
+  --surface-raised:   #FBF7EE;   /* parchment — elevated cards, inputs */
+  --border:           #D9CEBC;   /* stone */
+  --border-strong:    #C9B89E;
+  --text-primary:     #3D2B1F;
+  --text-secondary:   #6B5242;
+  --text-muted:       #9B8472;
 
-  --success:          #1A6648;   /* deep forest green */
+  --success:          #2E7D5F;   /* deep forest green */
   --success-bg:       #EBF4EF;
-  --error:            #B83B46;
+  --error:            #B91C1C;
   --error-bg:         #F9EAEB;
   --warning:          #9C5A18;
   --warning-bg:       #FEF3E6;
@@ -317,6 +339,30 @@ window.LUCIDE_FALLBACK = {
   --disinfect-bg:     #E6EDFC;
   --biweekly:         #6A3AAD;
   --biweekly-bg:      #EDE7F9;
+
+  /* Manual token names, for rules written against the design system. */
+  --mahogany:         #1C1006;
+  --walnut:           #2A1B0A;
+  --bronze:           #C9963A;
+  --gold:             #E8B84B;
+  --cream:            #F7F2E8;
+  --accent-soft:      rgba(201,150,58,.09);
+  --accent-hover:     rgba(201,150,58,.15);
+
+  /* Aliases. The JOB 2 work (2026-09-12) was written against these names and
+     they were never defined here, so the stay picker, the tenured button and
+     the meter nudge lost their corner radius and their text colour. */
+  --text-1:           var(--text-primary);
+  --text-2:           var(--text-secondary);
+  --text-3:           var(--text-muted);
+  --ok:               var(--success);
+  --warn:             var(--warning);
+  --danger:           var(--error);
+
+  --radius-sm:        6px;
+  --radius-md:        10px;
+  --radius-lg:        16px;
+  --radius-xl:        24px;
 
   /* Layout */
   --top-bar-height:   52px;
@@ -387,7 +433,7 @@ body.submitting { pointer-events: none; }
   left: 0;
   right: 0;
   height: var(--top-bar-height);
-  background: #0E1C22;
+  background: var(--mahogany);
   color: var(--earthen-ivory);
   display: flex;
   align-items: center;
@@ -400,6 +446,7 @@ body.submitting { pointer-events: none; }
 
 #property-name {
   font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--earthen-gold);
@@ -424,7 +471,7 @@ body.submitting { pointer-events: none; }
   height: 4px;
   border-radius: 2px;
   flex: 1;
-  background: rgba(198,172,142,0.25);
+  background: rgba(201,150,58,0.28);
   transition: background var(--transition-base);
 }
 
@@ -630,6 +677,7 @@ body.submitting { pointer-events: none; }
 
 #phase-label-bar {
   font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--earthen-mocha);
@@ -647,15 +695,18 @@ body.submitting { pointer-events: none; }
   overflow: hidden;
 }
 
-/* Per-phase accent — warm luxury dark family */
-#phase-0 .phase-header { background: linear-gradient(150deg, #1A2E38 0%, #0E1E28 100%); }
-#phase-1 .phase-header { background: linear-gradient(150deg, #26201A 0%, #1A1410 100%); }
-#phase-2 .phase-header { background: linear-gradient(150deg, #1C2818 0%, #121C10 100%); }
-#phase-3 .phase-header { background: linear-gradient(150deg, #26221A 0%, #1A1610 100%); }
-#phase-4 .phase-header { background: linear-gradient(150deg, #24201A 0%, #181410 100%); }
+/* Per-phase accent. Five distinguishable headers, but all inside the
+   manual's mahogany family now — phase 0 used to be teal and phase 2 green,
+   which read as a different product next to the manual's dark surfaces. */
+#phase-0 .phase-header { background: linear-gradient(150deg, #2E1F12 0%, #1C1006 100%); }
+#phase-1 .phase-header { background: linear-gradient(150deg, #34240F 0%, #1F1207 100%); }
+#phase-2 .phase-header { background: linear-gradient(150deg, #2A2612 0%, #1A1408 100%); }
+#phase-3 .phase-header { background: linear-gradient(150deg, #382713 0%, #221406 100%); }
+#phase-4 .phase-header { background: linear-gradient(150deg, #2A1B0A 0%, #1C1006 100%); }
 
 .phase-header h1 {
   font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
   font-size: var(--font-size-h1);
   font-weight: 700;
   color: var(--earthen-ivory);
@@ -818,7 +869,10 @@ textarea {
 
 .field-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0,1fr), not 1fr: a date input's min-content width is wider than
+     half of a 375px screen, and plain 1fr is floored by it — which pushed
+     the check-out field's calendar icon off the right edge. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
@@ -888,7 +942,7 @@ textarea {
    MESSENGER CTA CARD
 ═══════════════════════════════════════════════════════════════ */
 .messenger-cta {
-  background: linear-gradient(145deg, #1A2A30, #0E1C22);
+  background: linear-gradient(145deg, var(--walnut), var(--mahogany));
   border-radius: 14px;
   padding: var(--space-5);
   color: var(--earthen-ivory);
@@ -931,7 +985,7 @@ textarea {
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.messenger-btn:hover  { background: rgba(198,172,142,0.25); border-color: rgba(198,172,142,0.7); }
+.messenger-btn:hover  { background: rgba(201,150,58,0.28); border-color: rgba(198,172,142,0.7); }
 .messenger-btn:active { background: rgba(198,172,142,0.35); }
 .messenger-btn.sent   { background: rgba(0,107,84,0.25); border-color: rgba(0,107,84,0.5); color: #6EE7B7; }
 
@@ -2217,6 +2271,7 @@ body.mode-quick .detail-text { display: none; }
 
 .modal-title {
   font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
   font-size: 1.4rem;
   font-weight: 700;
   color: var(--earthen-slate);
@@ -2295,6 +2350,7 @@ body.mode-quick .detail-text { display: none; }
 
 .success-title {
   font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
   font-size: 2.2rem;
   font-weight: 700;
   color: var(--earthen-slate);
@@ -2340,16 +2396,16 @@ body.mode-quick .detail-text { display: none; }
 }
 
 .success-action-btn.messenger {
-  background: linear-gradient(145deg, #1A2A30, #0E1C22);
+  background: linear-gradient(145deg, var(--walnut), var(--mahogany));
   color: var(--earthen-gold);
-  border: 1px solid rgba(198,172,142,0.3);
+  border: 1px solid rgba(201,150,58,0.34);
 }
 
 /* Primary: Start New Report */
 .success-action-btn.reset {
-  background: linear-gradient(145deg, #1A2A30, #0E1C22);
+  background: linear-gradient(145deg, var(--walnut), var(--mahogany));
   color: var(--earthen-ivory);
-  border: 1px solid rgba(198,172,142,0.25);
+  border: 1px solid rgba(201,150,58,0.28);
   font-size: 1rem;
   font-weight: 700;
   min-height: 60px;
@@ -3104,9 +3160,9 @@ body.mode-quick .detail-text { display: none; }
   gap: var(--space-2);
   width: 100%;
   min-height: 52px;
-  background: linear-gradient(135deg, #1A2A30, #0E1C22);
+  background: linear-gradient(135deg, var(--walnut), var(--mahogany));
   color: var(--earthen-gold);
-  border: 1.5px solid rgba(184,150,46,0.5);
+  border: 1.5px solid rgba(201,150,58,0.5);
   border-radius: 12px;
   font-family: var(--font-body);
   font-size: var(--font-size-sm);
@@ -3383,80 +3439,107 @@ body.mode-quick .detail-text { display: none; }
 .toast-blur-btn.keep  { border-color: rgba(255,255,255,0.2); }
 
 /* Auth gate: internal-only tool (Lloyd, 2026-09-08) — name + PIN is the
-   whole sign-in, no separate password step. Shares the dark full-bleed
-   .pin-gate/.pin-card look (below) since it's functionally the same kind
-   of screen as the PIN lock/setup gates that follow it. */
-/* Sign-in / PIN gates, design pass (Lloyd, 2026-09-08): frosted glass on a
-   deep teal-to-black ground, gold accents — the same earthen-* palette and
-   Cormorant Garamond headline treatment as the rest of the app, so the
-   very first screen a cleaner sees already feels like Cascade rather than
-   a generic phone lock screen. Keys are perfectly circular via
-   aspect-ratio (a fixed min-height with a flexible grid column made them
-   ovals before backdrop-filter blurs the ground behind the glass panel
-   and each key; -webkit- prefix covers Safari/older Android WebView. */
+   whole sign-in, no separate password step. Shares the .pin-gate/.pin-card
+   look (below) with the lock and setup screens.
+
+   Design pass 2026-09-12 (Lloyd): this REVERSES the dark frosted-glass
+   treatment of 2026-09-08 (ff16feb). The Operations Manual's PIN gate is
+   now the reference — warm linen ground, parchment card, champagne-gold
+   logo mark, Cormorant headline, soft stone-bordered keys — so the two
+   tools read as one product instead of two. Body type stays the system
+   stack and the display face stays the self-hosted Cormorant subset (WP4):
+   we match the manual on colour, spacing, borders and scale, not by adding
+   a Google Fonts round trip. Cormorant ships oldstyle figures, so anything
+   numeric uses the body face with lining tabular numerals. */
 #auth-gate, .pin-gate {
   position:fixed; inset:0; z-index:10000; display:grid; place-items:center; padding:24px;
+  background: var(--earthen-ivory);
+}
+#auth-gate::before, .pin-gate::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 8%, rgba(184,150,46,0.10) 0%, transparent 60%),
-    radial-gradient(ellipse 140% 90% at 50% 100%, #14232a 0%, transparent 60%),
-    linear-gradient(180deg, var(--earthen-slate) 0%, var(--earthen-darkest) 100%);
+    radial-gradient(ellipse 60% 50% at 20% 30%, rgba(201,150,58,.12) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 80% 70%, rgba(28,16,6,.06) 0%, transparent 70%);
 }
 #auth-gate[hidden], .pin-gate[hidden] { display:none; }
 .pin-card {
-  width:min(370px,100%); text-align:center; color:var(--earthen-ivory);
-  background: rgba(240,235,224,0.07);
-  -webkit-backdrop-filter: blur(28px) saturate(140%);
-  backdrop-filter: blur(28px) saturate(140%);
-  border: 1px solid rgba(184,150,46,0.28);
-  border-radius: 26px;
-  padding: 40px 30px 34px;
-  box-shadow: 0 24px 70px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.10);
+  position:relative;
+  width:min(420px,100%); text-align:center; color:var(--text-primary);
+  background: var(--surface-raised);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 44px 32px 36px;
+  box-shadow: 0 10px 40px rgba(28,16,6,.13);
 }
-.pin-card h1 { margin:0 0 8px; font-family:var(--font-display); font-size:1.6rem; letter-spacing:.01em; color:var(--earthen-ivory); }
-.pin-card p { margin:0 0 24px; color:rgba(240,235,224,0.6); font-size:.9rem; line-height:1.4; }
+.pin-logo-mark {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:52px; height:52px; border-radius:50%;
+  background: linear-gradient(135deg, var(--bronze) 0%, var(--gold) 100%);
+  margin-bottom:18px;
+  box-shadow: 0 4px 16px rgba(201,150,58,.35);
+}
+.pin-logo-mark svg { width:26px; height:26px; fill:#fff; }
+.pin-card h1 {
+  margin:0 0 4px; font-family:var(--font-display); font-size:1.8rem;
+  font-weight:700; letter-spacing:-.01em; color:var(--mahogany);
+}
+.pin-card p.pin-subtitle {
+  font-size:.8rem; font-weight:500; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--text-muted); margin:0 0 28px;
+}
+.pin-card p { margin:0 0 22px; color:var(--text-secondary); font-size:.88rem; line-height:1.45; }
 
+.auth-name-label {
+  display:block; text-align:left; font-size:.75rem; font-weight:600;
+  letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);
+  margin-bottom:6px;
+}
 .auth-name-select, #auth-name-manual {
   width:100%; min-height:52px; margin-bottom:22px; box-sizing:border-box;
-  padding:12px 16px; border-radius:14px; border:1px solid rgba(184,150,46,0.25);
-  background: rgba(240,235,224,0.07);
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-  color:var(--earthen-ivory); font:500 1rem var(--font-body);
+  padding:12px 16px; border-radius:var(--radius-md);
+  border:1.5px solid var(--border);
+  background: var(--earthen-ivory);
+  color:var(--text-primary); font:500 1rem var(--font-body);
   -webkit-appearance:none; appearance:none;
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 .auth-name-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23B8962E' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23C9963A' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat:no-repeat; background-position:right 16px center; padding-right:40px;
 }
 .auth-name-select:focus, #auth-name-manual:focus {
-  outline:none; border-color:rgba(184,150,46,0.65);
-  background: rgba(240,235,224,0.11);
+  outline:none; border-color:var(--bronze);
+  box-shadow: 0 0 0 3px rgba(201,150,58,.15);
 }
-.auth-name-select option { color:#1c1a18; }
-#auth-name-manual::placeholder { color:rgba(240,235,224,0.4); }
+#auth-name-manual::placeholder { color:var(--text-muted); }
 
-.pin-dots { display:flex; justify-content:center; gap:20px; margin-bottom:28px; }
+.pin-dots { display:flex; justify-content:center; gap:14px; margin-bottom:26px; height:16px; }
 .pin-dot {
-  width:13px; height:13px; border-radius:50%; border:1.5px solid rgba(184,150,46,0.45); background:transparent;
-  transition: transform .25s cubic-bezier(.34,1.56,.64,1), background .2s ease, box-shadow .2s ease, border-color .2s ease;
+  width:13px; height:13px; border-radius:50%;
+  border:1.5px solid var(--border-strong); background:transparent;
+  transition: transform .25s cubic-bezier(.34,1.56,.64,1), background .2s ease, border-color .2s ease;
 }
-.pin-dot.filled { background:var(--earthen-gold); border-color:var(--earthen-gold); transform:scale(1.15); box-shadow:0 0 10px rgba(184,150,46,.65); }
-.pin-card .pin-error { min-height:20px; margin:0 0 16px; color:#e8a15c; font-size:.86rem; }
-.pin-keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:20px 26px; max-width:270px; margin:0 auto; }
+.pin-dot.filled { background:var(--mahogany); border-color:var(--mahogany); transform:scale(1.12); }
+.pin-card .pin-error { min-height:20px; margin:0 0 16px; color:var(--danger); font-size:.86rem; font-weight:500; }
+.pin-keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:290px; margin:0 auto; }
 .pin-key {
-  aspect-ratio:1; width:100%; min-height:0; border-radius:50%;
-  border: 1px solid rgba(184,150,46,0.22);
-  background: rgba(240,235,224,0.08);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -1px 2px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.28);
-  color:var(--earthen-ivory); font:500 1.55rem var(--font-body);
-  cursor:pointer;
-  transition: transform .08s ease, background .15s ease, border-color .15s ease;
+  height:58px; min-height:0; border-radius:var(--radius-md);
+  border:1.5px solid var(--border);
+  background: var(--surface-raised);
+  color:var(--text-primary); font:500 1.28rem var(--font-body);
+  font-variant-numeric: lining-nums tabular-nums;
+  cursor:pointer; -webkit-tap-highlight-color:transparent;
+  transition: transform .09s ease, background .15s ease, border-color .15s ease;
 }
-.pin-key:active { background:rgba(184,150,46,0.22); border-color:rgba(184,150,46,0.55); transform:scale(0.93); }
+.pin-key:hover  { background:var(--earthen-ivory); border-color:var(--border-strong); }
+.pin-key:active { transform:scale(.95); background:var(--accent-soft); border-color:var(--bronze); }
+.pin-key:focus-visible { outline:2px solid var(--bronze); outline-offset:2px; }
 .pin-key-spacer { border:0; background:transparent; box-shadow:none; cursor:default; }
-.pin-key-back { font-size:1.25rem; }
+.pin-key-back {
+  font-size:.78rem; font-weight:600; letter-spacing:.04em;
+  color:var(--text-muted); border-color:transparent; background:transparent;
+}
+.pin-key-back:hover { color:var(--text-primary); background:var(--earthen-ivory); border-color:var(--border); }
 
 
 /* ── Stay picker (JOB 2a) ─────────────────────────────────────────────── */
@@ -3574,8 +3657,15 @@ body.mode-quick .detail-text { display: none; }
      PIN, not two. -->
 <section id="auth-gate" aria-labelledby="auth-title">
   <div class="pin-card" id="auth-form">
-    <h1 id="auth-title">Staff sign in</h1>
-    <label for="auth-name-select" style="display:block;text-align:left;font-size:.82rem;font-weight:700;color:#bdb5ab;margin-bottom:6px;">Your name</label>
+    <div class="pin-logo-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L3 7v10l9 5 9-5V7L12 2zm0 2.18L19 8v8l-7 3.88L5 16V8l7-3.82z"/>
+      </svg>
+    </div>
+    <h1 id="auth-title">Cascade Hideaway</h1>
+    <p class="pin-subtitle">Cleaning Checklist</p>
+    <p class="pin-prompt-line">Choose your name, then enter your PIN</p>
+    <label class="auth-name-label" for="auth-name-select">Your name</label>
     <select id="auth-name-select" class="auth-name-select">
       <option value="" disabled selected>Choose your name…</option>
       <option value="Honey">Honey</option>
@@ -3598,7 +3688,7 @@ body.mode-quick .detail-text { display: none; }
       <button type="button" class="pin-key" data-digit="9">9</button>
       <span class="pin-key pin-key-spacer" aria-hidden="true"></span>
       <button type="button" class="pin-key" data-digit="0">0</button>
-      <button type="button" class="pin-key pin-key-back" id="auth-pin-back" aria-label="Delete digit">⌫</button>
+      <button type="button" class="pin-key pin-key-back" id="auth-pin-back" aria-label="Delete last digit">Delete</button>
     </div>
   </div>
 </section>
@@ -3607,6 +3697,11 @@ body.mode-quick .detail-text { display: none; }
      password. See PIN_KEY / verifyPin() / showPinLockScreen(). -->
 <section id="pin-lock-gate" class="pin-gate" hidden aria-labelledby="pin-lock-title">
   <div class="pin-card">
+    <div class="pin-logo-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L3 7v10l9 5 9-5V7L12 2zm0 2.18L19 8v8l-7 3.88L5 16V8l7-3.82z"/>
+      </svg>
+    </div>
     <h1 id="pin-lock-title">Enter your PIN</h1>
     <div class="pin-dots" id="pin-lock-dots" aria-hidden="true">
       <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
@@ -3624,13 +3719,18 @@ body.mode-quick .detail-text { display: none; }
       <button type="button" class="pin-key" data-digit="9">9</button>
       <span class="pin-key pin-key-spacer" aria-hidden="true"></span>
       <button type="button" class="pin-key" data-digit="0">0</button>
-      <button type="button" class="pin-key pin-key-back" id="pin-lock-back" aria-label="Delete digit">⌫</button>
+      <button type="button" class="pin-key pin-key-back" id="pin-lock-back" aria-label="Delete last digit">Delete</button>
     </div>
   </div>
 </section>
 
 <section id="pin-setup-gate" class="pin-gate" hidden aria-labelledby="pin-setup-title">
   <div class="pin-card">
+    <div class="pin-logo-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L3 7v10l9 5 9-5V7L12 2zm0 2.18L19 8v8l-7 3.88L5 16V8l7-3.82z"/>
+      </svg>
+    </div>
     <h1 id="pin-setup-title">Set a PIN</h1>
     <p id="pin-setup-sub">Choose a 4-digit PIN to unlock this app quickly next time.</p>
     <div class="pin-dots" id="pin-setup-dots" aria-hidden="true">
@@ -3649,7 +3749,7 @@ body.mode-quick .detail-text { display: none; }
       <button type="button" class="pin-key" data-digit="9">9</button>
       <span class="pin-key pin-key-spacer" aria-hidden="true"></span>
       <button type="button" class="pin-key" data-digit="0">0</button>
-      <button type="button" class="pin-key pin-key-back" id="pin-setup-back" aria-label="Delete digit">⌫</button>
+      <button type="button" class="pin-key pin-key-back" id="pin-setup-back" aria-label="Delete last digit">Delete</button>
     </div>
   </div>
 </section>

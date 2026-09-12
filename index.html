@@ -6,6 +6,17 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.3 — The way out is earned (2026-09-13):         ║
+  ║  - "I could not photograph the meters" no longer appears as a ║
+  ║    standing offer. It was advertising an opt-out to someone   ║
+  ║    who had not tried to take the photo. It now stays hidden   ║
+  ║    until one of two things happens: the uploaded meter photos ║
+  ║    produce a finding (screenshot, no camera data, same file   ║
+  ║    twice, impossible reading), or the cleaner is stopped      ║
+  ║    leaving Phase 1 with the readings typed and ONLY the photo ║
+  ║    missing. A photo never taken produces no discrepancy, so   ║
+  ║    the second trigger is what keeps the feature reachable.    ║
+  ║                                                              ║
   ║  CHANGELOG v8.2 — Vision check + photo allowance (26-09-13):  ║
   ║  - A layer that actually LOOKS at the meter photo. New edge   ║
   ║    function verify-meter-photo reads the image and compares   ║
@@ -5492,6 +5503,11 @@ const state = {
   meterPhotosSkipped: false,
   meterSkipReason:    '',
   meterSkipAllowed:   null,   // null = not asked yet
+  // Whether the way out has been EARNED yet (2026-09-13, Lloyd). It used to
+  // appear as soon as the server said a skip was permitted, which advertised
+  // an opt-out to someone who had not tried to take the photo. Now it stays
+  // hidden until the photos actually go wrong.
+  meterSkipRevealed:  false,
   bedroomPhotos:      [],           // [{data, url, fileId, name, uploaded}, ...]
   kitchenPhotos:      [],           // [{data, url, fileId, name, uploaded}, ...]
   precleanPhotos:     [],           // Feature 3: pre-clean photos (replaces Messenger)
@@ -5801,6 +5817,12 @@ function isPhase4Valid() {
 }
 
 function showGateHint(phase) {
+  // Being stopped by a missing meter photo — and nothing else — is the
+  // "I forgot" case. Offer the way out at the moment it is actually needed,
+  // not before.
+  if (phase === 1 && meterPhotoIsTheOnlyBlocker()) {
+    revealMeterSkipOffer('blocked on a missing meter photo');
+  }
   // v6.8: warm nudge with specific missing item info
   const nudge = buildNudgeMessage(phase);
   if (nudge) {
@@ -6091,9 +6113,45 @@ async function loadMeterFollowups() {
   } catch { /* never let a follow-up notice break the page */ }
 }
 
+/* The way out is hidden until it is needed (2026-09-13, Lloyd: "only show
+   this if discrepancy is found in the initial photos uploaded").
+
+   Two things earn it, and both are a real problem rather than a standing
+   offer:
+
+     1. The uploaded meter photos produced a finding — a screenshot, no camera
+        data, the same file twice, a reading that cannot be right. This is
+        Lloyd's case exactly: a discrepancy in what was uploaded.
+     2. The cleaner tried to leave Phase 1 and the ONLY thing stopping her is
+        a missing meter photo. That is the "forgotten" case the allowance was
+        built for, and without it the feature could never appear at all — a
+        photo that was never taken produces no discrepancy to find.
+
+   Offering it before either has happened teaches the shortcut to someone who
+   has not yet tried the long way. */
+function revealMeterSkipOffer(why) {
+  if (state.meterSkipRevealed) return;
+  state.meterSkipRevealed = true;
+  if (why) console.debug('[meter-skip] offered because:', why);
+  refreshMeterSkipAllowance();
+}
+
+// True when a missing meter photo is the only thing holding Phase 1 back.
+// A cleaner who has not filled in the readings is not stuck on the camera.
+function meterPhotoIsTheOnlyBlocker() {
+  if (state.cleaningType === 'emergency' || state.cleaningType === 'mid_stay') return false;
+  const elec  = (el('electricMeterReading')?.value || '').trim();
+  const water = (el('waterMeterReading')?.value || '').trim();
+  const precleanOk = state.precleanPhotos.length >= PRECLEAN_PHOTO_MIN;
+  const photosMissing = !state.meterPhotos[0] || !state.meterPhotos[1];
+  return elec.length > 0 && water.length > 0 && precleanOk && photosMissing;
+}
+
 async function refreshMeterSkipAllowance() {
   const row = el('meter-skip-row');
   if (!row) return;
+  // Hidden until earned. Everything below only decides WHAT it says.
+  if (!state.meterSkipRevealed && !state.meterPhotosSkipped) { row.hidden = true; return; }
   if (state.cleaningType === 'emergency' || state.cleaningType === 'mid_stay') {
     row.hidden = true;   // meters are optional in those modes anyway
     return;
@@ -6339,6 +6397,9 @@ function renderMeterNudge() {
   }
   const findings = meterFindings();
   if (!findings.length) { box.hidden = true; return; }
+  // A discrepancy in what was uploaded is exactly when a way out earns its
+  // place on the screen.
+  revealMeterSkipOffer('meter photo findings');
   list.innerHTML = findings.map(f => `<li>${escapeHtml(f)}</li>`).join('');
   box.hidden = false;
 }

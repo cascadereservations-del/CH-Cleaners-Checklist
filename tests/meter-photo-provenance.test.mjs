@@ -134,3 +134,20 @@ test('the sign-in follow-up asks rather than accuses', () => {
   assert.match(html, /rpc\/get_meter_photo_followups/);
   assert.match(html, /a late reading is worth more than none/);
 });
+
+test('the way out is hidden until the photos actually go wrong', () => {
+  // Lloyd, 2026-09-13: it must not be a standing offer. Two things earn it —
+  // a finding in the uploaded photos, or being stuck with the readings typed
+  // and the photo missing.
+  assert.match(html, /if \(!state\.meterSkipRevealed && !state\.meterPhotosSkipped\) \{ row\.hidden = true; return; \}/);
+  assert.match(html, /revealMeterSkipOffer\('meter photo findings'\)/);
+  assert.match(html, /revealMeterSkipOffer\('blocked on a missing meter photo'\)/);
+});
+
+test('being stuck means the camera, not an empty form', () => {
+  const fn = html.match(/function meterPhotoIsTheOnlyBlocker\(\)[\s\S]*?\n\}/)[0];
+  // Readings typed and preclean done, photo missing — otherwise she is not
+  // stuck on the camera and should not be shown a way around it.
+  assert.match(fn, /elec\.length > 0 && water\.length > 0 && precleanOk && photosMissing/);
+  assert.match(fn, /if \(state\.cleaningType === 'emergency' \|\| state\.cleaningType === 'mid_stay'\) return false;/);
+});

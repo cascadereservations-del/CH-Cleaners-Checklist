@@ -1,5 +1,15 @@
 // sw.js — Cascade Hideaway Cleaning Checklist
-// Service Worker  v1.1  |  2026-05-28
+// Service Worker  v1.2  |  2026-09-13
+//
+// v1.2: Navigation is NETWORK-FIRST with a 3s timeout, not
+//       stale-while-revalidate. SWR always served the PREVIOUS deploy on the
+//       first load after a push and only revealed the new one on the second —
+//       which on 2026-09-13 looked exactly like a redesign having "regressed"
+//       when the page on the server was in fact correct. For a tool whose
+//       content is a live checklist and live policy, one round trip is worth
+//       less than a cleaner working from yesterday's page. Offline is
+//       unaffected: the timeout and any network error both fall back to cache.
+//       Cache name bumped so existing installs evict the old shell.
 //
 // v1.1: Added Supabase, Telegram, and calendar-sync endpoints to network-only
 //       exclusion list — these were missing from v1.0 and could be intercepted.
@@ -8,10 +18,15 @@
 // Routing strategy:
 //   GAS API / Supabase / Telegram → network-only  (never cache live API calls)
 //   CDN assets (fonts/icons)      → cache-first    (stale CDN bytes are fine)
-//   Navigation (HTML page)        → stale-while-revalidate  (instant load + background refresh)
+//   Navigation (HTML page)        → network-first, 3s timeout, cache fallback
 //   Everything else               → network-first, cache fallback
 
-const CACHE_NAME = 'ch-shell-v4-fonts';
+const CACHE_NAME = 'ch-shell-v5-networkfirst';
+
+// How long a navigation waits for the network before falling back to the
+// cached shell. Long enough for a normal 3G page load, short enough that a
+// dead connection does not leave a cleaner staring at a white screen.
+const NAV_TIMEOUT_MS = 3000;
 
 // App shell: cache these on install for instant offline load
 const SHELL_URLS = [
@@ -25,7 +40,6 @@ const SHELL_URLS = [
 const CDN_HOSTS = [
     'fonts.googleapis.com',
     'fonts.gstatic.com',
-    'unpkg.com',
     'cdn.jsdelivr.net',
     'cdnjs.cloudflare.com',
 ];
@@ -122,24 +136,35 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // ── 3. Navigation — stale-while-revalidate ────────────────
-    // Serve cached shell instantly; fetch fresh copy in background.
-    // Cleaners always get UI immediately even on slow 3G.
+    // ── 3. Navigation — network-first with a timeout ──────────
+    // v1.2: was stale-while-revalidate, which meant the first load after every
+    // deploy served the previous version. Now the network gets NAV_TIMEOUT_MS
+    // to answer; anything else (slow link, offline, error, non-200) falls back
+    // to the cached shell, so offline use is unchanged.
     if (request.mode === 'navigate') {
         event.respondWith(
-            caches.open(CACHE_NAME).then(cache =>
-                cache.match(request).then(cached => {
-                    const networkFetch = fetch(request)
-                        .then(resp => {
-                            if (resp && resp.status === 200) {
-                                cache.put(request, resp.clone()).catch(() => {});
-                            }
+            caches.open(CACHE_NAME).then(async cache => {
+                const cached = await cache.match(request);
+                let timer;
+                const timeout = new Promise(resolve => {
+                    timer = setTimeout(() => resolve(null), NAV_TIMEOUT_MS);
+                });
+                const network = fetch(request)
+                    .then(resp => {
+                        if (resp && resp.status === 200) {
+                            cache.put(request, resp.clone()).catch(() => {});
                             return resp;
-                        })
-                        .catch(() => cached);
-                    return cached || networkFetch;
-                })
-            )
+                        }
+                        return null;
+                    })
+                    .catch(() => null);
+                const winner = await Promise.race([network, timeout]);
+                clearTimeout(timer);
+                if (winner) return winner;
+                // Network lost the race or failed. Serve the cache if we have
+                // it, otherwise wait out the network rather than fail hard.
+                return cached || (await network) || fetch(request);
+            })
         );
         return;
     }

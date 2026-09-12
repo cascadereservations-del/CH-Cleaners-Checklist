@@ -6,6 +6,26 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.1 — Cache, clock, provenance (2026-09-13):     ║
+  ║  - sw.js v1.2: navigation is NETWORK-FIRST with a 3s timeout, ║
+  ║    was stale-while-revalidate. SWR served the PREVIOUS deploy ║
+  ║    on the first load after every push, which looked exactly   ║
+  ║    like a shipped redesign having regressed. Offline is       ║
+  ║    unchanged — timeout and error both fall back to cache.     ║
+  ║  - Stay picker filters on the CLOCK, not just the date. A     ║
+  ║    checkout is offered only after 12 noon on its date; a      ║
+  ║    guest who has not arrived is never offered; a mid-stay     ║
+  ║    waits for 2 PM check-in. Sorted earliest first. Built with ║
+  ║    an explicit +08:00 so a phone in another timezone agrees.  ║
+  ║  - Meter photos: photoProvenance() reads the ORIGINAL file    ║
+  ║    for PNG-ness, Exif presence and a camera Make/Model tag,   ║
+  ║    plus a screen-sized dimension check. Screenshots and       ║
+  ║    stripped copies are named in the nudge. It never blocks —  ║
+  ║    Exif is forgeable and chat apps strip it from real photos  ║
+  ║    — so the findings are also SENT with the report.           ║
+  ║  - The tenured tick-all moved to the BOTTOM of its tasks and  ║
+  ║    asks a question: "Have you finished all N Clean tasks?"    ║
+  ║                                                              ║
   ║  CHANGELOG v8.0 — Drawn icons, no CDN (2026-09-13):          ║
   ║  - ~100 emoji-as-icons became one inline SVG sprite in the   ║
   ║    manual's idiom: 24x24, no fill, currentColor stroke, so   ║
@@ -5917,6 +5937,80 @@ const WATER_M3_PER_DAY_MAX  = 1.2;
 const DIGIT_SLIP_FACTOR     = 8;   // a 10x typo, with room for a genuine spike
 const PHOTO_STALE_HOURS     = 12;  // older than this and it is not today's meter
 
+/* ── Meter photo provenance (2026-09-13) ────────────────────────────────────
+   Lloyd's question was blunt: what stops someone uploading a screenshot or a
+   photo of a photo? Until now: the arithmetic cross-check, the file's
+   lastModified, and a fingerprint that catches the same file twice. Nothing
+   looked at what KIND of file it was.
+
+   What a phone camera produces and a screenshot does not: a JPEG carrying an
+   Exif block with a Make/Model. A screenshot is usually a PNG, and when it is
+   a JPEG it has no camera block. The check reads the first 64 KB of the
+   ORIGINAL file — processPhoto() re-encodes to JPEG and strips Exif, so this
+   has to happen before that, on the File the picker handed us.
+
+   It is honest about its limits and it never blocks:
+     - Some Android cameras and every "share via Messenger" round trip strip
+       Exif from a perfectly genuine photo.
+     - Exif is trivially forgeable by anyone who wants to.
+   So this is a tripwire for the lazy case, not proof of anything. It is
+   surfaced to the cleaner AND sent with the report, so the person who cares
+   about the answer — Lloyd — sees it rather than having to ask. */
+async function photoProvenance(file) {
+  const out = {
+    mime: file?.type || '',
+    isPng: /png/i.test(file?.type || ''),
+    hasExif: false,
+    hasCameraTag: false,
+    screenSized: false,
+    width: null, height: null,
+  };
+  try {
+    const head = new Uint8Array(await file.slice(0, 65536).arrayBuffer());
+    const isJpeg = head[0] === 0xFF && head[1] === 0xD8;
+    if (isJpeg) {
+      // Walk the JPEG marker segments looking for APP1 "Exif\0\0".
+      for (let i = 2; i < head.length - 4; ) {
+        if (head[i] !== 0xFF) { i++; continue; }
+        const marker = head[i + 1];
+        if (marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { i += 2; continue; }
+        if (marker === 0xDA) break;                       // start of scan: no more headers
+        const len = (head[i + 2] << 8) | head[i + 3];
+        if (marker === 0xE1 &&
+            head[i + 4] === 0x45 && head[i + 5] === 0x78 &&
+            head[i + 6] === 0x69 && head[i + 7] === 0x66) {
+          out.hasExif = true;
+          // Make and Model are IFD0 tags 0x010F / 0x0110. Rather than walk the
+          // TIFF tree, look for the tag ids inside this segment — enough to
+          // tell "a camera wrote this" from "nothing did".
+          const seg = head.subarray(i + 4, Math.min(i + 4 + len, head.length));
+          for (let k = 0; k < seg.length - 1; k++) {
+            const tag = (seg[k] << 8) | seg[k + 1];
+            const tagLE = (seg[k + 1] << 8) | seg[k];
+            if (tag === 0x010F || tag === 0x0110 || tagLE === 0x010F || tagLE === 0x0110) {
+              out.hasCameraTag = true;
+              break;
+            }
+          }
+          break;
+        }
+        if (!len) break;
+        i += 2 + len;
+      }
+    }
+  } catch { /* unreadable slice: leave the flags false and say nothing */ }
+  return out;
+}
+
+// A screenshot's pixel size is the device screen, times its pixel ratio.
+function looksScreenSized(w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  const sw = Math.round(screen.width * dpr), sh = Math.round(screen.height * dpr);
+  if (!w || !h || !sw || !sh) return false;
+  const near = (a, b) => Math.abs(a - b) <= 2;
+  return (near(w, sw) && near(h, sh)) || (near(w, sh) && near(h, sw));
+}
+
 function daysBetween(aStr, bStr) {
   const a = new Date(aStr + 'T00:00:00'), b = new Date(bStr + 'T00:00:00');
   if (isNaN(a) || isNaN(b)) return null;
@@ -5999,6 +6093,20 @@ function meterFindings() {
     }
     if (photo.fingerprint && photo.fingerprint === state.prevMeterFingerprints?.[i]) {
       out.push(`${label}: this is the same photo file as the last report. Take a fresh one.`);
+    }
+    const prov = photo.provenance;
+    if (prov) {
+      if (prov.isPng && prov.screenSized) {
+        out.push(`${label}: that is a screenshot, not a photo of the meter — it is a PNG the exact size of this screen.`);
+      } else if (prov.isPng) {
+        out.push(`${label}: that file is a PNG. Phone cameras save JPEGs, so this is probably a screenshot or a saved image.`);
+      } else if (prov.screenSized) {
+        out.push(`${label}: that image is exactly the size of this screen, which is what a screenshot looks like.`);
+      } else if (!prov.hasExif) {
+        out.push(`${label}: that photo carries no camera information. A picture taken here would. It may be a download, a screenshot, or a copy sent through a chat app.`);
+      } else if (!prov.hasCameraTag) {
+        out.push(`${label}: that photo has been through an editor — the camera details are gone. Use the original.`);
+      }
     }
   });
 
@@ -6694,6 +6802,25 @@ function initMeterPhotos() {
           if (state.meterPhotos[i]) state.meterPhotos[i].fingerprint = fp;
           renderMeterNudge();
         });
+        // Read provenance off the ORIGINAL file — processPhoto() has already
+        // re-encoded to JPEG above, which strips whatever Exif was there.
+        photoProvenance(file).then(prov => {
+          if (!state.meterPhotos[i]) return;
+          const img = new Image();
+          img.onload = () => {
+            prov.width = img.naturalWidth; prov.height = img.naturalHeight;
+            prov.screenSized = looksScreenSized(prov.width, prov.height);
+            state.meterPhotos[i].provenance = prov;
+            renderMeterNudge();
+            URL.revokeObjectURL(img.src);
+          };
+          img.onerror = () => {
+            state.meterPhotos[i].provenance = prov;
+            renderMeterNudge();
+            URL.revokeObjectURL(img.src);
+          };
+          img.src = URL.createObjectURL(file);
+        });
 
         renderMeterThumb();
 
@@ -7206,6 +7333,14 @@ const PHASE_TASK_CONTAINERS = {
   'phase-4': ['final-cleaning-items', 'power-check-items'],
 };
 
+// What the control calls the step it belongs to, so it can ask about this
+// step by name rather than saying "this step".
+const PHASE_CHECKALL_NAMES = {
+  'phase-2': 'Arrive & Prep',
+  'phase-3': 'Clean',
+  'phase-4': 'Finish',
+};
+
 function monthsSince(dateStr) {
   const then = new Date(dateStr + 'T00:00:00');
   if (isNaN(then)) return 0;
@@ -7252,15 +7387,21 @@ function refreshCheckAllButtons() {
 
     const boxes = phaseTaskBoxes(phaseId);
     const all   = boxes.length > 0 && boxes.every(cb => cb.checked);
+    const name  = PHASE_CHECKALL_NAMES[phaseId] || 'this step';
     btn.classList.toggle('done', all);
-    btn.textContent = all
-      ? `↺ Undo — untick these ${boxes.length} tasks`
-      : `✓ Tick all ${boxes.length} tasks in this step`;
+    // Asked as a question, at the bottom of the tasks it is asking about
+    // (2026-09-13). It used to sit above the list as an instruction, which
+    // invited a tap before reading anything.
+    btn.innerHTML = all
+      ? `${ICON_CHECK} All ${boxes.length} ${name} tasks ticked — tap to undo`
+      : `Have you finished all ${boxes.length} ${name} tasks?`;
     btn.setAttribute('aria-label', all
-      ? 'Untick every task in this step'
-      : 'Tick every task in this step. Photos and meter readings are still asked for separately.');
+      ? `Untick all ${boxes.length} tasks in ${name}`
+      : `Yes, all ${boxes.length} tasks in ${name} are done — tick them. Photos and meter readings are still asked for separately.`);
   });
 }
+
+const ICON_CHECK = '<svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg>';
 
 function initPhaseCheckAll() {
   Object.keys(PHASE_TASK_CONTAINERS).forEach(phaseId => {
@@ -7285,11 +7426,19 @@ function initPhaseCheckAll() {
     note.className = 'phase-checkall-note';
     note.hidden    = true;
     note.textContent = 'Photos and meter readings are still asked for separately.';
+    // Sits under the question as its caveat; the margin was written for the
+    // old position directly beneath a button.
+    note.style.marginTop = 'calc(var(--space-2) * -1)';
 
-    const anchor = phase.querySelector('.phase-progress');
-    if (anchor && anchor.nextSibling) {
-      phase.insertBefore(btn,  anchor.nextSibling);
-      phase.insertBefore(note, btn.nextSibling);
+    // Bottom of the step, not the top: the question only makes sense once a
+    // cleaner has been down the list. Anchored to the LAST task container of
+    // this phase so it lands under the tasks it is asking about, wherever
+    // that container happens to sit in the phase.
+    const ids  = PHASE_TASK_CONTAINERS[phaseId] || [];
+    const last = ids.map(id => el(id)).filter(Boolean).pop();
+    if (last && last.parentNode) {
+      last.parentNode.insertBefore(btn,  last.nextSibling);
+      last.parentNode.insertBefore(note, btn.nextSibling);
     } else {
       phase.appendChild(btn);
       phase.appendChild(note);
@@ -8799,6 +8948,13 @@ function buildPayload() {
       electric: { value: electricVal, unit: 'kWh' },
       water:    { value: waterVal,    unit: 'm³' },
     },
+    // The cross-check findings travel WITH the report. On screen they are a
+    // nudge a cleaner can ignore by design (D-084); in the payload they are a
+    // record the person who cares can actually read.
+    meterChecks: {
+      findings: (typeof meterFindings === 'function' ? meterFindings() : []),
+      provenance: [0, 1].map(i => state.meterPhotos[i]?.provenance || null),
+    },
     previousElectricReading: prevE,
     previousWaterReading:    prevW,
     deltaKwh,
@@ -9811,6 +9967,38 @@ function triggerCalendarSync() {}
 let _stayOptions = [];
 let _stayRpcMissing = false;
 
+/* The picker used to offer anything the RPC returned for the date, which on
+   2026-09-13 at 05:29 meant a checkout that had not happened yet (noon that
+   day), a guest not arriving until the afternoon, and a stay whose blocked
+   window was a test row. A report can only be written about a turnover that
+   has ALREADY happened, so the client filters on the clock, not just the date.
+
+   Times: check-in is 2:00 PM per the Operations Manual; check-out is 12:00
+   noon. Asia/Manila is UTC+8 year round with no DST, so building the instant
+   with an explicit +08:00 offset is exact and does not depend on the phone's
+   own timezone — a cleaner's device set to another zone still gets this right. */
+const CHECKOUT_HOUR_PH = '12:00:00';
+const CHECKIN_HOUR_PH  = '14:00:00';
+
+function phInstant(dateStr, hhmmss) {
+  const t = Date.parse(`${dateStr}T${hhmmss}+08:00`);
+  return Number.isNaN(t) ? null : t;
+}
+
+// The moment a stay becomes reportable, or null if we cannot tell.
+function stayReportableFrom(b) {
+  if (b.kind === 'checkout')  return phInstant(b.checkout_date, CHECKOUT_HOUR_PH);
+  // A mid-stay refresh is reportable once the guest has actually arrived.
+  if (b.kind === 'mid_stay')  return phInstant(b.checkin_date,  CHECKIN_HOUR_PH);
+  // kind === 'checkin': nobody has stayed yet, so there is nothing to report on.
+  return null;
+}
+
+// Sort key: the date the report is actually about, earliest first.
+function stayOrderKey(b) {
+  return phInstant(b.kind === 'mid_stay' ? b.checkin_date : b.checkout_date, CHECKOUT_HOUR_PH) || 0;
+}
+
 function stayLabel(b) {
   const nights = b.nights ? `${b.nights} night${b.nights !== 1 ? 's' : ''}` : '';
   // A calendar row with no guest name is a blocked / maintenance window, not
@@ -9852,8 +10040,20 @@ async function loadCleanableBookings(dateStr) {
 
     // Already-reported stays are not offered — a long stay can still appear
     // twice, once per cleaning type, because only that pair is filed.
-    _stayOptions = rows.filter(r => !r.already_reported);
-    const reported = rows.length - _stayOptions.length;
+    const unreported = rows.filter(r => !r.already_reported);
+    const reported   = rows.length - unreported.length;
+
+    // Then drop anything that has not happened yet: a checkout still hours
+    // away, or a guest who has not arrived. Counted so the hint can say so
+    // rather than showing an unexplained empty picker.
+    const now = Date.now();
+    _stayOptions = unreported
+      .filter(b => {
+        const from = stayReportableFrom(b);
+        return from !== null && now >= from;
+      })
+      .sort((a, b) => stayOrderKey(a) - stayOrderKey(b));
+    const notYet = unreported.length - _stayOptions.length;
 
     sel.innerHTML = '<option value="">Choose the stay…</option>' +
       _stayOptions.map((b, i) =>
@@ -9862,9 +10062,11 @@ async function loadCleanableBookings(dateStr) {
     wrap.style.display = 'block';
 
     if (!_stayOptions.length) {
-      hint.textContent = reported
-        ? `Every stay around this date already has a report. Check the date, or carry on and fill the details by hand.`
-        : `No stay on the calendar matches this date. Carry on and fill the details by hand.`;
+      hint.textContent = notYet
+        ? `${notYet === 1 ? 'The stay' : 'The stays'} on this date ${notYet === 1 ? 'has' : 'have'} not finished yet — check-out is 12 noon. Come back after the guest leaves, or fill the details by hand.`
+        : reported
+          ? `Every stay around this date already has a report. Check the date, or carry on and fill the details by hand.`
+          : `No stay on the calendar matches this date. Carry on and fill the details by hand.`;
       hint.className = 'warn';
       return;
     }

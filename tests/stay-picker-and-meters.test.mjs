@@ -15,7 +15,75 @@ test('the cleaner picks the stay instead of typing the guest name', () => {
 });
 
 test('a stay that already has a report is not offered again', () => {
-  assert.match(html, /_stayOptions = rows\.filter\(r => !r\.already_reported\)/);
+  assert.match(html, /rows\.filter\(r => !r\.already_reported\)/);
+});
+
+/* The clock filter, exercised for real rather than grepped. Lloyd's report of
+   2026-09-13 05:29 +08:00: the picker offered a checkout that had not happened
+   yet (noon that day), a guest arriving that afternoon, and a blocked test
+   window — when the only honest answer was Aya Falgui's 2026-09-07 checkout. */
+function loadStayClockHelpers() {
+  const grab = (name) => {
+    const m = html.match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n\\}'));
+    assert.ok(m, 'could not find ' + name + ' in index.html');
+    return m[0];
+  };
+  const src = [
+    html.match(/const CHECKOUT_HOUR_PH = '[^']+';/)[0],
+    html.match(/const CHECKIN_HOUR_PH\s+= '[^']+';/)[0],
+    grab('phInstant'),
+    grab('stayReportableFrom'),
+    grab('stayOrderKey'),
+    'return { stayReportableFrom, stayOrderKey };',
+  ].join('\n');
+  return new Function(src)();
+}
+
+test('a checkout that has not happened yet is not offered', () => {
+  const { stayReportableFrom } = loadStayClockHelpers();
+  const earlyMorning = Date.parse('2026-09-13T05:29:00+08:00');
+  const afterNoon    = Date.parse('2026-09-13T12:30:00+08:00');
+  const row = { kind: 'checkout', checkout_date: '2026-09-13', checkin_date: '2026-09-12' };
+  assert.ok(stayReportableFrom(row) > earlyMorning, 'noon checkout is still ahead at 05:29');
+  assert.ok(stayReportableFrom(row) <= afterNoon,   'and behind us at 12:30');
+});
+
+test('a guest who has not arrived is never offered', () => {
+  const { stayReportableFrom } = loadStayClockHelpers();
+  assert.equal(stayReportableFrom({ kind: 'checkin', checkin_date: '2026-09-13' }), null);
+});
+
+test('the picker offers only the finished stays, earliest first', () => {
+  const { stayReportableFrom, stayOrderKey } = loadStayClockHelpers();
+  const now = Date.parse('2026-09-13T05:29:00+08:00');
+  const rows = [
+    { guest_name: 'Dale Anwen De La Cerna', kind: 'checkout', checkout_date: '2026-09-13', checkin_date: '2026-09-12' },
+    { guest_name: null,                     kind: 'checkout', checkout_date: '2026-09-09', checkin_date: '2026-09-08' },
+    { guest_name: 'Aya Falgui',             kind: 'checkout', checkout_date: '2026-09-07', checkin_date: '2026-09-06' },
+    { guest_name: 'James Rebaya',           kind: 'checkin',  checkin_date:  '2026-09-13', checkout_date: '2026-09-14' },
+  ];
+  const offered = rows
+    .filter(b => { const f = stayReportableFrom(b); return f !== null && now >= f; })
+    .sort((a, b) => stayOrderKey(a) - stayOrderKey(b));
+
+  // Dale's noon checkout and James's arrival are both still ahead.
+  assert.deepEqual(offered.map(b => b.checkout_date), ['2026-09-07', '2026-09-09']);
+  assert.equal(offered[0].guest_name, 'Aya Falgui', 'earliest finished stay is first');
+});
+
+test('a mid-stay refresh waits for the guest to actually arrive', () => {
+  const { stayReportableFrom } = loadStayClockHelpers();
+  const row = { kind: 'mid_stay', checkin_date: '2026-09-13', checkout_date: '2026-09-16' };
+  assert.ok(stayReportableFrom(row) > Date.parse('2026-09-13T05:29:00+08:00'));
+  assert.ok(stayReportableFrom(row) <= Date.parse('2026-09-13T14:00:00+08:00'));
+});
+
+test('the clock filter does not depend on the device timezone', () => {
+  const { stayReportableFrom } = loadStayClockHelpers();
+  // An explicit +08:00 offset, not a local-time string, is what makes this true.
+  assert.match(html, /\+08:00/);
+  assert.equal(stayReportableFrom({ kind: 'checkout', checkout_date: '2026-09-07' }),
+               Date.parse('2026-09-07T12:00:00+08:00'));
 });
 
 test('a missing RPC hides the picker rather than breaking Phase 0', () => {

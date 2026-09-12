@@ -1,7 +1,7 @@
 /**
  * ═══════════════════════════════════════════════════════════════════
  *  CASCADE HIDEAWAY — Cleaning Report Web App Backend
- *  Version: 3.6  |  Updated: 2026
+ *  Version: 3.8  |  Updated: 2026-06-07
  * ═══════════════════════════════════════════════════════════════════
  *
  *  SETUP STEPS:
@@ -12,60 +12,48 @@
  *  5. Deploy → New deployment → Web app:
  *       Execute as: Me
  *       Who has access: Anyone
- *  6. Copy the deployment URL into SCRIPT_URL in index.html.
+ *  6. Copy the deployment URL into GAS_SCRIPT_URL secret in the
+ *     Supabase Edge Function (submit-cleaning).
  *  7. Authorise the script when prompted on the first run.
  *
- *  ── If upgrading from v3.4 ──────────────────────────────────────
- *  Simply deploy a new version after pasting this file.
- *  Run testSubmit() once from the editor to re-authorise if needed.
- *  ────────────────────────────────────────────────────────────────
+ *  CHANGELOG v3.8:
+ *  - FIX:  Photo upload loop now supports Supabase Storage URLs in
+ *          addition to legacy base64.  Since frontend v6.6 photos are
+ *          uploaded to Storage first; the payload carries photo.url
+ *          (an https:// Storage URL) with no photo.data.  GAS now calls
+ *          UrlFetchApp.fetch(photo.url) to pull the image and writes the
+ *          blob to the Drive section subfolder.  This restores the
+ *          per-section Drive folders and the email "Photos by Section"
+ *          links that had been silently empty since v6.6.
+ *          Legacy base64 (photo.data) path preserved for backwards compat.
+ *  - NEW:  _handleSubmit success response now includes folderUrl and
+ *          folderId so callers can link directly to the Drive archive.
+ *  - FIX:  doGet status message updated to v3.8.
+ *  - FIX:  _handleSubmit success log updated to v3.8.
  *
- *  ACTIONS:
- *    GET  ?action=lastReadings
- *         → Scans sheet backwards for the most recent numeric electric
- *           and water readings. Returns:
- *           { electric: 12345.6, water: 789.1 }
- *           Front-end uses these to display Previous reading and
- *           compute Consumption = Current − Previous client-side.
- *
- *    POST action=init   → create dated subfolder
- *    POST action=upload → save one photo
- *    POST (default)     → full cleaning report → Sheet + Drive + Email
+ *  CHANGELOG v3.7:
+ *  - NEW:  Server-side submissionId dedup via PropertiesService.
+ *  - FIX:  doGet() status message updated to v3.7.
+ *  - FIX:  _handleSubmit() success log updated to v3.7.
+ *  - FIX:  _handleInit() now uses 'Asia/Manila' for folder date stamp.
+ *  - FIX:  reportFolder creation now includes a collision guard.
+ *  - FIX:  criticalTableBlock rewritten to plain concatenation.
+ *  - NEW:  Success response now echoes back submissionId.
  *
  *  CHANGELOG v3.6:
- *  - NEW:  _buildEmailHtml() now renders a Critical Items Summary table
- *          at the top of the email body, before the urgent block.
- *          Table shows each critical item and its outcome (✅ All Good /
- *          ⚠️ Issue). Header tint is green when all pass, red when any fail.
- *          Requires front-end to include `critical: !!item.critical` in
- *          the checklistDetails payload (added to index_v16.html).
- *  - FIX:  testSubmit() updated to include critical items for table testing.
+ *  - NEW:  _buildEmailHtml() renders a Critical Items Summary table.
  *
  *  CHANGELOG v3.5:
- *  - FIX: _buildEmailHtml() now renders Last Guest Name and
- *         Number of Nights Stayed in the summary table.
- *         Added _cell() helper for consistent table cell markup.
- *         Updated testSubmit() to include lastGuestName / numberOfNights.
+ *  - FIX:  Last Guest Name and Number of Nights Stayed in summary table.
+ *  - NEW:  _cell() helper for consistent table cell markup.
  *
  *  CHANGELOG v3.4:
- *  - NEW:  GET ?action=lastReadings — fast backwards scan for previous
- *          electric and water readings, returned as JSON to front-end.
- *  - FIX:  _handleSubmit now accepts pre-calculated deltaKwh, deltaM3,
- *          previousElectricReading, previousWaterReading directly from
- *          the payload. No sheet scanning at submit time.
- *  - FIX:  _logToSheet signature updated; backwards-scan delta block
- *          entirely removed. Delta values come in as parameters.
- *  - KEPT: Monthly tally (_updateMonthlySummary) unchanged — it sums
- *          the DELTA_KWH / DELTA_M3 columns, which now contain the
- *          pre-calculated client-side values.
- *  - KEPT: All v3.3 fixes (setValues, fixNamedTable, migrateSheetV32).
+ *  - NEW:  GET ?action=lastReadings — backwards scan for previous readings.
+ *  - FIX:  _handleSubmit accepts pre-calculated deltaKwh, deltaM3.
  *
- *  CHANGELOG v3.3 (prior):
- *  - FIXED: Replaced ALL sheet.appendRow() calls with
- *           sheet.getRange(...).setValues([[]]) to bypass the
- *           Named Table restriction that caused TypeError on appendRow.
- *  - New:   fixNamedTable() — removes Named Table format from the
- *           log sheet so the sheet behaves normally again.
+ *  CHANGELOG v3.3:
+ *  - FIXED: All appendRow() replaced with getRange().setValues([[]]).
+ *  - NEW:   fixNamedTable() — removes Named Table format from log sheet.
  * ═══════════════════════════════════════════════════════════════════
  */
 
@@ -114,17 +102,50 @@ const TOTAL_COLS = 19;
 
 
 // ═══════════════════════════════════════════════════════════════════
+//  DEDUP HELPERS  (v3.7 — unchanged in v3.8)
+// ═══════════════════════════════════════════════════════════════════
+var DEDUP_TTL_MS = 72 * 60 * 60 * 1000;
+
+function _dedupKey(submissionId) {
+  return 'seen_' + submissionId;
+}
+
+function _isDuplicate(submissionId) {
+  if (!submissionId) return false;
+  var stored = PropertiesService.getScriptProperties().getProperty(_dedupKey(submissionId));
+  if (!stored) return false;
+  var storedMs = parseInt(stored, 10);
+  if (isNaN(storedMs)) return false;
+  return (Date.now() - storedMs) < DEDUP_TTL_MS;
+}
+
+function _markSeen(submissionId) {
+  if (!submissionId) return;
+  PropertiesService.getScriptProperties().setProperty(_dedupKey(submissionId), String(Date.now()));
+}
+
+function pruneDedup() {
+  var props = PropertiesService.getScriptProperties();
+  var all   = props.getProperties();
+  var now   = Date.now();
+  for (var k in all) {
+    if (k.indexOf('seen_') !== 0) continue;
+    var ms = parseInt(all[k], 10);
+    if (isNaN(ms) || (now - ms) >= DEDUP_TTL_MS) {
+      props.deleteProperty(k);
+    }
+  }
+  Logger.log('pruneDedup: sweep complete.');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 //  ROUTER
 // ═══════════════════════════════════════════════════════════════════
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
-
-  // ── v3.4: lastReadings — fetch previous meter values for front-end ──
-  if (action === 'lastReadings') {
-    return _handleLastReadings();
-  }
-
-  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.5 — online' });
+  if (action === 'lastReadings') return _handleLastReadings();
+  return _json({ ok: true, msg: 'Cascade Hideaway Web App v3.8 — online' });
 }
 
 function doPost(e) {
@@ -145,7 +166,14 @@ function doPost(e) {
       payload = JSON.parse(payloadStr);
     }
 
-    return _handleSubmit(payload);
+    const subId = String(payload.submissionId || payload.submission_id || '').trim();
+    if (subId && _isDuplicate(subId)) {
+      Logger.log('[doPost] Duplicate rejected: ' + subId);
+      return _json({ result: 'duplicate', status: 'duplicate', submissionId: subId });
+    }
+    if (subId) _markSeen(subId);
+
+    return _handleSubmit(payload, subId);
 
   } catch (err) {
     Logger.log('FATAL ERROR: ' + err.toString() + '\n' + (err.stack || ''));
@@ -155,25 +183,7 @@ function doPost(e) {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  ACTION: LAST READINGS  (v3.4 — NEW)
-//
-//  GET ?action=lastReadings
-//
-//  Scans the Cleaning Report Log sheet backwards from the last row,
-//  looking for the most recent row that contains a numeric value in
-//  the Electric (col H) and Water (col I) columns.
-//
-//  Returns JSON:
-//    { electric: 12345.6, water: 789.1 }
-//
-//  If no prior reading exists for a meter, that field is null:
-//    { electric: null, water: null }
-//
-//  The front-end uses these values to:
-//    1. Display "Previous Reading" (readonly)
-//    2. Compute Consumption = Current − Previous (live, client-side)
-//    3. Send previousElectricReading, previousWaterReading, deltaKwh,
-//       deltaM3 in the submit payload so Code.gs never needs to scan.
+//  ACTION: LAST READINGS  (v3.4 — unchanged in v3.8)
 // ═══════════════════════════════════════════════════════════════════
 function _handleLastReadings() {
   try {
@@ -184,15 +194,13 @@ function _handleLastReadings() {
       return _json({ electric: null, water: null });
     }
 
-    const lastRow = sheet.getLastRow();
-    // Read all data rows in one call for efficiency (cols H and I only)
+    const lastRow   = sheet.getLastRow();
     const elecData  = sheet.getRange(2, COL.ELECTRIC, lastRow - 1, 1).getValues();
     const waterData = sheet.getRange(2, COL.WATER,    lastRow - 1, 1).getValues();
 
     let electric = null;
     let water    = null;
 
-    // Scan backwards — most recent row with a numeric value wins
     for (let i = elecData.length - 1; i >= 0; i--) {
       if (electric === null) {
         const v = elecData[i][0];
@@ -224,8 +232,8 @@ function _handleLastReadings() {
 //    "2026-09-08 cleaning report photos - Cascade Bria - Honey"
 //  and submit made
 //    "20260908_Honey"
-//  so every turnover left two folders, one of them usually empty — the
-//  empty one being the link the sheet recorded (FD-003).
+//  so every turnover left two folders, one of them usually empty — and the
+//  empty one was the link the sheet recorded (FD-003).
 //
 //  One report, one folder, filed by the CLEANING date rather than the day
 //  it happened to be uploaded:
@@ -246,10 +254,10 @@ function _childFolder(parent, name) {
 function _reportFolder(cleaningDate, unitName, cleanerName) {
   const root = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
 
-  // Fall back to today only if the client sent no cleaning date.
+  // Fall back to today only if the caller sent no cleaning date.
   const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(cleaningDate || '')
     ? cleaningDate
-    : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    : Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
 
   const year  = dateStr.slice(0, 4);
   const month = dateStr.slice(0, 7);
@@ -258,8 +266,7 @@ function _reportFolder(cleaningDate, unitName, cleanerName) {
     return _sanitizeName(t || '').replace(/\s+/g, '-').replace(/-+/g, '-') || 'Unknown';
   };
 
-  const base = dateStr + '_' + slug(unitName) + '_' + slug(cleanerName);
-
+  const base        = dateStr + '_' + slug(unitName) + '_' + slug(cleanerName);
   const monthFolder = _childFolder(_childFolder(root, year), month);
 
   // A second turnover on one day is real (mid-stay, or a re-clean).
@@ -301,7 +308,7 @@ function _photoFileName(sectionId, index, reading) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//  ACTION: INIT — create dated photo subfolder in Drive
+//  ACTION: INIT — create dated photo subfolder in Drive (v3.7)
 // ═══════════════════════════════════════════════════════════════════
 function _handleInit(e) {
   const unitName     = _sanitizeName(_getParam(e, 'unitName')    || 'Unknown Unit');
@@ -320,7 +327,8 @@ function _handleInit(e) {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  ACTION: UPLOAD — save one photo into an existing Drive subfolder
+//  ACTION: UPLOAD — save one base64 photo into a Drive subfolder
+//  (legacy path — used only if the frontend sends directly to GAS)
 // ═══════════════════════════════════════════════════════════════════
 function _handleUpload(e) {
   const folderId = _getParam(e, 'folderId');
@@ -349,20 +357,17 @@ function _handleUpload(e) {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  ACTION: SUBMIT — full report → Sheet + Photos + Email + Calendar
+//  ACTION: SUBMIT — full report → Sheet + Drive + Email + Calendar
 //
-//  v3.4 CHANGE: Delta values are now sent from the front-end.
-//  The payload should include:
-//    electricReading           — current reading (string or number)
-//    waterReading              — current reading (string or number)
-//    previousElectricReading   — previous reading (number | null)
-//    previousWaterReading      — previous reading (number | null)
-//    deltaKwh                  — pre-calculated Δ (number | null)
-//    deltaM3                   — pre-calculated Δ (number | null)
-//
-//  No sheet scanning occurs during submission.
+//  v3.8: Photo upload loop now supports Supabase Storage URLs.
+//        When photo.url is present (and photo.data is absent), GAS
+//        fetches the image via UrlFetchApp and saves it to the Drive
+//        section subfolder.  This restores the per-section Drive
+//        folders and the email photo links that had been silently
+//        empty since frontend v6.6.
+//        Success response now includes folderUrl + folderId.
 // ═══════════════════════════════════════════════════════════════════
-function _handleSubmit(payload) {
+function _handleSubmit(payload, subId) {
 
   const formData         = payload.formData        || {};
   const photos           = payload.photos          || {};
@@ -374,7 +379,6 @@ function _handleSubmit(payload) {
   const emailSubject     = payload.emailSubject    || 'Cleaning Report – Cascade Bria';
   const meta             = payload.meta            || {};
 
-  // ── Current meter readings ──────────────────────────────────
   const electricReading = String(
     payload.electricReading
     || (payload.meterReadings && payload.meterReadings.electric && payload.meterReadings.electric.value)
@@ -389,9 +393,6 @@ function _handleSubmit(payload) {
     || ''
   ).trim() || 'Not recorded';
 
-  // ── v3.4: Accept pre-calculated deltas from front-end ───────
-  // deltaKwh / deltaM3 arrive as numbers or null from the client.
-  // Fall back to '—' if missing (e.g. no previous reading exists).
   const rawDeltaKwh = payload.deltaKwh;
   const rawDeltaM3  = payload.deltaM3;
   const deltaKwh = (typeof rawDeltaKwh === 'number' && !isNaN(rawDeltaKwh))
@@ -399,7 +400,6 @@ function _handleSubmit(payload) {
   const deltaM3  = (typeof rawDeltaM3  === 'number' && !isNaN(rawDeltaM3))
     ? +(rawDeltaM3.toFixed(3))  : '—';
 
-  // ── v3.5: Guest stay info & avg consumption per day ─────────
   const lastGuestName  = String(payload.lastGuestName  || formData.lastGuestName  || '—').trim() || '—';
   const numberOfNights = Number(payload.numberOfNights || formData.numberOfNights || 0);
   const avgKwhPerDay   = (typeof rawDeltaKwh === 'number' && !isNaN(rawDeltaKwh) && numberOfNights > 0)
@@ -407,7 +407,6 @@ function _handleSubmit(payload) {
   const avgM3PerDay    = (typeof rawDeltaM3  === 'number' && !isNaN(rawDeltaM3)  && numberOfNights > 0)
     ? +(rawDeltaM3  / numberOfNights).toFixed(3) : null;
 
-  // ── Core form fields ────────────────────────────────────────
   const cleaningDate = String(
     payload.cleaningDate || formData.cleaningDate || ''
   ).trim() || Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
@@ -426,28 +425,30 @@ function _handleSubmit(payload) {
   const doneItems      = Number(meta.doneItems  || 0);
   const totalItems     = Number(meta.totalItems || 0);
 
-  Logger.log('=== CLEANING REPORT RECEIVED (v3.5) ===');
+  Logger.log('=== CLEANING REPORT RECEIVED (v3.8) ===');
   Logger.log('Cleaner:    ' + cleanerName + ' | Unit: ' + unitName);
   Logger.log('Date:       ' + cleaningDate);
   Logger.log('Last Guest: ' + lastGuestName + ' | Nights: ' + numberOfNights);
   Logger.log('Electric:   ' + electricReading + ' kWh  |  Δ: ' + deltaKwh);
-  Logger.log('Water:      ' + waterReading + ' m³    |  Δ: ' + deltaM3);
+  Logger.log('Water:      ' + waterReading    + ' m³    |  Δ: ' + deltaM3);
   Logger.log('Completion: ' + completionRate + '%');
   Logger.log('Photos:     ' + Object.keys(photos).length + ' section(s)');
+  if (subId) Logger.log('SubID:      ' + subId);
 
-  // ── Upload base64 photos to Drive ───────────────────────────
-  // FD-003: the client already created a folder at action=init and has been
-  // uploading meter photos into it. Reuse it instead of making a second,
-  // usually-empty one and linking the sheet to that.
+  // ── Create report folder ──────────────────────────────────────
+  // FD-003: the client created a folder at action=init and has been uploading
+  // into it. Reuse it rather than making a second, usually-empty folder and
+  // linking the sheet to that one.
   var reportFolder = null;
   if (sessionFolderId) {
     try { reportFolder = DriveApp.getFolderById(sessionFolderId); }
     catch (folderErr) { Logger.log('sessionFolderId unusable: ' + folderErr); }
   }
   if (!reportFolder) {
-    reportFolder = _reportFolder(cleaningDate, unitName || UNIT_NAME, cleanerName);
+    reportFolder = _reportFolder(cleaningDate, unitName, cleanerName);
   }
 
+  // ── Upload photos to Drive (v3.8: supports Storage URL + legacy base64) ──
   const photoLinks = {};
   for (const sectionId in photos) {
     const sectionPhotos = photos[sectionId];
@@ -458,35 +459,55 @@ function _handleSubmit(payload) {
     photoLinks[sectionId] = [];
 
     sectionPhotos.forEach(function(photo, i) {
-      if (!photo || !photo.data) return;
+      if (!photo) return;
       try {
-        const base64 = photo.data.replace(/^data:image\/\w+;base64,/, '');
-        const bytes  = Utilities.base64Decode(base64);
-        const meterValue = (sectionId === 'meterPhotos')
+        var blob;
+        var meterValue = (sectionId === 'meterPhotos')
           ? (i === 0 ? electricReading : waterReading)
           : null;
-        const blob   = Utilities.newBlob(bytes, 'image/jpeg',
-                         _photoFileName(sectionId, i, meterValue));
-        const file   = sectionFolder.createFile(blob);
+        var fileName = _photoFileName(sectionId, i, meterValue);
+
+        if (photo.data) {
+          // ── Legacy path: base64 embedded in payload ──────────
+          var base64 = photo.data.replace(/^data:image\/\w+;base64,/, '');
+          blob = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg', fileName);
+
+        } else if (photo.url && photo.url.indexOf('http') === 0) {
+          // ── v3.8 path: Supabase Storage URL ──────────────────
+          // The Storage bucket is public-read; no auth header required.
+          var resp = UrlFetchApp.fetch(photo.url, { muteHttpExceptions: true });
+          if (resp.getResponseCode() !== 200) {
+            Logger.log('Photo fetch failed (' + sectionId + ' #' + i + '): HTTP ' + resp.getResponseCode() + ' — ' + photo.url);
+            return;
+          }
+          blob = resp.getBlob();
+          blob.setName(fileName);
+
+        } else {
+          return; // no data and no url — skip
+        }
+
+        var file = sectionFolder.createFile(blob);
+        // Share so email recipients can open each photo link directly.
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
         photoLinks[sectionId].push({
           name:         photo.name || ('Photo ' + (i + 1)),
           url:          file.getUrl(),
           sectionLabel: sectionNames[sectionId] || sectionId
         });
+
       } catch (photoErr) {
         Logger.log('Photo error (' + sectionId + ' #' + i + '): ' + photoErr.toString());
       }
     });
   }
 
-  // ── Build notes text ────────────────────────────────────────
+  // ── Build notes ───────────────────────────────────────────────
   const notesText = notesArr.map(function(n) {
     return '[' + (n.section || '') + ']: ' + (n.isUrgent ? '[URGENT] ' : '') + (n.text || '');
   }).join('\n');
 
-  // ── Log to spreadsheet ──────────────────────────────────────
-  // v3.5: Prepend guest stay info to the General Notes column
   const _guestInfoNote = (lastGuestName !== '—' || numberOfNights > 0)
     ? 'Last Guest: ' + lastGuestName +
       (numberOfNights > 0
@@ -495,6 +516,7 @@ function _handleSubmit(payload) {
     : '';
   const _fullNotesText = [_guestInfoNote, notesText].filter(Boolean).join('\n');
 
+  // ── Log to spreadsheet ────────────────────────────────────────
   _logToSheet(
     cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
     electricReading, waterReading,
@@ -504,11 +526,11 @@ function _handleSubmit(payload) {
     reportFolder.getUrl()
   );
 
-  // ── Send HTML email ─────────────────────────────────────────
+  // ── Send HTML email ───────────────────────────────────────────
   const htmlEmail = _buildEmailHtml({
     cleaningDate, cleanerName, unitName, startTime, endTime, elapsedTime,
     electricReading, waterReading,
-    deltaKwh: deltaKwh, deltaM3: deltaM3,
+    deltaKwh:     deltaKwh,     deltaM3:     deltaM3,
     avgKwhPerDay: avgKwhPerDay, avgM3PerDay: avgM3PerDay,
     lastGuestName: lastGuestName, numberOfNights: numberOfNights,
     rate: completionRate, done: doneItems, total: totalItems,
@@ -526,7 +548,7 @@ function _handleSubmit(payload) {
     Logger.log('Email sent to ' + EMAIL_RECIPIENTS);
   }
 
-  // ── Calendar event ──────────────────────────────────────────
+  // ── Calendar event (non-fatal) ────────────────────────────────
   try {
     if (calendarData && calendarData.startDateTime) {
       const cal = CalendarApp.getCalendarById(CALENDAR_ID);
@@ -544,24 +566,22 @@ function _handleSubmit(payload) {
     Logger.log('Calendar error (non-fatal): ' + calErr.toString());
   }
 
-  Logger.log('=== REPORT PROCESSED SUCCESSFULLY (v3.5) ===');
-  return _json({ result: 'success', status: 'success', message: 'Report submitted successfully.' });
+  Logger.log('=== REPORT PROCESSED SUCCESSFULLY (v3.8) ===');
+
+  // v3.8: return folderUrl + folderId so callers can link to the Drive archive.
+  return _json({
+    result:       'success',
+    status:       'success',
+    message:      'Report submitted successfully.',
+    submissionId: subId || null,
+    folderId:     reportFolder.getId(),
+    folderUrl:    reportFolder.getUrl()
+  });
 }
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  SPREADSHEET LOGGING  (v3.4)
-//
-//  v3.4 CHANGE:
-//    - Signature now receives deltaKwh and deltaM3 as direct params.
-//    - The entire backwards-scan block has been removed.
-//    - Monthly totals (_updateMonthlySummary) are unchanged — they
-//      still SUM the delta columns, which now hold client-calculated
-//      values attributed to the month of cleaningDate.
-//
-//  v3.3 FIX (retained):
-//    - ALL appendRow() replaced with getRange().setValues() to bypass
-//      the Named Table restriction.
+//  SPREADSHEET LOGGING  (v3.4 — unchanged in v3.8)
 // ═══════════════════════════════════════════════════════════════════
 function _logToSheet(
   cleaningDate, unitName, cleanerName, startTime, endTime, elapsedTime,
@@ -574,7 +594,6 @@ function _logToSheet(
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     let   sheet = ss.getSheetByName(SHEET_NAME);
 
-    // ── Auto-create sheet with v3.2 headers if absent ──────────
     if (!sheet) {
       sheet = ss.insertSheet(SHEET_NAME);
       sheet.getRange(1, 1, 1, TOTAL_COLS).setValues([[
@@ -592,11 +611,9 @@ function _logToSheet(
       sheet.setFrozenRows(1);
     }
 
-    // ── Parse meter readings to numeric if possible ─────────────
     const elecVal  = (electricReading !== 'Not recorded') ? (parseFloat(electricReading)  || null) : null;
     const waterVal = (waterReading    !== 'Not recorded') ? (parseFloat(waterReading)     || null) : null;
 
-    // ── Determine the month-year bucket for monthly totals ──────
     let rowYear, rowMonth;
     try {
       const p  = String(cleaningDate).split('-');
@@ -608,9 +625,6 @@ function _logToSheet(
       rowMonth  = now.getMonth() + 1;
     }
 
-    // ── Compute running monthly totals ──────────────────────────
-    // Sum the DELTA_KWH / DELTA_M3 columns for the same month.
-    // This is a simple forward sum — no backwards scan needed.
     let monthKwh = '—';
     let monthM3  = '—';
     const lastRow = sheet.getLastRow();
@@ -643,39 +657,36 @@ function _logToSheet(
       if (typeof deltaM3  === 'number') monthM3  = +(sumM3  + deltaM3 ).toFixed(3);
 
     } else {
-      // First ever row — monthly total equals the delta itself
       if (typeof deltaKwh === 'number') monthKwh = deltaKwh;
       if (typeof deltaM3  === 'number') monthM3  = deltaM3;
     }
 
-    // ── Write the new row ───────────────────────────────────────
     const newRow = lastRow + 1;
     sheet.getRange(newRow, 1, 1, TOTAL_COLS).setValues([[
-      new Date(),                                        // A  Timestamp
-      cleaningDate,                                      // B  Cleaning Date
-      unitName,                                          // C  Property
-      cleanerName,                                       // D  Cleaner
-      startTime,                                         // E  Start Time
-      endTime,                                           // F  End Time
-      elapsedTime,                                       // G  Elapsed
-      elecVal  !== null ? elecVal  : electricReading,    // H  Electric (kWh)
-      waterVal !== null ? waterVal : waterReading,       // I  Water (m³)
-      deltaKwh,                                          // J  ⚡ Δ kWh  (from client)
-      deltaM3,                                           // K  💧 Δ m³   (from client)
-      monthKwh,                                          // L  ⚡ Month kWh
-      monthM3,                                           // M  💧 Month m³
-      rate + '%',                                        // N  Completion %
-      done,                                              // O  Items Done
-      total,                                             // P  Total Items
-      urgentText || '—',                                 // Q  Urgent Notes
-      notesText  || '—',                                 // R  General Notes
-      folderUrl  || '—'                                  // S  Photos Folder
+      new Date(),
+      cleaningDate,
+      unitName,
+      cleanerName,
+      startTime,
+      endTime,
+      elapsedTime,
+      elecVal  !== null ? elecVal  : electricReading,
+      waterVal !== null ? waterVal : waterReading,
+      deltaKwh,
+      deltaM3,
+      monthKwh,
+      monthM3,
+      rate + '%',
+      done,
+      total,
+      urgentText || '—',
+      notesText  || '—',
+      folderUrl  || '—'
     ]]);
 
     try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
-    Logger.log('Sheet row written to row ' + newRow + ' (delta pre-calculated by client).');
+    Logger.log('Sheet row written to row ' + newRow + '.');
 
-    // ── Refresh Monthly Summary tab ─────────────────────────────
     _updateMonthlySummary(ss);
 
   } catch (sheetErr) {
@@ -685,8 +696,7 @@ function _logToSheet(
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  MONTHLY SUMMARY TAB  (v3.3 / unchanged in v3.4 / unchanged in v3.5)
-//  FIX: All appendRow() replaced with getRange().setValues()
+//  MONTHLY SUMMARY TAB  (v3.3 — unchanged in v3.8)
 // ═══════════════════════════════════════════════════════════════════
 function _updateMonthlySummary(ssParam) {
   try {
@@ -713,7 +723,6 @@ function _updateMonthlySummary(ssParam) {
 
     const data = src.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
 
-    // Aggregate by YYYY-MM
     const months = {};
     data.forEach(function(row) {
       const cellDate  = row[COL.DATE      - 1];
@@ -741,7 +750,7 @@ function _updateMonthlySummary(ssParam) {
 
     const sortedKeys = Object.keys(months).sort();
     if (sortedKeys.length > 0) {
-      const rows = sortedKeys.map(function(key, i) {
+      const rows = sortedKeys.map(function(key) {
         const m     = months[key];
         const parts = key.split('-');
         const label = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1)
@@ -751,7 +760,6 @@ function _updateMonthlySummary(ssParam) {
       });
 
       sum.getRange(2, 1, rows.length, 6).setValues(rows);
-
       sortedKeys.forEach(function(_, i) {
         sum.getRange(i + 2, 1, 1, 6).setBackground(i % 2 === 0 ? '#F5F3EF' : '#FFFFFF');
       });
@@ -765,23 +773,13 @@ function _updateMonthlySummary(ssParam) {
   }
 }
 
-// Public wrapper — run from the editor at any time to force a rebuild
 function updateMonthlySummary() {
   _updateMonthlySummary(null);
 }
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  FIX NAMED TABLE  (v3.3 — unchanged)
-//
-//  Run ONCE from the editor if the log sheet was formatted as a
-//  Named Table (Format > Table in Google Sheets), which blocks writes.
-//
-//  HOW TO RUN:
-//    1. Open Apps Script editor
-//    2. Select "fixNamedTable" in the function dropdown
-//    3. Click Run — check Execution log
-//    4. Deploy a NEW VERSION of the web app after success
+//  FIX NAMED TABLE  (v3.3 — unchanged in v3.8)
 // ═══════════════════════════════════════════════════════════════════
 function fixNamedTable() {
   const ss    = SpreadsheetApp.openById(SHEET_ID);
@@ -827,98 +825,21 @@ function fixNamedTable() {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  MIGRATION — run ONCE to upgrade an existing sheet safely
-// ═══════════════════════════════════════════════════════════════════
-function migrateSheetV32() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-
-  // Delete orphan Sheet2 if empty (v3.3 addition)
-  const orphan = ss.getSheetByName('Sheet2');
-  if (orphan) {
-    const hasData = orphan.getLastRow() > 0 || orphan.getLastColumn() > 0;
-    if (!hasData) {
-      try { ss.deleteSheet(orphan); Logger.log('Deleted empty orphan "Sheet2".'); }
-      catch(e) { Logger.log('Could not delete Sheet2: ' + e.toString()); }
-    } else {
-      Logger.log('Sheet2 has data — skipping deletion.');
-    }
-  }
-
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) { Logger.log('Sheet not found — will be created on first submission.'); return; }
-
-  const colCount = sheet.getLastColumn();
-  const rowCount = sheet.getLastRow();
-  Logger.log('Detected: ' + colCount + ' columns, ' + rowCount + ' rows.');
-
-  if (colCount >= TOTAL_COLS) {
-    Logger.log('Already at v3.2+ width. Refreshing Monthly Summary only.');
-    _updateMonthlySummary(ss);
-    return;
-  }
-
-  if (colCount <= 8) {
-    Logger.log('Original schema. Expanding to 19 cols.');
-    const toAdd = TOTAL_COLS - colCount;
-    for (let i = 0; i < toAdd; i++) sheet.insertColumnAfter(colCount + i);
-    sheet.getRange(1, 1, 1, TOTAL_COLS).setValues([[
-      'Timestamp',      'Cleaning Date',  'Property',      'Cleaner',
-      'Start Time',     'End Time',       'Elapsed',
-      'Electric (kWh)', 'Water (m³)',
-      '⚡ Δ kWh',       '💧 Δ m³',        '⚡ Month kWh',  '💧 Month m³',
-      'Completion %',   'Items Done',     'Total Items',
-      'Urgent Notes',   'General Notes',  'Photos Folder'
-    ]]);
-    if (rowCount > 1) sheet.getRange(2, colCount + 1, rowCount - 1, toAdd).setValue('—');
-    Logger.log('Original schema migrated.');
-
-  } else if (colCount === 15) {
-    Logger.log('v3.1 schema. Inserting 4 new columns after Water (col I).');
-    for (let i = 0; i < 4; i++) sheet.insertColumnAfter(9);
-    sheet.getRange(1, COL.DELTA_KWH).setValue('⚡ Δ kWh');
-    sheet.getRange(1, COL.DELTA_M3 ).setValue('💧 Δ m³');
-    sheet.getRange(1, COL.MONTH_KWH).setValue('⚡ Month kWh');
-    sheet.getRange(1, COL.MONTH_M3 ).setValue('💧 Month m³');
-    if (rowCount > 1) sheet.getRange(2, COL.DELTA_KWH, rowCount - 1, 4).setValue('—');
-    Logger.log('v3.1 schema migrated.');
-
-  } else {
-    Logger.log('Unexpected column count: ' + colCount + '. Inspect manually.');
-    return;
-  }
-
-  sheet.getRange(1, 1, 1, TOTAL_COLS)
-       .setFontWeight('bold').setBackground('#22333B').setFontColor('#FFFFFF');
-  try { sheet.autoResizeColumns(1, TOTAL_COLS); } catch(e) {}
-  _updateMonthlySummary(ss);
-  Logger.log('✅ Migration complete. Run fixNamedTable() if needed, then deploy a NEW VERSION.');
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-//  EMAIL HTML BUILDER
-//
-//  v3.5 FIX: Added Last Guest Name and Number of Nights Stayed rows
-//            to the summary table. Added _cell() inner helper for
-//            consistent two-column cell markup.
+//  EMAIL HTML BUILDER  (v3.7 fix preserved in v3.8)
 // ═══════════════════════════════════════════════════════════════════
 function _buildEmailHtml(d) {
   const rateColor = d.rate === 100 ? '#006B54' : d.rate >= 80 ? '#e07b00' : '#C1414D';
   const dateStr   = d.cleaningDate ? _formatReadableDate(d.cleaningDate) : d.cleaningDate;
 
-  // Delta display helpers
   const fmtDeltaKwh = (typeof d.deltaKwh === 'number') ? '+' + d.deltaKwh.toFixed(2) + ' kWh' : '—';
   const fmtDeltaM3  = (typeof d.deltaM3  === 'number') ? '+' + d.deltaM3.toFixed(3)  + ' m³'  : '—';
-  // v3.5: avg per day (null when numberOfNights === 0)
   const fmtAvgKwh   = (typeof d.avgKwhPerDay === 'number') ? d.avgKwhPerDay.toFixed(2) + ' kWh/night' : null;
   const fmtAvgM3    = (typeof d.avgM3PerDay  === 'number') ? d.avgM3PerDay.toFixed(3)  + ' m³/night'  : null;
 
-  // v3.5: nights label
   const nightsLabel = (d.numberOfNights && d.numberOfNights > 0)
     ? d.numberOfNights + ' night' + (d.numberOfNights !== 1 ? 's' : '')
     : '—';
 
-  // ── Inner helper: one 50%-wide table cell ──────────────────
   function _cell(label, value) {
     return '<td style="padding:12px 14px;border-bottom:1px solid #EAE0D5;width:50%;vertical-align:top;">'
       + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
@@ -927,9 +848,6 @@ function _buildEmailHtml(d) {
       + '</td>';
   }
 
-  // ── Critical items summary table ──────────────────────────
-  // Shows every critical item with its outcome (✅ All Good or ⚠️ Issue).
-  // Only rendered when checklistDetails contains at least one critical item.
   let criticalTableBlock = '';
   const criticalItems = [];
   (d.checklistDetails || []).forEach(function(section) {
@@ -939,37 +857,38 @@ function _buildEmailHtml(d) {
   });
 
   if (criticalItems.length) {
-    const allCritOk = criticalItems.every(function(i) { return i.checked; });
-    const headerBg  = allCritOk ? '#e6f4ee' : '#fef0f1';
-    const headerCol = allCritOk ? '#006B54' : '#C1414D';
+    const allCritOk  = criticalItems.every(function(i) { return i.checked; });
+    const headerBg   = allCritOk ? '#e6f4ee' : '#fef0f1';
+    const headerCol  = allCritOk ? '#006B54' : '#C1414D';
     const headerIcon = allCritOk ? '✅' : '⚠️';
 
+    var critRows = criticalItems.map(function(item, i) {
+      var rowBg  = i % 2 === 0 ? '#ffffff' : '#f9f8f5';
+      var status = item.checked
+        ? '<span style="color:#006B54;font-weight:700;">✅ All Good</span>'
+        : '<span style="color:#C1414D;font-weight:700;">⚠️ Issue</span>';
+      return '<tr style="background:' + rowBg + ';border-top:1px solid #EAE0D5;">'
+        + '<td style="padding:9px 12px;color:#22333B;">' + _esc(item.text) + '</td>'
+        + '<td style="padding:9px 12px;text-align:center;">' + status + '</td>'
+        + '</tr>';
+    }).join('');
+
     criticalTableBlock =
-      '<div style=\"margin-bottom:20px;\">'\
-      + '<p style=\"font-weight:700;color:' + headerCol + ';font-size:1em;margin:0 0 8px;\">'\
-      + headerIcon + ' Critical Items Summary</p>'\
-      + '<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;'\
-      +   'border:1px solid #EAE0D5;border-radius:10px;overflow:hidden;font-size:0.88em;\">'\
-      + '<tr style=\"background:' + headerBg + ';\">'\
-      + '<th style=\"padding:8px 12px;text-align:left;font-size:0.75em;font-weight:700;'\
-      +   'text-transform:uppercase;letter-spacing:0.8px;color:#5E503F;width:70%;\">Item</th>'\
-      + '<th style=\"padding:8px 12px;text-align:center;font-size:0.75em;font-weight:700;'\
-      +   'text-transform:uppercase;letter-spacing:0.8px;color:#5E503F;width:30%;\">Status</th>'\
-      + '</tr>'\
-      + criticalItems.map(function(item, i) {
-          const rowBg  = i % 2 === 0 ? '#ffffff' : '#f9f8f5';
-          const status = item.checked
-            ? '<span style=\"color:#006B54;font-weight:700;\">✅ All Good</span>'
-            : '<span style=\"color:#C1414D;font-weight:700;\">⚠️ Issue</span>';
-          return '<tr style=\"background:' + rowBg + ';border-top:1px solid #EAE0D5;\">'\
-            + '<td style=\"padding:9px 12px;color:#22333B;\">' + _esc(item.text) + '</td>'\
-            + '<td style=\"padding:9px 12px;text-align:center;\">' + status + '</td>'\
-            + '</tr>';
-        }).join('')\
+      '<div style="margin-bottom:20px;">'
+      + '<p style="font-weight:700;color:' + headerCol + ';font-size:1em;margin:0 0 8px;">'
+      + headerIcon + ' Critical Items Summary</p>'
+      + '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;'
+      + 'border:1px solid #EAE0D5;border-radius:10px;overflow:hidden;font-size:0.88em;">'
+      + '<tr style="background:' + headerBg + ';">'
+      + '<th style="padding:8px 12px;text-align:left;font-size:0.75em;font-weight:700;'
+      + 'text-transform:uppercase;letter-spacing:0.8px;color:#5E503F;width:70%;">Item</th>'
+      + '<th style="padding:8px 12px;text-align:center;font-size:0.75em;font-weight:700;'
+      + 'text-transform:uppercase;letter-spacing:0.8px;color:#5E503F;width:30%;">Status</th>'
+      + '</tr>'
+      + critRows
       + '</table></div>';
   }
 
-  // Urgent block
   let urgentBlock = '';
   if (d.urgentText) {
     const lines = d.urgentText.split('\n').filter(function(l) { return l.trim(); });
@@ -982,7 +901,6 @@ function _buildEmailHtml(d) {
       + '</div>';
   }
 
-  // Notes block
   let notesBlock = '';
   const regularNotes = (d.notesArr || []).filter(function(n) { return !n.isUrgent; });
   if (regularNotes.length) {
@@ -997,7 +915,6 @@ function _buildEmailHtml(d) {
       + '</div>';
   }
 
-  // Photos block
   let photosBlock = '';
   let hasPhotos   = false;
   for (const sid in d.photoLinks) {
@@ -1019,7 +936,6 @@ function _buildEmailHtml(d) {
   }
   if (!hasPhotos) photosBlock = '<p style="color:#888;font-size:0.9em;">No photos were attached.</p>';
 
-  // Checklist block
   let checklistBlock = '';
   (d.checklistDetails || []).forEach(function(section) {
     checklistBlock +=
@@ -1044,34 +960,29 @@ function _buildEmailHtml(d) {
     + '<div style="max-width:660px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;'
     +   'box-shadow:0 4px 18px rgba(0,0,0,0.1);">'
 
-    // ── Email header banner ────────────────────────────────────
     + '<div style="background:linear-gradient(135deg,#22333B 0%,#5E503F 100%);padding:28px 24px;text-align:center;">'
     + '<h1 style="font-family:Georgia,serif;color:#ffffff;margin:0;font-size:1.7rem;letter-spacing:1px;">CASCADE HIDEAWAY</h1>'
     + '<p style="color:#EAE0D5;margin:6px 0 0;font-size:0.82rem;text-transform:uppercase;letter-spacing:2px;">Cleaning &amp; Turn-over Report</p>'
     + '</div>'
+
     + '<div style="padding:24px 28px;">'
 
-    // ── Summary table ──────────────────────────────────────────
     + '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;background:#f9f8f5;'
     +   'border-radius:10px;overflow:hidden;border:1px solid #EAE0D5;">'
-    // Row 1: Property | Cleaning Date
     + '<tr>'
     + _cell('Property',      _esc(d.unitName))
     + _cell('Cleaning Date', _esc(dateStr))
     + '</tr>'
-    // Row 2: Cleaner | Time
     + '<tr>'
     + _cell('Cleaner', _esc(d.cleanerName))
     + _cell('Time',    _esc(d.startTime) + ' → ' + _esc(d.endTime)
                        + (d.elapsedTime && d.elapsedTime !== '—'
                           ? ' (' + _esc(d.elapsedTime) + ')' : ''))
     + '</tr>'
-    // Row 3 (v3.5 NEW): Last Guest | Nights Stayed
     + '<tr>'
     + _cell('Last Guest',    _esc(d.lastGuestName || '—'))
     + _cell('Nights Stayed', _esc(nightsLabel))
     + '</tr>'
-    // Row 4: Completion (full width)
     + '<tr>'
     + '<td style="padding:12px 14px;" colspan="2">'
     + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;'
@@ -1082,12 +993,10 @@ function _buildEmailHtml(d) {
     + '</tr>'
     + '</table>'
 
-    // ── Meter readings block ───────────────────────────────────
     + '<div style="background:linear-gradient(135deg,#eaf4f0,#e4f2ea);border:2px solid #006B54;'
     +   'border-radius:12px;padding:16px 20px;margin-bottom:20px;">'
     + '<p style="font-weight:700;color:#006B54;margin:0 0 12px;font-size:1em;">⚡💧 Meter Readings</p>'
     + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
-    // Electric card
     + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;vertical-align:top;">'
     + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">⚡ Electric</span>'
     + '<span style="display:block;font-size:1.6em;font-weight:700;color:'
@@ -1098,7 +1007,6 @@ function _buildEmailHtml(d) {
     + (fmtAvgKwh ? '<div style="margin-top:3px;font-size:0.78em;color:#5E503F;font-weight:600;">⌀ avg ' + _esc(fmtAvgKwh) + '</div>' : '')
     + '</td>'
     + '<td width="4%"></td>'
-    // Water card
     + '<td width="48%" style="background:#ffffff;border-radius:8px;padding:10px 14px;text-align:center;vertical-align:top;">'
     + '<span style="display:block;font-size:0.72em;font-weight:700;color:#5E503F;text-transform:uppercase;letter-spacing:1px;">💧 Water</span>'
     + '<span style="display:block;font-size:1.6em;font-weight:700;color:'
@@ -1125,7 +1033,6 @@ function _buildEmailHtml(d) {
     + '</p>'
     + '</div>'
 
-    // ── Email footer ───────────────────────────────────────────
     + '<div style="background:#22333B;padding:16px;text-align:center;">'
     + '<p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.8em;">✨ Cascade Hideaway Automated Report ✨</p>'
     + '<p style="color:rgba(255,255,255,0.4);margin:6px 0 0;font-size:0.72em;">Generated: '
@@ -1179,12 +1086,13 @@ function _json(obj) {
 
 
 // ═══════════════════════════════════════════════════════════════════
-//  TEST — writes a real row to the sheet + sends test email
-//  Select "testSubmit" and click Run from the editor
+//  TEST — writes a real row + sends test email
+//  Select "testSubmit" and click Run from the editor.
 // ═══════════════════════════════════════════════════════════════════
 function testSubmit() {
   const today = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
   const result = _handleSubmit({
+    submissionId:             'test-' + Date.now(),
     electricReading:          '12350.0',
     waterReading:             '790.5',
     previousElectricReading:  12345.6,
@@ -1226,7 +1134,7 @@ function testSubmit() {
     allNotes:    [],
     urgentItems: '',
     meta: { rate: 100, doneItems: 2, totalItems: 2 }
-  });
+  }, 'test-manual');
   Logger.log('testSubmit result: ' + result.getContent());
   Logger.log('✅ Check sheet and email inbox for the test row.');
 }

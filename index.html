@@ -3458,6 +3458,112 @@ body.mode-quick .detail-text { display: none; }
 .pin-key-spacer { border:0; background:transparent; box-shadow:none; cursor:default; }
 .pin-key-back { font-size:1.25rem; }
 
+
+/* ── Stay picker (JOB 2a) ─────────────────────────────────────────────── */
+#stayPick {
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-3);
+  font-size: 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-1);
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a7a68' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 20px;
+  padding-right: 44px;
+}
+
+#stayPick:focus { border-color: var(--earthen-gold, #c9963a); outline: none; }
+#stayPick.picked { border-color: var(--ok, #2e7d5f); }
+
+#stay-pick-hint {
+  margin-top: var(--space-2);
+  font-size: .85rem;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+#stay-pick-hint.ok    { color: var(--ok, #2e7d5f); }
+#stay-pick-hint.warn  { color: var(--warn, #9a6b1f); }
+#stay-pick-hint.error { color: var(--danger, #b3261e); }
+
+/* ── Tenured fast path (JOB 2c) ───────────────────────────────────────── */
+.phase-checkall {
+  display: none;
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: inherit;
+  font-size: .92rem;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.phase-checkall[hidden] { display: none !important; }
+.phase-checkall:active  { transform: scale(.99); }
+
+.phase-checkall.done {
+  border-style: solid;
+  border-color: var(--ok, #2e7d5f);
+  color: var(--ok, #2e7d5f);
+  background: rgba(46,125,95,.07);
+}
+
+.phase-checkall-note {
+  margin: calc(var(--space-2) * -1) 0 var(--space-4);
+  font-size: .8rem;
+  line-height: 1.45;
+  color: var(--text-3, #8a7a68);
+  text-align: center;
+}
+
+/* ── Meter cross-check nudge (JOB 2d-2) ───────────────────────────────── */
+#meter-nudge {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(154,107,31,.35);
+  border-radius: var(--radius-md);
+  background: rgba(201,150,58,.09);
+}
+
+#meter-nudge[hidden] { display: none !important; }
+
+#meter-nudge .mn-head {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+#meter-nudge .mn-list {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.15rem;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+#meter-nudge .mn-list li { margin-bottom: 4px; }
+
+#meter-nudge .mn-foot {
+  margin: 0;
+  font-size: .78rem;
+  color: var(--text-secondary);
+}
 </style>
 </head>
 <body class="mode-detail">
@@ -3730,6 +3836,14 @@ body.mode-quick .detail-text { display: none; }
       <div id="cleaning-date-hint" role="status" aria-live="polite"></div>
     </div>
 
+    <div class="field-group" id="stay-pick-wrap" style="display:none;">
+      <label class="field-label" for="stayPick">Which stay is this report for? <span class="required">*</span></label>
+      <select id="stayPick" name="stayPick" aria-describedby="stay-pick-hint">
+        <option value="">Choose the stay…</option>
+      </select>
+      <div id="stay-pick-hint" role="status" aria-live="polite"></div>
+    </div>
+
     <div class="field-row" style="margin-bottom:var(--space-4);">
       <div class="field-group" style="margin-bottom:0;" id="checkin-field-wrap">
         <label class="field-label" for="checkInDate">Check-in date</label>
@@ -3960,6 +4074,12 @@ body.mode-quick .detail-text { display: none; }
           </button>
         </div>
         <img id="condition-photo-preview" class="issue-photo-preview" src="" alt="Condition photo preview">
+      </div>
+
+      <div id="meter-nudge" role="status" aria-live="polite" hidden>
+        <div class="mn-head"><span aria-hidden="true">👀</span> <strong>Worth a second look</strong></div>
+        <ul class="mn-list" id="meter-nudge-list"></ul>
+        <p class="mn-foot">If it is right as typed, carry on — this never blocks your report.</p>
       </div>
 
       <label style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);cursor:pointer;min-height:44px;">
@@ -4452,6 +4572,7 @@ const AUTH_SESSION_KEY   = 'ch_staff_session_v1';
 let staffSession         = null;
 
 const DRAFT_KEY          = 'ch_draft_v6';
+const METER_FP_KEY       = 'ch_last_meter_fp'; // last report's meter photo hashes
 const DRAFT_VERSION      = 5; // bumped v7.8: extraExpenses added to draft
 const VIEW_KEY           = 'ch_view_mode';
 const DWELL_KEY          = 'ch_dwell_start';
@@ -4998,6 +5119,8 @@ const CONFIRM_LEAVE_ITEMS = [
 ];
 
 const POWER_CHECK_ITEMS = [
+  { id: 'check_smartlife_waiting', text: 'Turn on the "Waiting for Check In" automation in SmartLife', highlight: true,
+    detail: 'Open the SmartLife app on your phone, tap Smart at the bottom, then Automations at the top, and tick the switch next to "Waiting for Check In" so it turns on. This is what gets the unit ready for the arriving guest — do it as the last thing before you lock up. If the switch will not stay on, flag it here.' },
   { id: 'check_ecoflow_stowed', text: 'EcoFlow RIVER 3 stowed in its spot, cable tidy',
     detail: 'After confirming it is charged, place the EcoFlow RIVER 3 back in its designated spot with the charging cable coiled neatly. Confirm it is present and undamaged. It is not borrowable and must stay in the unit at all times — flag immediately if it is missing.' },
   { id: 'check_10_6', text: 'Final power & safety check — windows closed, door locked', critical: true,
@@ -5273,6 +5396,7 @@ function goToPhase(newPhase, skipGate = false) {
 
   updateStepper();
   updateBottomBar();
+  if (typeof refreshCheckAllButtons === 'function') refreshCheckAllButtons();
   ls(PHASE_KEY, String(newPhase));
   saveDraft();
 }
@@ -5566,7 +5690,10 @@ function initSetupForm() {
       state.checkOutDate = _d;
     }
     fetchBookingForDate(_d);
+    loadCleanableBookings(_d);
   });
+
+  el('stayPick')?.addEventListener('change', applyStayPick);
 
   // Watch all fields for gate check
   ['cleanerName','cleaningDate','startTime','lastGuestName','checkInDate','checkOutDate','emergencyDescription'].forEach(id => {
@@ -5589,6 +5716,144 @@ function initSetupForm() {
       });
     }
   });
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   METER CROSS-CHECK (JOB 2d-2)
+   Catches the two mistakes that actually happen: a number typed wrong,
+   and the wrong photo attached to it. It runs while the form is being
+   filled and never blocks — a nudge, then the cleaner decides.
+
+   Deliberately NOT optical character recognition. A Philippine water
+   meter is a dial face and the electric meter is a 7-segment LCD behind
+   glass, photographed at an angle in poor light: OCR on that is wrong
+   often enough that it would cry wolf and be ignored, and it costs a
+   megabyte of library on a phone. What the browser CAN know for certain
+   is used instead — how the number compares with the last reading and
+   the days between, whether a photo is there at all, whether it was
+   taken today, and whether it is byte-for-byte the photo from last time.
+═══════════════════════════════════════════════════════════════ */
+
+// Calibrated on 2026-09-12 against all 36 rows of meter_readings, not guessed.
+// Real range across a year of turnovers: electric 4.7–28 kWh per day, water
+// 0.09–0.72 m³ per day. The ceilings sit just above the honest maximum, so a
+// heavy week passes and a mistyped digit does not. The four impossible rows
+// already in that table — 3558 kWh/day and 67.4 m³/day (both from a previous
+// reading of 0) and two negative deltas from a backfill filed out of order —
+// are exactly what these catch.
+// ponytail: fixed ceilings; move to a rolling average if the unit's usage
+// pattern shifts enough to make them noisy.
+const ELEC_KWH_PER_DAY_MAX  = 35;
+const WATER_M3_PER_DAY_MAX  = 1.2;
+const DIGIT_SLIP_FACTOR     = 8;   // a 10x typo, with room for a genuine spike
+const PHOTO_STALE_HOURS     = 12;  // older than this and it is not today's meter
+
+function daysBetween(aStr, bStr) {
+  const a = new Date(aStr + 'T00:00:00'), b = new Date(bStr + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.max(1, Math.round((b - a) / 86400000));
+}
+
+async function photoFingerprint(photo) {
+  const blob = photo?._blob;
+  if (!blob || !crypto?.subtle) return null;
+  try {
+    const buf  = await blob.arrayBuffer();
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    return [...new Uint8Array(hash)].slice(0, 8)
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch { return null; }
+}
+
+function meterFindings() {
+  const out  = [];
+  const date = (el('cleaningDate')?.value || todayManila());
+  const gap  = state.prevReadingDate ? daysBetween(state.prevReadingDate, date) : null;
+
+  [
+    { i: 0, label: 'Electric', unit: 'kWh', fieldId: 'electricMeterReading',
+      prev: state.prevElectricReading, perDay: ELEC_KWH_PER_DAY_MAX },
+    { i: 1, label: 'Water', unit: 'm³', fieldId: 'waterMeterReading',
+      prev: state.prevWaterReading, perDay: WATER_M3_PER_DAY_MAX },
+  ].forEach(m => {
+    const raw = (el(m.fieldId)?.value || '').trim();
+    const val = parseFloat(raw);
+    const photo = state.meterPhotos[m.i];
+    if (raw === '' && !photo) return;   // nothing typed, nothing shot — not yet their problem
+
+    if (raw !== '' && !photo) {
+      out.push(`${m.label}: ${raw} ${m.unit} typed, but no photo of that meter yet.`);
+    }
+    if (raw === '' && photo) {
+      out.push(`${m.label}: there is a photo but no reading typed in.`);
+    }
+    if (isNaN(val)) return;
+
+    // The 3558 kWh/day and 67.4 m³/day rows in meter_readings were both born
+    // this way: no previous reading on file, so the whole meter total was
+    // recorded as one turnover's usage. Say so before it happens again.
+    if (m.prev === null || m.prev === undefined || m.prev === 0) {
+      if (val > 0) {
+        out.push(`${m.label}: there is no previous reading on file, so ${val} ${m.unit} would be recorded as this stay's entire usage. Check with Lloyd before submitting.`);
+      }
+      return;
+    }
+
+    if (val < m.prev) {
+      out.push(`${m.label}: ${val} ${m.unit} is lower than the last reading (${m.prev}). A meter does not run backwards — check the photo.`);
+      return;
+    }
+    if (val > m.prev * DIGIT_SLIP_FACTOR && m.prev > 0) {
+      out.push(`${m.label}: ${val} ${m.unit} is many times the last reading (${m.prev}) — one digit too many?`);
+      return;
+    }
+    if (gap && m.prev > 0) {
+      const perDay = (val - m.prev) / gap;
+      if (perDay > m.perDay) {
+        out.push(`${m.label}: that is ${perDay.toFixed(1)} ${m.unit} a day over ${gap} day${gap !== 1 ? 's' : ''} — much higher than normal. Check the photo matches the number.`);
+      }
+    }
+  });
+
+  // Photo provenance: taken today, and not the same file as last time.
+  [0, 1].forEach(i => {
+    const photo = state.meterPhotos[i];
+    const label = i === 0 ? 'Electric' : 'Water';
+    if (!photo) return;
+    if (photo.takenAt) {
+      const ageHours = (Date.now() - photo.takenAt) / 3600000;
+      if (ageHours > PHOTO_STALE_HOURS) {
+        const when = new Date(photo.takenAt).toLocaleDateString('en-PH',
+          { month: 'short', day: 'numeric' });
+        out.push(`${label}: that picture was taken on ${when}, not today. Is it the right one?`);
+      }
+    }
+    if (photo.fingerprint && photo.fingerprint === state.prevMeterFingerprints?.[i]) {
+      out.push(`${label}: this is the same photo file as the last report. Take a fresh one.`);
+    }
+  });
+
+  const both = state.meterPhotos[0]?.fingerprint && state.meterPhotos[1]?.fingerprint;
+  if (both && state.meterPhotos[0].fingerprint === state.meterPhotos[1].fingerprint) {
+    out.push('Both meter slots hold the same photo — one of them is the wrong meter.');
+  }
+
+  return out;
+}
+
+function renderMeterNudge() {
+  const box  = el('meter-nudge');
+  const list = el('meter-nudge-list');
+  if (!box || !list) return;
+  if (state.cleaningType === 'emergency' || state.cleaningType === 'mid_stay') {
+    box.hidden = true;   // meters are optional in those modes
+    return;
+  }
+  const findings = meterFindings();
+  if (!findings.length) { box.hidden = true; return; }
+  list.innerHTML = findings.map(f => `<li>${escapeHtml(f)}</li>`).join('');
+  box.hidden = false;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -5637,8 +5902,8 @@ function initMeterDelta() {
     saveDraft();
   }
 
-  el('electricMeterReading')?.addEventListener('input', update);
-  el('waterMeterReading')?.addEventListener('input', () => { update(); updateWaterDecimalDisplay(); });
+  el('electricMeterReading')?.addEventListener('input', () => { update(); renderMeterNudge(); });
+  el('waterMeterReading')?.addEventListener('input', () => { update(); updateWaterDecimalDisplay(); renderMeterNudge(); });
 }
 
 function updateWaterDecimalDisplay() {
@@ -5668,6 +5933,9 @@ function updateWaterDecimalDisplay() {
 async function fetchPrevReadings() {
   const skeleton = el('prev-skeleton');
   const row      = el('prev-readings-row');
+
+  // Last report's meter photo hashes, so a re-used photo can be spotted.
+  state.prevMeterFingerprints = lsJSON(METER_FP_KEY) || [null, null];
 
   try {
     const resp = await fetch(`${EDGE_BASE}/last-readings?property_id=${encodeURIComponent(PROPERTY_ID)}`, {
@@ -6250,12 +6518,22 @@ function initMeterPhotos() {
           idbId: stored ? id : null, _blob: blob, objectUrl: URL.createObjectURL(blob), name: fname,
           uploaded: false, url: null, fileId: null, data: null, status: 'queued',
         };
+        // Provenance for the cross-check. lastModified is when the camera or
+        // the gallery file was actually written; the timestamp this app burns
+        // into the image is applied now, so it cannot prove freshness.
+        state.meterPhotos[i].takenAt = file.lastModified || null;
+        photoFingerprint(state.meterPhotos[i]).then(fp => {
+          if (state.meterPhotos[i]) state.meterPhotos[i].fingerprint = fp;
+          renderMeterNudge();
+        });
+
         renderMeterThumb();
 
         updatePhotoCounter();
         updateBottomBar();
         updateProgress(1);
         saveDraft();
+        renderMeterNudge();
 
         enqueuePhotoUpload(() => uploadPhotoRecord(state.meterPhotos[i], `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
 
@@ -6736,6 +7014,122 @@ function initCondition() {
 /* ═══════════════════════════════════════════════════════════════
    CHECKLIST RENDERING
 ═══════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════
+   TENURED FAST PATH (JOB 2c)
+   Someone who has run this turnover for months should not tap forty
+   boxes to say "yes, I did my job". Three months in, each phase offers
+   one control that ticks its plain tasks — and only those. Photos,
+   meter readings and the four Confirm & Leave judgements are still
+   asked for one at a time, because those are the evidence.
+   Source of truth for a hire date is employees.hire_date in Supabase;
+   a cleaner's token cannot read that table, and this list changes about
+   as often as the sign-in name list right above it.
+═══════════════════════════════════════════════════════════════ */
+
+const STAFF_HIRE_DATES = { 'Honey': '2026-05-07' };
+const TENURE_MONTHS_FOR_FAST_PATH = 3;
+
+// Which containers belong to which phase. Confirm & Leave is deliberately
+// absent — those four are answered ✅ or ⚠, never bulk-ticked.
+const PHASE_TASK_CONTAINERS = {
+  'phase-2': ['arrive-items', 'chemical-items'],
+  'phase-3': ['bedroom-items', 'kitchen-items'],
+  'phase-4': ['final-cleaning-items', 'power-check-items'],
+};
+
+function monthsSince(dateStr) {
+  const then = new Date(dateStr + 'T00:00:00');
+  if (isNaN(then)) return 0;
+  const now = new Date();
+  return (now.getFullYear() - then.getFullYear()) * 12
+       + (now.getMonth() - then.getMonth())
+       - (now.getDate() < then.getDate() ? 1 : 0);
+}
+
+function isTenuredCleaner() {
+  const hired = STAFF_HIRE_DATES[state.cleanerName];
+  return !!hired && monthsSince(hired) >= TENURE_MONTHS_FOR_FAST_PATH;
+}
+
+function phaseTaskBoxes(phaseId) {
+  const ids = PHASE_TASK_CONTAINERS[phaseId] || [];
+  const boxes = [];
+  ids.forEach(cid => {
+    const c = el(cid);
+    if (!c) return;
+    c.querySelectorAll('input[type="checkbox"][id^="cb-"]').forEach(cb => boxes.push(cb));
+  });
+  return boxes;
+}
+
+function setPhaseCheckAll(phaseId, checked) {
+  phaseTaskBoxes(phaseId).forEach(cb => {
+    if (cb.checked === checked) return;
+    cb.checked = checked;
+    cb.dispatchEvent(new Event('change'));   // reuse the existing per-item wiring
+  });
+  refreshCheckAllButtons();
+}
+
+function refreshCheckAllButtons() {
+  Object.keys(PHASE_TASK_CONTAINERS).forEach(phaseId => {
+    const btn = el(`checkall-${phaseId}`);
+    if (!btn) return;
+    const tenured = isTenuredCleaner();
+    btn.hidden = !tenured;
+    const note = el(`checkall-note-${phaseId}`);
+    if (note) note.hidden = !tenured;
+    if (!tenured) return;
+
+    const boxes = phaseTaskBoxes(phaseId);
+    const all   = boxes.length > 0 && boxes.every(cb => cb.checked);
+    btn.classList.toggle('done', all);
+    btn.textContent = all
+      ? `↺ Undo — untick these ${boxes.length} tasks`
+      : `✓ Tick all ${boxes.length} tasks in this step`;
+    btn.setAttribute('aria-label', all
+      ? 'Untick every task in this step'
+      : 'Tick every task in this step. Photos and meter readings are still asked for separately.');
+  });
+}
+
+function initPhaseCheckAll() {
+  Object.keys(PHASE_TASK_CONTAINERS).forEach(phaseId => {
+    const phase = el(phaseId);
+    if (!phase || el(`checkall-${phaseId}`)) return;
+
+    const btn = document.createElement('button');
+    btn.type      = 'button';
+    btn.id        = `checkall-${phaseId}`;
+    btn.className = 'phase-checkall';
+    btn.hidden    = true;
+    btn.addEventListener('click', () => {
+      const boxes = phaseTaskBoxes(phaseId);
+      const all   = boxes.length > 0 && boxes.every(cb => cb.checked);
+      setPhaseCheckAll(phaseId, !all);
+      if ('vibrate' in navigator) navigator.vibrate(all ? 10 : [10, 40, 10]);
+      showToast(all ? '↺ Tasks unticked' : '✓ Tasks ticked — photos still needed', '', 2600);
+    });
+
+    const note = document.createElement('p');
+    note.id        = `checkall-note-${phaseId}`;
+    note.className = 'phase-checkall-note';
+    note.hidden    = true;
+    note.textContent = 'Photos and meter readings are still asked for separately.';
+
+    const anchor = phase.querySelector('.phase-progress');
+    if (anchor && anchor.nextSibling) {
+      phase.insertBefore(btn,  anchor.nextSibling);
+      phase.insertBefore(note, btn.nextSibling);
+    } else {
+      phase.appendChild(btn);
+      phase.appendChild(note);
+    }
+  });
+  refreshCheckAllButtons();
+}
+
 function renderItems(items, containerId) {
   const container = el(containerId);
   if (!container) return;
@@ -8335,6 +8729,10 @@ async function proceedWithSubmission() {
       }
       state.isSubmitting = false;
       document.body.classList.remove('submitting');
+      lsJSON(METER_FP_KEY, [
+        state.meterPhotos[0]?.fingerprint || null,
+        state.meterPhotos[1]?.fingerprint || null,
+      ]);
       clearDraft();
       ls(DWELL_KEY, null);
       if (state.dwellInterval) clearInterval(state.dwellInterval);
@@ -8555,6 +8953,7 @@ function renderAllItems() {
   renderItems(FINAL_CLEANING_ITEMS, 'final-cleaning-items');
   renderItems(POWER_CHECK_ITEMS,    'power-check-items');
   renderItems(WEEKLY_ITEMS,         'weekly-items-list');
+  initPhaseCheckAll();
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -9226,6 +9625,132 @@ const CAL_SYNC_KEY = 'ch_cal_last_sync'; // localStorage key for client-side rat
 // Calendar synchronization is server-scheduled. Cleaner devices only read the
 // resulting property-scoped projection and never invoke the sync boundary.
 function triggerCalendarSync() {}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   STAY PICKER (JOB 2a)
+   The cleaner picks the stay instead of typing the guest's name.
+   Source is get_cleanable_bookings — a SECURITY DEFINER RPC, because a
+   cleaner's token cannot SELECT calendar_events directly (the only policy
+   there is owner/admin) and used to get back an empty list, silently.
+   If the RPC is not deployed yet the picker stays hidden and the old
+   typed flow is untouched.
+═══════════════════════════════════════════════════════════════ */
+
+let _stayOptions = [];
+let _stayRpcMissing = false;
+
+function stayLabel(b) {
+  const nights = b.nights ? `${b.nights} night${b.nights !== 1 ? 's' : ''}` : '';
+  const who    = b.guest_name || 'Guest name not on the calendar';
+  const when   = b.kind === 'mid_stay'
+    ? `staying ${b.checkin_date} → ${b.checkout_date}`
+    : b.kind === 'checkin'
+      ? `arriving ${b.checkin_date}`
+      : `checked out ${b.checkout_date}`;
+  return [who, when, nights].filter(Boolean).join(' · ');
+}
+
+async function loadCleanableBookings(dateStr) {
+  const wrap = el('stay-pick-wrap');
+  const sel  = el('stayPick');
+  const hint = el('stay-pick-hint');
+  if (!wrap || !sel || !dateStr || _stayRpcMissing) return;
+
+  if (!navigator.onLine) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_cleanable_bookings`, {
+      method: 'POST',
+      headers: { ...(await staffHeaders(true)) },
+      body: JSON.stringify({ p_date: dateStr, p_property_id: PROPERTY_ID }),
+    });
+    if (resp.status === 404) { _stayRpcMissing = true; wrap.style.display = 'none'; return; }
+    if (!resp.ok) { wrap.style.display = 'none'; return; }
+
+    const rows = await resp.json();
+    if (!Array.isArray(rows)) { wrap.style.display = 'none'; return; }
+
+    // Already-reported stays are not offered — a long stay can still appear
+    // twice, once per cleaning type, because only that pair is filed.
+    _stayOptions = rows.filter(r => !r.already_reported);
+    const reported = rows.length - _stayOptions.length;
+
+    sel.innerHTML = '<option value="">Choose the stay…</option>' +
+      _stayOptions.map((b, i) =>
+        `<option value="${i}">${escapeHtml(stayLabel(b))}</option>`).join('');
+
+    wrap.style.display = 'block';
+
+    if (!_stayOptions.length) {
+      hint.textContent = reported
+        ? `Every stay around this date already has a report. Check the date, or carry on and fill the details by hand.`
+        : `No stay on the calendar matches this date. Carry on and fill the details by hand.`;
+      hint.className = 'warn';
+      return;
+    }
+
+    hint.textContent = _stayOptions.length === 1
+      ? 'One stay needs a report for this date.'
+      : `${_stayOptions.length} stays could match this date — pick the one you cleaned.`;
+    hint.className = '';
+
+    // One candidate and nothing typed yet: choose it. Fewer taps, and the
+    // cleaner can still change it.
+    if (_stayOptions.length === 1 && !el('lastGuestName')?.value) {
+      sel.value = '0';
+      applyStayPick();
+    }
+  } catch {
+    wrap.style.display = 'none';
+  }
+}
+
+function applyStayPick() {
+  const sel  = el('stayPick');
+  const hint = el('stay-pick-hint');
+  const idx  = sel && sel.value !== '' ? Number(sel.value) : -1;
+  const b    = _stayOptions[idx];
+  if (!b) { sel?.classList.remove('picked'); return; }
+
+  // A guest still in residence means this is the scheduled mid-stay refresh.
+  if (b.kind === 'mid_stay' && state.cleaningType !== 'mid_stay') {
+    setCleaningType('mid_stay', { auto: true });
+  }
+
+  applyBookingAutofill({
+    checkin_date:  b.checkin_date,
+    checkout_date: b.checkout_date,
+    nights:        b.nights,
+    guest_name:    b.guest_name,
+    direction:     b.kind === 'checkin' ? 'checkin' : 'checkout',
+  });
+
+  // applyBookingAutofill only fills an empty name; picking a different stay
+  // is an explicit choice and should win.
+  const nameEl = el('lastGuestName');
+  if (nameEl && b.guest_name && nameEl.value !== b.guest_name) {
+    nameEl.value = b.guest_name;
+    state.lastGuestName = b.guest_name;
+  }
+
+  sel.classList.add('picked');
+  if (hint) {
+    hint.textContent = b.guest_name
+      ? `Reporting on ${b.guest_name}'s stay — dates and name filled in.`
+      : 'Dates filled in. The calendar has no name for this stay, so type it yourself.';
+    hint.className = b.guest_name ? 'ok' : 'warn';
+  }
+  updateBottomBar(); updateProgress(0); saveDraft();
+}
+
+function escapeHtml(t) {
+  return String(t).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 async function fetchBookingForDate(dateStr) {
   if (!dateStr || !navigator.onLine) {

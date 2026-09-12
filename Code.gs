@@ -215,21 +215,100 @@ function _handleLastReadings() {
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  DRIVE FOLDER SCHEMA (2026-09-12)
+//
+//  The root was a flat pile because two handlers invented two different
+//  names for the same report: init made
+//    "2026-09-08 cleaning report photos - Cascade Bria - Honey"
+//  and submit made
+//    "20260908_Honey"
+//  so every turnover left two folders, one of them usually empty — the
+//  empty one being the link the sheet recorded (FD-003).
+//
+//  One report, one folder, filed by the CLEANING date rather than the day
+//  it happened to be uploaded:
+//
+//    <root>/2026/2026-09/2026-09-08_Cascade-Bria_Honey/
+//        01_pre-clean/  02_meters/  03_bedroom/  04_kitchen/
+//        05_after-clean/  06_issues/
+//
+//  Sorting by name now sorts by time, a month is one folder to archive,
+//  and a meter photo is named for the number it proves.
+// ═══════════════════════════════════════════════════════════════════
+
+function _childFolder(parent, name) {
+  const existing = parent.getFoldersByName(name);
+  return existing.hasNext() ? existing.next() : parent.createFolder(name);
+}
+
+function _reportFolder(cleaningDate, unitName, cleanerName) {
+  const root = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
+
+  // Fall back to today only if the client sent no cleaning date.
+  const dateStr = /^\d{4}-\d{2}-\d{2}$/.test(cleaningDate || '')
+    ? cleaningDate
+    : Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+  const year  = dateStr.slice(0, 4);
+  const month = dateStr.slice(0, 7);
+
+  const slug = function (t) {
+    return _sanitizeName(t || '').replace(/\s+/g, '-').replace(/-+/g, '-') || 'Unknown';
+  };
+
+  const base = dateStr + '_' + slug(unitName) + '_' + slug(cleanerName);
+
+  const monthFolder = _childFolder(_childFolder(root, year), month);
+
+  // A second turnover on one day is real (mid-stay, or a re-clean).
+  let name = base, idx = 2;
+  while (monthFolder.getFoldersByName(name).hasNext()) {
+    name = base + '_' + idx;
+    idx++;
+  }
+  return monthFolder.createFolder(name);
+}
+
+// Sections are numbered so Drive lists them in the order they were done.
+var SECTION_FOLDER_NAMES = {
+  meterPhotos:      '02_meters',
+  precleanPhotos:   '01_pre-clean',
+  bedroomPhotos:    '03_bedroom',
+  kitchenPhotos:    '04_kitchen',
+  aftercleanPhotos: '05_after-clean',
+  issuePhotos:      '06_issues'
+};
+
+function _sectionFolderName(sectionId, fallbackLabel) {
+  return SECTION_FOLDER_NAMES[sectionId]
+      || (fallbackLabel || sectionId).replace(/[^\w\s\-]/g, '').replace(/\s+/g, '_').trim()
+      || sectionId;
+}
+
+// A meter photo should carry the number it is evidence for, so the pair can
+// be checked later without opening the sheet.
+function _photoFileName(sectionId, index, reading) {
+  if (sectionId === 'meterPhotos') {
+    const which = index === 0 ? 'electric' : 'water';
+    const value = (reading === null || reading === undefined || reading === '')
+      ? 'no-reading'
+      : String(reading).replace(/[^0-9.]/g, '');
+    return which + '_' + value + '.jpg';
+  }
+  return 'photo_' + (index + 1) + '.jpg';
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  ACTION: INIT — create dated photo subfolder in Drive
 // ═══════════════════════════════════════════════════════════════════
 function _handleInit(e) {
-  const unitName    = _sanitizeName(_getParam(e, 'unitName')    || 'Unknown Unit');
-  const cleanerName = _sanitizeName(_getParam(e, 'cleanerName') || 'Unknown Cleaner');
+  const unitName     = _sanitizeName(_getParam(e, 'unitName')    || 'Unknown Unit');
+  const cleanerName  = _sanitizeName(_getParam(e, 'cleanerName') || 'Unknown Cleaner');
+  const cleaningDate = _getParam(e, 'cleaningDate') || '';
 
-  const root    = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
-  const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-  const base    = dateStr + ' cleaning report photos - ' + unitName + ' - ' + cleanerName;
-
-  let name = base, idx = 2;
-  while (root.getFoldersByName(name).hasNext()) { name = base + ' (' + idx + ')'; idx++; }
-
-  const folder = root.createFolder(name);
+  const folder = _reportFolder(cleaningDate, unitName, cleanerName);
   Logger.log('Init: created folder "' + folder.getName() + '"');
   return _json({
     result:     'success',
@@ -334,6 +413,10 @@ function _handleSubmit(payload) {
   ).trim() || Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
 
   const cleanerName  = formData.cleanerName  || payload.cleanerName  || '—';
+  // The client has sent this since v6; Code.gs never read it (FD-003).
+  const sessionFolderId = String(
+    payload.sessionFolderId || formData.sessionFolderId || ''
+  ).trim();
   const unitName     = formData.unitName     || payload.unitName     || 'Cascade Bria';
   const startTime    = formData.startTime    || '—';
   const endTime      = formData.endTime      || '—';
@@ -353,19 +436,25 @@ function _handleSubmit(payload) {
   Logger.log('Photos:     ' + Object.keys(photos).length + ' section(s)');
 
   // ── Upload base64 photos to Drive ───────────────────────────
-  const driveRoot    = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
-  const dateStamp    = cleaningDate.replace(/-/g, '');
-  const reportFolder = driveRoot.createFolder(
-    dateStamp + '_' + _sanitizeName(cleanerName).replace(/\s+/g, '_')
-  );
+  // FD-003: the client already created a folder at action=init and has been
+  // uploading meter photos into it. Reuse it instead of making a second,
+  // usually-empty one and linking the sheet to that.
+  var reportFolder = null;
+  if (sessionFolderId) {
+    try { reportFolder = DriveApp.getFolderById(sessionFolderId); }
+    catch (folderErr) { Logger.log('sessionFolderId unusable: ' + folderErr); }
+  }
+  if (!reportFolder) {
+    reportFolder = _reportFolder(cleaningDate, unitName || UNIT_NAME, cleanerName);
+  }
 
   const photoLinks = {};
   for (const sectionId in photos) {
     const sectionPhotos = photos[sectionId];
     if (!sectionPhotos || !sectionPhotos.length) continue;
 
-    const rawLabel      = (sectionNames[sectionId] || sectionId).replace(/[^\w\s\-]/g, '').replace(/\s+/g, '_').trim();
-    const sectionFolder = reportFolder.createFolder(rawLabel || sectionId);
+    const sectionFolder = _childFolder(
+      reportFolder, _sectionFolderName(sectionId, sectionNames[sectionId]));
     photoLinks[sectionId] = [];
 
     sectionPhotos.forEach(function(photo, i) {
@@ -373,7 +462,11 @@ function _handleSubmit(payload) {
       try {
         const base64 = photo.data.replace(/^data:image\/\w+;base64,/, '');
         const bytes  = Utilities.base64Decode(base64);
-        const blob   = Utilities.newBlob(bytes, 'image/jpeg', 'photo_' + (i + 1) + '.jpg');
+        const meterValue = (sectionId === 'meterPhotos')
+          ? (i === 0 ? electricReading : waterReading)
+          : null;
+        const blob   = Utilities.newBlob(bytes, 'image/jpeg',
+                         _photoFileName(sectionId, i, meterValue));
         const file   = sectionFolder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         photoLinks[sectionId].push({

@@ -131,6 +131,15 @@ test('photo freshness uses the file time, not the burned-in stamp', () => {
   assert.match(html, /const PHOTO_STALE_HOURS     = 12;/);
 });
 
+test('a reading identical to the previous one is caught', () => {
+  // The ceiling check only looked upward, so copying last time's number —
+  // the cheapest way to file without visiting the meter — sailed through.
+  // It is already in the data: 2026-09-10 recorded 3832.00 kWh and 72.1530 m3,
+  // digit for digit the 2026-09-06 figures, four days apart.
+  assert.match(html, /if \(val === m\.prev\) \{/);
+  assert.match(html, /exactly the same number as last time/);
+});
+
 test('the same photo in both meter slots is caught', () => {
   assert.match(html, /Both meter slots hold the same photo/);
 });

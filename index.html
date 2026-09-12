@@ -6,6 +6,15 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.4 — Zero movement (2026-09-13):                 ║
+  ║  - The meter cross-check only ever looked UPWARD: too high a   ║
+  ║    rate, or a negative delta. A reading identical to the       ║
+  ║    previous one — the cheapest way to file a report without    ║
+  ║    walking to the meter — passed every check. It is already    ║
+  ║    in the data: the 2026-09-10 turnover recorded 3832.00 kWh   ║
+  ║    and 72.1530 m3, digit for digit the 2026-09-06 figures,     ║
+  ║    four days apart. Now named by the nudge, still non-blocking.║
+  ║                                                              ║
   ║  CHANGELOG v8.3 — The way out is earned (2026-09-13):         ║
   ║  - "I could not photograph the meters" no longer appears as a ║
   ║    standing offer. It was advertising an opt-out to someone   ║
@@ -6343,6 +6352,16 @@ function meterFindings() {
       const perDay = (val - m.prev) / gap;
       if (perDay > m.perDay) {
         out.push(`${m.label}: that is ${perDay.toFixed(1)} ${m.unit} a day over ${gap} day${gap !== 1 ? 's' : ''} — much higher than normal. Check the photo matches the number.`);
+      }
+      // A reading identical to the previous one (2026-09-13). The ceiling
+      // check only ever looked upward, so the cheapest way to file a report
+      // without going to the meter — copying last time's number — sailed
+      // through. It is already in the data: the 2026-09-10 turnover recorded
+      // 3832.00 kWh and 72.1530 m³, digit for digit the 2026-09-06 figures,
+      // four days apart. A fridge alone moves the electric meter, and water
+      // matching to four decimals over four days is not a quiet week.
+      if (val === m.prev) {
+        out.push(`${m.label}: exactly the same number as last time (${m.prev}). Over ${gap} day${gap !== 1 ? 's' : ''} the meter should have moved at least a little — is this today's reading?`);
       }
     }
   });

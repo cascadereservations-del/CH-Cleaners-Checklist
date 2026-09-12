@@ -99,3 +99,38 @@ test('provenance is read before the re-encode that would destroy it', () => {
   assert.match(html, /photoProvenance\(file\)/);
   assert.doesNotMatch(html, /photoProvenance\(blob\)/);
 });
+
+/* ── The forgotten-photo allowance (2026-09-13) ──────────────────────────── */
+
+test('the allowance forgives the photo, never the reading', () => {
+  // Both readings stay required; only the two photo checks are waived.
+  assert.match(html, /const skipped = state\.meterPhotosSkipped === true;/);
+  assert.match(html, /const photo0ok = skipped \|\| photos\[0\] !== null;/);
+  assert.match(html, /return elec\.length > 0 && water\.length > 0/);
+});
+
+test('the never-two-in-a-row limit is decided by the server, not the phone', () => {
+  // A localStorage flag is cleared by reinstalling the app, so the client
+  // must ask every time rather than remember the answer.
+  assert.match(html, /rpc\/can_skip_meter_photos/);
+  assert.doesNotMatch(html, /localStorage.{0,60}meterPhotosSkipped/);
+});
+
+test('the page survives being ahead of the database', () => {
+  // Same rule the stay picker follows: if the function is not applied yet,
+  // hide the offer and leave the normal photo requirement standing.
+  const fn = html.match(/async function refreshMeterSkipAllowance\(\)[\s\S]*?\n\}/)[0];
+  assert.match(fn, /if \(!resp\.ok\) \{ row\.hidden = true; return; \}/);
+});
+
+test('a skip is recorded with a reason and sent with the report', () => {
+  assert.match(html, /meterPhotosSkipped: state\.meterPhotosSkipped === true/);
+  assert.match(html, /meterPhotoSkipNote: state\.meterPhotosSkipped \? state\.meterSkipReason : null/);
+  // An unexplained skip is not accepted.
+  assert.match(html, /if \(reason\.length < 4\)/);
+});
+
+test('the sign-in follow-up asks rather than accuses', () => {
+  assert.match(html, /rpc\/get_meter_photo_followups/);
+  assert.match(html, /a late reading is worth more than none/);
+});

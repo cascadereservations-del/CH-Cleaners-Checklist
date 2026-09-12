@@ -6,6 +6,29 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.2 — Vision check + photo allowance (26-09-13):  ║
+  ║  - A layer that actually LOOKS at the meter photo. New edge   ║
+  ║    function verify-meter-photo reads the image and compares   ║
+  ║    it with the typed number. Provider-agnostic behind         ║
+  ║    VISION_PROVIDER (gemini | openrouter) — both keys already  ║
+  ║    exist in the estate. Runs AFTER the fact, never in the     ║
+  ║    submit path, so a model outage cannot cost a report.       ║
+  ║    Verdicts: ok | mismatch | unreadable | not_a_meter | error.║
+  ║    It never blocks; a low-confidence read is never treated as ║
+  ║    an accusation.                                             ║
+  ║  - The next sign-in asks for a re-upload when a report was    ║
+  ║    skipped or the photo disagreed (get_meter_photo_followups).║
+  ║  - "I could not photograph the meters": allowed ONCE, refused ║
+  ║    if the previous report also skipped. Enforced server-side  ║
+  ║    by can_skip_meter_photos — a localStorage flag is cleared  ║
+  ║    by reinstalling the app. The READINGS are still required;  ║
+  ║    only the picture is forgiven, and a reason is recorded.    ║
+  ║  - The 08:00 Telegram reminder gains a meter-photo section    ║
+  ║    (see supabase/functions/missed-cleaning-alert/PATCH-...).  ║
+  ║  - NEEDS APPLYING: sql/2026-09-13-meter-vision-and-photo-     ║
+  ║    skip.sql, then deploy verify-meter-photo. Until then the   ║
+  ║    page hides both features on a 404 and behaves as before.   ║
+  ║                                                              ║
   ║  CHANGELOG v8.1 — Cache, clock, provenance (2026-09-13):     ║
   ║  - sw.js v1.2: navigation is NETWORK-FIRST with a 3s timeout, ║
   ║    was stale-while-revalidate. SWR served the PREVIOUS deploy ║
@@ -3679,6 +3702,69 @@ body.mode-quick .detail-text { display: none; }
   font-size: .78rem;
   color: var(--text-secondary);
 }
+
+/* ── The forgotten-photo allowance (2026-09-13) ─────────────────────────── */
+#meter-skip-row {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+#meter-skip-row[hidden] { display: none !important; }
+#meter-skip-row.used { border-style: solid; border-color: var(--warning); background: var(--warning-bg); }
+#meter-skip-row .ms-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--font-size-sm); font-weight: 600;
+  color: var(--text-secondary); margin-bottom: var(--space-2);
+}
+#meter-skip-why {
+  width: 100%; min-height: 44px; box-sizing: border-box;
+  padding: 10px 12px; margin-bottom: var(--space-2);
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-raised); color: var(--text-primary);
+  font: 400 .92rem var(--font-body);
+}
+#meter-skip-why:focus { outline: none; border-color: var(--bronze); box-shadow: 0 0 0 3px var(--accent-soft); }
+#meter-skip-btn {
+  width: 100%; min-height: 44px;
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-secondary);
+  font: 600 .88rem var(--font-body); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#meter-skip-btn:active { transform: scale(.99); }
+#meter-skip-btn[hidden] { display: none !important; }
+#meter-skip-note {
+  margin: var(--space-2) 0 0;
+  font-size: .78rem; line-height: 1.45; color: var(--text-muted);
+}
+
+/* ── Sign-in follow-up: a report that still owes a meter photo ───────────── */
+#meter-followup {
+  margin: var(--space-3) 0 var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid rgba(154,107,31,.35);
+  border-radius: var(--radius-md);
+  background: var(--warning-bg);
+}
+#meter-followup[hidden] { display: none !important; }
+#meter-followup .mf-head {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-size: 1.15rem; font-weight: 700;
+  color: var(--text-heading, var(--text-primary)); margin-bottom: var(--space-2);
+}
+#meter-followup .mf-list { margin: 0 0 var(--space-3); padding-left: 1.15rem; font-size: var(--font-size-sm); line-height: 1.55; }
+#meter-followup .mf-list li { margin-bottom: 5px; }
+#meter-followup .mf-foot { margin: 0; font-size: .8rem; color: var(--text-secondary); }
+#meter-followup .mf-dismiss {
+  margin-top: var(--space-3); min-height: 40px; padding: 0 var(--space-4);
+  border: 1.5px solid var(--border-strong); border-radius: var(--radius-md);
+  background: transparent; color: var(--text-secondary);
+  font: 600 .82rem var(--font-body); cursor: pointer;
+}
 /* ── Drawn icon set (2026-09-13) ──────────────────────────────────────────
    Emoji-as-icons are gone: they render as a different typeface per platform,
    they carry colour this palette does not control, and next to the manual's
@@ -3968,6 +4054,13 @@ body.mode-quick .detail-text { display: none; }
       </div>
     </div>
 
+    <div id="meter-followup" hidden role="status">
+      <div class="mf-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> A meter photo needs another look</div>
+      <ul class="mf-list" id="meter-followup-list"></ul>
+      <p class="mf-foot">If you still have the photo, send it to Lloyd on Messenger. If not, photograph the meter as it is now and say so — a late reading is worth more than none.</p>
+      <button type="button" class="mf-dismiss" id="meter-followup-dismiss">I have dealt with it</button>
+    </div>
+
     <!-- Zone: Cleaner -->
     <div class="zone-divider"><span class="zone-label"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-broom"/></svg> Cleaner</span></div>
 
@@ -4229,6 +4322,15 @@ body.mode-quick .detail-text { display: none; }
       <div class="photo-count-badge" id="photo-count-badge" role="status" aria-live="polite">
         <span id="photo-count-text">0 / 2 photos</span>
       </div>
+      <div id="meter-skip-row" hidden>
+        <div class="ms-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> I could not photograph the meters</div>
+        <input type="text" id="meter-skip-why" maxlength="200"
+               placeholder="What happened? e.g. meter room was locked"
+               aria-label="Why the meter photos are missing">
+        <button type="button" id="meter-skip-btn" hidden>Submit without meter photos, just this once</button>
+        <p id="meter-skip-note"></p>
+      </div>
+
     </div>
 
     <!-- Section D: Unit Condition -->
@@ -5383,6 +5485,13 @@ const state = {
   prevWaterReading:   null,
   prevReadingDate:    null,
   meterPhotos:        [null, null], // [{data, url, fileId, name, uploaded}, ...]
+  // The one-time "I could not take the meter photos" allowance (2026-09-13).
+  // meterSkipAllowed is what the SERVER said; meterPhotosSkipped is what this
+  // report is claiming. Never trust the first without asking again — a stale
+  // yes from an hour ago is not permission.
+  meterPhotosSkipped: false,
+  meterSkipReason:    '',
+  meterSkipAllowed:   null,   // null = not asked yet
   bedroomPhotos:      [],           // [{data, url, fileId, name, uploaded}, ...]
   kitchenPhotos:      [],           // [{data, url, fileId, name, uploaded}, ...]
   precleanPhotos:     [],           // Feature 3: pre-clean photos (replaces Messenger)
@@ -5661,8 +5770,12 @@ function isPhase1Valid() {
   const elec  = (el('electricMeterReading')?.value || '').trim();
   const water = (el('waterMeterReading')?.value || '').trim();
   const photos = state.meterPhotos;
-  const photo0ok = photos[0] !== null;
-  const photo1ok = photos[1] !== null;
+  // The allowance covers the PHOTOS only. The readings are still typed, still
+  // required, and still cross-checked — forgetting the camera is not the same
+  // as not reading the meter.
+  const skipped = state.meterPhotosSkipped === true;
+  const photo0ok = skipped || photos[0] !== null;
+  const photo1ok = skipped || photos[1] !== null;
   // Feature 1: gate on preclean minimum (Feature 3 added precleanPhotos)
   const precleanOk = state.precleanPhotos.length >= PRECLEAN_PHOTO_MIN;
   return elec.length > 0 && water.length > 0 && photo0ok && photo1ok && precleanOk;
@@ -5936,6 +6049,104 @@ const ELEC_KWH_PER_DAY_MAX  = 35;
 const WATER_M3_PER_DAY_MAX  = 1.2;
 const DIGIT_SLIP_FACTOR     = 8;   // a 10x typo, with room for a genuine spike
 const PHOTO_STALE_HOURS     = 12;  // older than this and it is not today's meter
+
+/* ── The forgotten-photo allowance (2026-09-13) ─────────────────────────────
+   Lloyd's rule: forgetting once is human, twice running is a habit. So the
+   report may go in without meter photos, but only if the PREVIOUS one had
+   them — and only the server can answer that honestly, because a flag in
+   localStorage is cleared by reinstalling the app.
+
+   A refusal is not a punishment and is not worded as one. The reading is
+   still required either way; this only forgives the picture. */
+/* Read once after sign-in. Anything the vision check disagreed with, or any
+   report that used the forgotten-photo allowance, gets raised here — at the
+   START of the next visit, which is the only moment a cleaner is actually
+   looking at this app and could still do something about it. */
+async function loadMeterFollowups() {
+  const box = el('meter-followup');
+  if (!box || !navigator.onLine) return;
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_meter_photo_followups`, {
+      method: 'POST',
+      headers: { ...(await staffHeaders(true)) },
+      body: JSON.stringify({ p_property_id: PROPERTY_ID, p_lookback: 14 }),
+    });
+    if (!resp.ok) return;                 // not applied yet — say nothing
+    const rows = await resp.json();
+    if (!Array.isArray(rows) || !rows.length) return;
+    const list = el('meter-followup-list');
+    if (list) {
+      list.innerHTML = rows.slice(0, 3).map(r => {
+        const when = r.cleaned_at
+          ? new Date(r.cleaned_at).toLocaleDateString('en-PH',
+              { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })
+          : 'a recent report';
+        const detail = (r.vision_verdict === 'mismatch' && r.vision_electric != null)
+          ? ` (the photo looks like ${escapeHtml(String(r.vision_electric))}, the report says ${escapeHtml(String(r.typed_electric ?? '—'))})`
+          : '';
+        return `<li><strong>${escapeHtml(when)}</strong> — ${escapeHtml(r.reason || 'needs another look')}${detail}</li>`;
+      }).join('');
+    }
+    box.hidden = false;
+  } catch { /* never let a follow-up notice break the page */ }
+}
+
+async function refreshMeterSkipAllowance() {
+  const row = el('meter-skip-row');
+  if (!row) return;
+  if (state.cleaningType === 'emergency' || state.cleaningType === 'mid_stay') {
+    row.hidden = true;   // meters are optional in those modes anyway
+    return;
+  }
+  if (!navigator.onLine) { row.hidden = true; return; }
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/can_skip_meter_photos`, {
+      method: 'POST',
+      headers: { ...(await staffHeaders(true)) },
+      body: JSON.stringify({ p_property_id: PROPERTY_ID }),
+    });
+    // The page can be ahead of the database, exactly as the stay picker can.
+    // A 404 means the function is not applied yet: hide the offer, change
+    // nothing else, and let the normal photo requirement stand.
+    if (!resp.ok) { row.hidden = true; return; }
+    const rows = await resp.json();
+    const r = Array.isArray(rows) ? rows[0] : rows;
+    state.meterSkipAllowed = !!r?.allowed;
+    row.hidden = false;
+    const btn  = el('meter-skip-btn');
+    const note = el('meter-skip-note');
+    if (state.meterSkipAllowed) {
+      if (btn)  { btn.hidden = false; btn.disabled = false; }
+      if (note) note.textContent = 'Only if you truly cannot go back — the next report will not be allowed to skip them.';
+    } else {
+      if (btn)  btn.hidden = true;
+      if (note) note.textContent = 'The last report also had no meter photos, so this one needs them. Please photograph both meters.';
+    }
+  } catch {
+    row.hidden = true;
+  }
+}
+
+function applyMeterSkip() {
+  if (!state.meterSkipAllowed) return;
+  const reason = (el('meter-skip-why')?.value || '').trim();
+  if (reason.length < 4) {
+    const note = el('meter-skip-note');
+    if (note) note.textContent = 'Please say in a few words what happened — it goes in the report.';
+    el('meter-skip-why')?.focus();
+    return;
+  }
+  state.meterPhotosSkipped = true;
+  state.meterSkipReason = reason.slice(0, 300);
+  const row = el('meter-skip-row');
+  if (row) row.classList.add('used');
+  const btn = el('meter-skip-btn');
+  if (btn) { btn.hidden = true; }
+  const note = el('meter-skip-note');
+  if (note) note.textContent = 'Recorded. The readings are still required, and the next report must include photos.';
+  showToast('Noted — meter photos skipped this once', '', 3200);
+  updateBottomBar(); updatePhotoCounter(); saveDraft();
+}
 
 /* ── Meter photo provenance (2026-09-13) ────────────────────────────────────
    Lloyd's question was blunt: what stops someone uploading a screenshot or a
@@ -8951,6 +9162,8 @@ function buildPayload() {
     // The cross-check findings travel WITH the report. On screen they are a
     // nudge a cleaner can ignore by design (D-084); in the payload they are a
     // record the person who cares can actually read.
+    meterPhotosSkipped: state.meterPhotosSkipped === true,
+    meterPhotoSkipNote: state.meterPhotosSkipped ? state.meterSkipReason : null,
     meterChecks: {
       findings: (typeof meterFindings === 'function' ? meterFindings() : []),
       provenance: [0, 1].map(i => state.meterPhotos[i]?.provenance || null),
@@ -9727,6 +9940,9 @@ function hasIncompleteExpense() {
 
 function setCleaningType(type, opts = {}) {
   state.cleaningType = type;
+  // Mid-stay and emergency do not require meter photos at all, so the
+  // forgotten-photo offer has to appear and disappear with the type.
+  if (typeof refreshMeterSkipAllowance === 'function') refreshMeterSkipAllowance();
   document.querySelectorAll('.ctype-btn').forEach(btn => {
     const a = btn.dataset.type === type;
     btn.classList.toggle('selected', a);
@@ -10400,6 +10616,13 @@ async function init() {
 
   // Feature 4: Inventory usage log
   initInventoryUsage();
+  el('meter-skip-btn')?.addEventListener('click', applyMeterSkip);
+  el('meter-followup-dismiss')?.addEventListener('click', () => {
+    const b = el('meter-followup'); if (b) b.hidden = true;
+  });
+  refreshMeterSkipAllowance();
+  loadMeterFollowups();
+
   initCleaningType();    // v7.8: was defined but never called — ctype buttons were inert
   initExtraExpenses();   // v7.8: additional expenses card
 

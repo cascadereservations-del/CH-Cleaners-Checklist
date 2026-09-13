@@ -6,6 +6,19 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.5 — Step 3 gets its own evidence (26-09-13):    ║
+  ║  - "Worth a second look" and "Meter readings match the        ║
+  ║    photos" moved from Step 4 to Step 3. Both are about the    ║
+  ║    meters; under the unit-condition buttons they answered a   ║
+  ║    different question.                                        ║
+  ║  - The skip offer now appears on an ANOMALY and nothing else. ║
+  ║    The "stuck on the camera" trigger is gone (Lloyd's call     ║
+  ║    after using it live). Consequence, stated on purpose: a    ║
+  ║    cleaner who simply forgot, whose readings look normal, is  ║
+  ║    not offered a way out — she goes back and photographs      ║
+  ║    them. meterPhotoIsTheOnlyBlocker() is kept uncalled as the ║
+  ║    documented switch if that is ever wanted back.             ║
+  ║                                                              ║
   ║  CHANGELOG v8.4 — Zero movement (2026-09-13):                 ║
   ║  - The meter cross-check only ever looked UPWARD: too high a   ║
   ║    rate, or a negative delta. A reading identical to the       ║
@@ -4342,6 +4355,19 @@ body.mode-quick .detail-text { display: none; }
       <div class="photo-count-badge" id="photo-count-badge" role="status" aria-live="polite">
         <span id="photo-count-text">0 / 2 photos</span>
       </div>
+      <div id="meter-nudge" role="status" aria-live="polite" hidden>
+        <div class="mn-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> <strong>Worth a second look</strong></div>
+        <ul class="mn-list" id="meter-nudge-list"></ul>
+        <p class="mn-foot">If it is right as typed, carry on — this never blocks your report.</p>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);cursor:pointer;min-height:44px;">
+        <input type="checkbox" id="meterVerified" name="meterVerified" style="width:22px;height:22px;border-radius:6px;min-height:unset;flex-shrink:0;accent-color:var(--earthen-slate);">
+        <span style="font-size:var(--font-size-sm);font-weight:500;color:var(--text-primary);">
+          Meter readings match the photos
+        </span>
+      </label>
+
       <div id="meter-skip-row" hidden>
         <div class="ms-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> I could not photograph the meters</div>
         <input type="text" id="meter-skip-why" maxlength="200"
@@ -4394,18 +4420,6 @@ body.mode-quick .detail-text { display: none; }
         <img id="condition-photo-preview" class="issue-photo-preview" src="" alt="Condition photo preview">
       </div>
 
-      <div id="meter-nudge" role="status" aria-live="polite" hidden>
-        <div class="mn-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> <strong>Worth a second look</strong></div>
-        <ul class="mn-list" id="meter-nudge-list"></ul>
-        <p class="mn-foot">If it is right as typed, carry on — this never blocks your report.</p>
-      </div>
-
-      <label style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);cursor:pointer;min-height:44px;">
-        <input type="checkbox" id="meterVerified" name="meterVerified" style="width:22px;height:22px;border-radius:6px;min-height:unset;flex-shrink:0;accent-color:var(--earthen-slate);">
-        <span style="font-size:var(--font-size-sm);font-weight:500;color:var(--text-primary);">
-          Meter readings match the photos
-        </span>
-      </label>
     </div>
 
     <p id="p1-gate-hint" class="gate-hint" role="alert" aria-live="polite">
@@ -5826,12 +5840,6 @@ function isPhase4Valid() {
 }
 
 function showGateHint(phase) {
-  // Being stopped by a missing meter photo — and nothing else — is the
-  // "I forgot" case. Offer the way out at the moment it is actually needed,
-  // not before.
-  if (phase === 1 && meterPhotoIsTheOnlyBlocker()) {
-    revealMeterSkipOffer('blocked on a missing meter photo');
-  }
   // v6.8: warm nudge with specific missing item info
   const nudge = buildNudgeMessage(phase);
   if (nudge) {
@@ -6147,6 +6155,12 @@ function revealMeterSkipOffer(why) {
 
 // True when a missing meter photo is the only thing holding Phase 1 back.
 // A cleaner who has not filled in the readings is not stuck on the camera.
+//
+// NO LONGER CALLED as of 2026-09-13: Lloyd asked for the skip offer to appear
+// on an anomaly and nothing else. Kept because it is the exact predicate to
+// restore if the plain "I forgot the camera" case is ever wanted again — and
+// deleting it would mean rediscovering the "only" part, which is the subtle
+// half. Not dead weight; a documented switch.
 function meterPhotoIsTheOnlyBlocker() {
   if (state.cleaningType === 'emergency' || state.cleaningType === 'mid_stay') return false;
   const elec  = (el('electricMeterReading')?.value || '').trim();

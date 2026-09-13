@@ -135,13 +135,29 @@ test('the sign-in follow-up asks rather than accuses', () => {
   assert.match(html, /a late reading is worth more than none/);
 });
 
-test('the way out is hidden until the photos actually go wrong', () => {
-  // Lloyd, 2026-09-13: it must not be a standing offer. Two things earn it —
-  // a finding in the uploaded photos, or being stuck with the readings typed
-  // and the photo missing.
+test('the way out appears on an anomaly and nothing else', () => {
+  // Lloyd, 2026-09-13, after using it live: hidden by default, shown only when
+  // something is actually wrong with the uploaded photo or the reading. The
+  // earlier "stuck on the camera" trigger was removed on his instruction.
   assert.match(html, /if \(!state\.meterSkipRevealed && !state\.meterPhotosSkipped\) \{ row\.hidden = true; return; \}/);
   assert.match(html, /revealMeterSkipOffer\('meter photo findings'\)/);
-  assert.match(html, /revealMeterSkipOffer\('blocked on a missing meter photo'\)/);
+  assert.doesNotMatch(html, /revealMeterSkipOffer\('blocked on a missing meter photo'\)/);
+});
+
+test('the meter nudge and its confirmation live with the meters, not the unit condition', () => {
+  // Both are about the meters, so they sit in Step 3 with the meter photos.
+  // In Step 4 they sat under the unit-condition buttons, a different question.
+  const step3 = html.indexOf('Step 3 &mdash; Meter Photos') >= 0
+    ? html.indexOf('Step 3 &mdash; Meter Photos')
+    : html.indexOf('Step 3 — Meter Photos');
+  const step4  = html.indexOf('Step 4 — Unit Condition');
+  const nudge  = html.indexOf('id="meter-nudge"');
+  const verify = html.indexOf('id="meterVerified"');
+  const skip   = html.indexOf('id="meter-skip-row"');
+  assert.ok(step3 > -1 && step4 > step3, 'step markers not found in order');
+  for (const [name, at] of [['nudge', nudge], ['meterVerified', verify], ['skip row', skip]]) {
+    assert.ok(at > step3 && at < step4, `${name} should sit between Step 3 and Step 4`);
+  }
 });
 
 test('being stuck means the camera, not an empty form', () => {

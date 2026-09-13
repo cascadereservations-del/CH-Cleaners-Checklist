@@ -219,8 +219,17 @@ async function readMeter(b64: string, mime: string, which: Which): Promise<Visio
    no power of ten makes different digits agree. Loosening the tolerance
    instead would have hidden real differences. */
 function agreesAllowingForDecimalPoint(read: number, typed: number, tol: number): boolean {
+  // The prompt asks for the WHOLE cubic metres and to ignore the fraction
+  // dials, so a correct read of a 68.827 face is "68" — and comparing that to
+  // the typed 68.827 flagged a mismatch on the first full sweep. The fault was
+  // mine on both sides: the instruction and the comparison disagreed. The
+  // whole-number part of the typed reading is therefore an accepted answer.
+  const targets = [typed, Math.floor(typed)];
   for (let k = -2; k <= 3; k++) {
-    if (Math.abs(read / Math.pow(10, k) - typed) <= tol) return true;
+    const scaled = read / Math.pow(10, k);
+    for (const t of targets) {
+      if (Math.abs(scaled - t) <= tol) return true;
+    }
   }
   return false;
 }

@@ -17,8 +17,8 @@
 // switching is config, not a rewrite. Same contract either way.
 //
 //   VISION_PROVIDER    gemini (default) | openrouter
-//   GEMINI_BOT_KEY     shared with ocr-receipt; falls back to GEMINI_API_KEY
-//   OPENROUTER_API_KEY
+//   CASCADE_GEMINI_BOT_KEY       (falls back to GEMINI_BOT_KEY, GEMINI_API_KEY)
+//   CASCADE_OPENROUTER_BOT_KEY   (falls back to OPENROUTER_API_KEY)
 //   VISION_MODEL       optional per-provider override
 //   TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID   the OPS group, as everywhere else
 //
@@ -43,11 +43,24 @@ const PROPERTY_ID = '6ae230f4-c189-4547-84b1-cb6e0b2cc9bd';
 const BUCKET      = 'cleaning-photos';
 
 const PROVIDER       = (Deno.env.get('VISION_PROVIDER') ?? 'gemini').toLowerCase();
-const GEMINI_KEY     = Deno.env.get('GEMINI_BOT_KEY') ?? Deno.env.get('GEMINI_API_KEY') ?? '';
-const OPENROUTER_KEY = Deno.env.get('OPENROUTER_API_KEY') ?? '';
+// The keys were rotated on 2026-09-12 into the CASCADE_-prefixed names. The
+// older GEMINI_BOT_KEY and GEMINI_API_KEY secrets still exist but no longer
+// authenticate — the first real sweep failed with "API key not valid" against
+// them. Newest name first, old ones kept as a fallback so a rollback of the
+// rotation does not break this function.
+const GEMINI_KEY     = Deno.env.get('CASCADE_GEMINI_BOT_KEY')
+                    ?? Deno.env.get('GEMINI_BOT_KEY')
+                    ?? Deno.env.get('GEMINI_API_KEY') ?? '';
+const OPENROUTER_KEY = Deno.env.get('CASCADE_OPENROUTER_BOT_KEY')
+                    ?? Deno.env.get('OPENROUTER_API_KEY') ?? '';
 
-const GEMINI_MODEL     = Deno.env.get('VISION_MODEL') ?? 'gemini-2.5-flash';
-const OPENROUTER_MODEL = Deno.env.get('VISION_MODEL') ?? 'google/gemini-2.5-flash';
+// gemini-2.5-flash was copied from ocr-receipt and is now refused for new
+// callers: "no longer available to new users, please update to
+// models/gemini-3.6-flash". Copying a working sibling's model id is not the
+// same as checking the model is still offered. ocr-receipt is very likely in
+// the same position — worth testing a receipt.
+const GEMINI_MODEL     = Deno.env.get('VISION_MODEL') ?? 'gemini-3.6-flash';
+const OPENROUTER_MODEL = Deno.env.get('VISION_MODEL') ?? 'google/gemini-3.6-flash';
 
 // How far a read may sit from the typed number before it counts as a mismatch.
 // The failure worth catching is a wrong digit in a five-digit index, not a
@@ -157,7 +170,9 @@ async function readWithGemini(b64: string, mime: string, which: Which): Promise<
     signal: AbortSignal.timeout(55_000),
   });
   const raw = await res.json();
-  if (!res.ok) throw new Error(`gemini_${res.status}`);
+  // Keep the body. v1 threw `gemini_400` and discarded the reason, which made
+  // the first real failure in production undiagnosable from the stored row.
+  if (!res.ok) throw new Error(`gemini_${res.status}: ${JSON.stringify(raw).slice(0, 400)}`);
   return parseModelJson(raw?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '');
 }
 
@@ -180,7 +195,7 @@ async function readWithOpenRouter(b64: string, mime: string, which: Which): Prom
     signal: AbortSignal.timeout(55_000),
   });
   const raw = await res.json();
-  if (!res.ok) throw new Error(`openrouter_${res.status}`);
+  if (!res.ok) throw new Error(`openrouter_${res.status}: ${JSON.stringify(raw).slice(0, 400)}`);
   return parseModelJson(raw?.choices?.[0]?.message?.content ?? '');
 }
 
@@ -191,6 +206,23 @@ async function readMeter(b64: string, mime: string, which: Which): Promise<Visio
   }
   if (!GEMINI_KEY) throw new Error('GEMINI_BOT_KEY not set');
   return await readWithGemini(b64, mime, which);
+}
+
+/* A water meter face is number wheels plus fraction dials, and a reader can
+   easily return the digits without the decimal point: the 2026-09-03 report
+   recorded 70.873 m3 and the first sweep read the same face as "708", which
+   was recorded as a mismatch. The digits agree; only the decimal placement
+   differs, and that is a reading convention rather than a discrepancy.
+
+   So before calling a mismatch, try shifting the read by powers of ten. This
+   forgives 708 against 70.873 and still catches 3814 against 3832, because
+   no power of ten makes different digits agree. Loosening the tolerance
+   instead would have hidden real differences. */
+function agreesAllowingForDecimalPoint(read: number, typed: number, tol: number): boolean {
+  for (let k = -2; k <= 3; k++) {
+    if (Math.abs(read / Math.pow(10, k) - typed) <= tol) return true;
+  }
+  return false;
 }
 
 // One verdict for the pair. The order is deliberate: "not a meter" outranks
@@ -205,8 +237,16 @@ function verdictFor(
   const lines: string[] = [];
   let notMeter = false, mismatch = false, unreadable = false;
 
+  // v2: a null result means NO PHOTO WAS FOUND, and v1 returned early on it —
+  // so a report with no meter photos in Storage at all came back "ok". Absent
+  // evidence scored as verified evidence, which is the worst possible way for
+  // a verification layer to be wrong. It is now stated plainly.
   const one = (label: string, typed: number | null, r: VisionResult | null, tol: number) => {
-    if (!r) return;
+    if (!r) {
+      unreadable = true;
+      lines.push(`${label}: no meter photo found in storage for this report`);
+      return;
+    }
     if (!r.is_meter) {
       notMeter = true;
       lines.push(`${label}: the photo does not look like a meter${r.note ? ` — ${r.note}` : ''}`);
@@ -217,7 +257,7 @@ function verdictFor(
       lines.push(`${label}: could not be read with confidence${r.note ? ` — ${r.note}` : ''}`);
       return;
     }
-    if (typed !== null && Math.abs(r.reading - typed) > tol) {
+    if (typed !== null && !agreesAllowingForDecimalPoint(r.reading, typed, tol)) {
       mismatch = true;
       lines.push(`${label}: the photo reads ${r.reading}, the report says ${typed}`);
     }
@@ -283,8 +323,14 @@ Deno.serve(async (req: Request) => {
   const results: any[] = [];
 
   for (const t of targets) {
+    // Photos filed before the 2026-09-12 Storage fix carry no submission id in
+    // their path, so they are matched by upload time instead — NOT by the date
+    // folder, which is the app's upload date and collides when two reports
+    // share a day. That collision produced a false mismatch against the
+    // cleaner on the first sweep; see sql/2026-09-13c.
     const { data: objects, error: objErr } = await db.rpc('get_meter_photo_objects', {
       p_submission_id: t.submission_id,
+      p_cleaned_at: t.cleaned_at ?? null,
     });
     if (objErr) { results.push({ submission_id: t.submission_id, error: objErr.message }); continue; }
 
@@ -298,7 +344,11 @@ Deno.serve(async (req: Request) => {
       const { data: blob, error } = await db.storage.from(BUCKET).download(path);
       if (error || !blob) return { ...EMPTY, note: 'photo could not be downloaded' };
       const b64 = bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
-      return await readMeter(b64, blob.type || 'image/jpeg', which);
+      // A download can arrive as application/octet-stream. Every meter photo
+      // this app writes is a JPEG, and the providers reject a non-image type
+      // outright, so fall back rather than forward a type they will refuse.
+      const mime = /^image\//.test(blob.type || '') ? blob.type : 'image/jpeg';
+      return await readMeter(b64, mime, which);
     };
 
     let e: VisionResult | null = null;

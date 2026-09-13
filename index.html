@@ -6,6 +6,26 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.6 — Rota, staff list, flagged photos (26-09-13):║
+  ║  - WEEKLY DEEP MAINTENANCE IS NOW A ROTA. Fourteen tasks in   ║
+  ║    one weekend is a day nobody has. Each belongs to a week of  ║
+  ║    the month and only that week's set is asked for — split by  ║
+  ║    effort, one heavy task per week, biweekly items in weeks    ║
+  ║    1 and 3. Week 5 folds into week 4.                          ║
+  ║  - The "Waiting for Check In" automation is properly           ║
+  ║    highlighted: gold spine, bold text, DO THIS LAST badge. It  ║
+  ║    had `highlight: true` already, rendering as a 10%-opacity   ║
+  ║    tint nobody could see.                                      ║
+  ║  - THE SIGN-IN NAME LIST COMES FROM THE STAFF RECORDS, not     ║
+  ║    the HTML. One cleaner: no dropdown, "Signing in as X".      ║
+  ║    Two or more: the dropdown. Zero, or the call fails: the     ║
+  ║    hard-coded fallback, so an offline phone still signs in.    ║
+  ║  - Code.gs v3.9 (NOT INSTALLED — manual paste, see D-085):     ║
+  ║    a meter photo the checks distrusted is filed in the         ║
+  ║    report's 99_FLAGGED folder, renamed FLAGGED_*, with the     ║
+  ║    reason in the Drive file description. One Drive search      ║
+  ║    — title contains "FLAGGED_" — gathers every one of them.    ║
+  ║                                                              ║
   ║  CHANGELOG v8.5 — Step 3 gets its own evidence (26-09-13):    ║
   ║  - "Worth a second look" and "Meter readings match the        ║
   ║    photos" moved from Step 4 to Step 3. Both are about the    ║
@@ -1825,11 +1845,25 @@ body.mode-quick .detail-text { display: none; }
   margin-left: 4px;
 }
 
-/* Item variant: highlight */
+/* Item variant: highlight. Strengthened 2026-09-13 — it was a 10%-opacity
+   tint, invisible on a page of cream cards, on the one task that decides
+   whether the unit is actually ready for the arriving guest. */
 .checklist-item.highlight {
-  border-color: #C6AC8E;
+  border-color: var(--bronze);
   border-width: 1.5px;
-  background: rgba(198,172,142,0.10);
+  border-left-width: 5px;
+  background: var(--accent-soft);
+  box-shadow: 0 2px 10px rgba(201,150,58,.14);
+}
+.checklist-item.highlight .item-text { font-weight: 700; }
+.item-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: 8px; padding: 2px 9px;
+  border-radius: 100px;
+  background: var(--mahogany); color: var(--gold);
+  font-size: .66rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  vertical-align: middle; white-space: nowrap;
 }
 
 /* Item variant: critical — safety or operationally vital */
@@ -3577,6 +3611,9 @@ body.mode-quick .detail-text { display: none; }
 }
 .pin-card p { margin:0 0 22px; color:var(--text-secondary); font-size:.88rem; line-height:1.45; }
 
+/* display:block beats the [hidden] attribute, so the label kept showing over
+   a control that was not there. */
+.auth-name-label[hidden] { display: none !important; }
 .auth-name-label {
   display:block; text-align:left; font-size:.75rem; font-weight:600;
   letter-spacing:.05em; text-transform:uppercase; color:var(--text-muted);
@@ -3600,6 +3637,14 @@ body.mode-quick .detail-text { display: none; }
   box-shadow: 0 0 0 3px rgba(201,150,58,.15);
 }
 #auth-name-manual::placeholder { color:var(--text-muted); }
+
+/* The single-cleaner case: a statement, not a question. */
+#auth-single-name {
+  margin: 0 0 22px;
+  font-size: .95rem; font-weight: 600;
+  color: var(--text-primary); text-align: center;
+}
+#auth-single-name[hidden] { display: none !important; }
 
 .pin-dots { display:flex; justify-content:center; gap:14px; margin-bottom:26px; height:16px; }
 .pin-dot {
@@ -3881,11 +3926,15 @@ body.mode-quick .detail-text { display: none; }
     <p class="pin-subtitle">Cleaning Checklist</p>
     <p class="pin-prompt-line">Choose your name, then enter your PIN</p>
     <label class="auth-name-label" for="auth-name-select">Your name</label>
+    <!-- The options are replaced at load from the staff records
+         (get_checklist_staff_names). What is written here is the fallback for
+         an offline or ahead-of-the-database page, not the source of truth. -->
     <select id="auth-name-select" class="auth-name-select">
       <option value="" disabled selected>Choose your name…</option>
       <option value="Honey">Honey</option>
       <option value="__other__">Other / not listed…</option>
     </select>
+    <p id="auth-single-name" hidden></p>
     <input type="text" id="auth-name-manual" placeholder="Type your name" autocomplete="username" autocapitalize="none" hidden>
     <div class="pin-dots" id="auth-pin-dots" aria-hidden="true">
       <span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span><span class="pin-dot"></span>
@@ -5093,6 +5142,67 @@ function restoreLastLogin() {
   }
 }
 
+/* The sign-in list comes from the staff records, not the HTML (Lloyd,
+   2026-09-13). Adding a cleaner used to mean editing and redeploying this
+   page; now she appears by existing.
+
+   Three shapes, because one name is not a choice:
+     0 names, or the call fails — leave the hard-coded fallback alone. An
+       offline phone, or a page ahead of the database, must still sign in.
+     1 name  — no dropdown at all. It is selected, the control is hidden, and
+       the card simply says who is signing in. Asking someone to pick from a
+       list of one is a question with no information in it.
+     2+      — the dropdown, which is what Lloyd asked for.
+
+   "Other / not listed…" survives every case; it is the way in for anyone the
+   records do not know about yet. */
+async function loadStaffNames() {
+  const select = el('auth-name-select');
+  if (!select || !navigator.onLine) return;
+  let names = [];
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_checklist_staff_names`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}`,
+                 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!resp.ok) return;                       // not applied yet: keep the fallback
+    const rows = await resp.json();
+    names = (Array.isArray(rows) ? rows : [])
+      .map(r => String(r.display_name || '').trim())
+      .filter(Boolean);
+  } catch {
+    return;                                     // offline or blocked: keep the fallback
+  }
+  if (!names.length) return;
+
+  const remembered = select.value;
+  select.innerHTML =
+    '<option value="" disabled selected>Choose your name…</option>' +
+    names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
+    '<option value="__other__">Other / not listed…</option>';
+
+  const single = el('auth-single-name');
+  if (names.length === 1) {
+    select.value = names[0];
+    select.hidden = true;
+    const label = document.querySelector('.auth-name-label');
+    if (label) label.hidden = true;
+    if (single) {
+      single.textContent = `Signing in as ${names[0]}`;
+      single.hidden = false;
+    }
+    const prompt = document.querySelector('.pin-prompt-line');
+    if (prompt) prompt.textContent = 'Enter your PIN';
+  } else {
+    select.hidden = false;
+    if (single) single.hidden = true;
+    // Re-select whatever was remembered, if that person is still on the list.
+    if (remembered && names.includes(remembered)) select.value = remembered;
+  }
+}
+
 function wireAuthNameSelect() {
   el('auth-name-select')?.addEventListener('change', e => {
     const manual = el('auth-name-manual');
@@ -5300,6 +5410,9 @@ async function initStaffAuth() {
 
   wireAuthNameSelect();
   restoreLastLogin();
+  // Not awaited: the gate must appear instantly, and the fallback list is
+  // already usable. The real list replaces it a moment later.
+  loadStaffNames();
   gate.hidden = false;
   return await new Promise(resolve => {
     createPinInput({
@@ -5459,7 +5572,8 @@ const CONFIRM_LEAVE_ITEMS = [
 ];
 
 const POWER_CHECK_ITEMS = [
-  { id: 'check_smartlife_waiting', text: 'Turn on the "Waiting for Check In" automation in SmartLife', highlight: true,
+  { id: 'check_smartlife_waiting', text: 'Turn on the "Waiting for Check In" automation in SmartLife',
+    highlight: true, badge: 'Do this last',
     detail: 'Open the SmartLife app on your phone, tap Smart at the bottom, then Automations at the top, and tick the switch next to "Waiting for Check In" so it turns on. This is what gets the unit ready for the arriving guest — do it as the last thing before you lock up. If the switch will not stay on, flag it here.' },
   { id: 'check_ecoflow_stowed', text: 'EcoFlow RIVER 3 stowed in its spot, cable tidy',
     detail: 'After confirming it is charged, place the EcoFlow RIVER 3 back in its designated spot with the charging cable coiled neatly. Confirm it is present and undamaged. It is not borrowable and must stay in the unit at all times — flag immediately if it is missing.' },
@@ -5467,34 +5581,57 @@ const POWER_CHECK_ITEMS = [
     detail: 'Double-check every window is latched. Test the door lock. Turn off all lights.' },
 ];
 
+/* Deep maintenance is scheduled across the month, not piled into one weekend
+   (Lloyd, 2026-09-13). Every task carries the week it belongs to; only that
+   week's set is asked for. Weeks are counted from the cleaning date, so the
+   rota follows the calendar rather than how often anyone happens to clean.
+
+   Week 5 does not exist: a month's tail end folds into week 4 rather than
+   inventing a fifth set nobody planned. */
+const WEEKLY_WEEK_COUNT = 4;
+
+function weekOfMonth(dateStr) {
+  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+  if (isNaN(d)) return 1;
+  return Math.min(WEEKLY_WEEK_COUNT, Math.ceil(d.getDate() / 7));
+}
+
+// The tasks actually being asked for this session. Everything that counts,
+// renders or reports goes through here; WEEKLY_ITEMS stays whole so a restored
+// draft can still resolve an id from another week.
+function weeklyItemsForSession() {
+  const wk = weekOfMonth(el('cleaningDate')?.value || state.cleaningDate || '');
+  return WEEKLY_ITEMS.filter(i => i.week === wk);
+}
+
 const WEEKLY_ITEMS = [
-  { id: 'weekly_1',  text: 'Deep-vacuum sofa & mattress with dust-mite vacuum',
+  { id: 'weekly_1', week: 1,  text: 'Deep-vacuum sofa & mattress with dust-mite vacuum',
     detail: 'Use the handheld dust-mite vacuum with the fabric attachment. Do both sides of every sofa cushion, the backrest, and the full mattress surface. Spend at least 2 minutes per section — slow passes are more effective.' },
-  { id: 'weekly_2',  text: 'Empty vacuum dust collector & clean its filter',
+  { id: 'weekly_2', week: 1,  text: 'Empty vacuum dust collector & clean its filter',
     detail: 'Remove the dust canister, empty completely into the bin, and tap the pleated filter firmly to dislodge trapped dust. Wipe the canister clean with a dry cloth. Do not wet-wash the filter unless it is labelled washable — let any rinsed filter dry fully before reinserting.' },
-  { id: 'weekly_3',  text: 'Deep-clean refrigerator inside & out', disinfect: true,
+  { id: 'weekly_3', week: 2,  text: 'Deep-clean refrigerator inside & out', disinfect: true,
     detail: 'Remove all shelves and drawers, wash them, wipe the interior walls, and clean the door seals.' },
-  { id: 'weekly_4',  text: 'Wash & dry AC filters completely before reinstalling', disinfect: true,
+  { id: 'weekly_4', week: 3,  text: 'Wash & dry AC filters completely before reinstalling', disinfect: true,
     detail: 'Remove filter from AC unit, wash under running water, let dry fully before re-inserting.' },
-  { id: 'weekly_5',  text: 'Clean air purifier — vacuum filter & wipe exterior',
+  { id: 'weekly_5', week: 2,  text: 'Clean air purifier — vacuum filter & wipe exterior',
     detail: 'Use the vacuum\'s brush attachment to remove dust from the intake grille and pre-filter. Wipe the entire exterior with a damp cloth. Do not remove or wash the internal HEPA filter — only the outer pre-filter ring is user-removable and rinseable.' },
-  { id: 'weekly_6',  text: 'Descale the iron steamer — remove mineral buildup',
+  { id: 'weekly_6', week: 4,  text: 'Descale the iron steamer — remove mineral buildup',
     detail: 'Use a descaling sachet or white vinegar solution. Follow the steamer\'s descale procedure.' },
-  { id: 'weekly_7',  text: 'Vacuum behind & under all furniture',
+  { id: 'weekly_7', week: 3,  text: 'Vacuum behind & under all furniture',
     detail: 'Pull out the bed, sofa, and wardrobe far enough to vacuum behind. Pay special attention to wall edges and corners — dust and debris accumulate fastest in these spots. Push furniture back fully and straight after cleaning.' },
-  { id: 'weekly_8',  text: 'Swap sofa cover & mattress protector', biweekly: true,
+  { id: 'weekly_8', week: 1,  text: 'Swap sofa cover & mattress protector', biweekly: true,
     detail: 'Replace with a fresh set from storage. Send used ones for laundering.' },
-  { id: 'weekly_9',  text: 'Liquid sosa drain treatment (no guest next day only)', biweekly: true,
+  { id: 'weekly_9', week: 3,  text: 'Liquid sosa drain treatment (no guest next day only)', biweekly: true,
     detail: 'Only if no guest is arriving the following day. Pour into all floor drains as directed.' },
-  { id: 'weekly_10', text: 'Check smart lock battery — replace if low or blinking', flag: true,
+  { id: 'weekly_10', week: 1, text: 'Check smart lock battery — replace if low or blinking', flag: true,
     detail: 'When the smart lock battery is low, the keypad backlight dims and the lock may beep a warning tone. Replace with fresh AA batteries from the supply box (stored in the utility area). Always flag if replaced so the property manager can restock.' },
-  { id: 'weekly_11', text: 'Clear floor drains — shower & kitchen sink',
+  { id: 'weekly_11', week: 2, text: 'Clear floor drains — shower & kitchen sink',
     detail: 'Remove the drain cover, clear any buildup, replace cover.' },
-  { id: 'weekly_12', text: 'Test every light bulb — replace any burnt or flickering', flag: true,
+  { id: 'weekly_12', week: 3, text: 'Test every light bulb — replace any burnt or flickering', flag: true,
     detail: 'Turn on every switch and lamp in the unit. Walk through and look for any bulb that is fully out, flickering, or noticeably dimmer than the others. Flag any replaced bulbs so the property manager can restock.' },
-  { id: 'weekly_13', text: 'Wipe wall scuffs, door frames, switch plates & skirting',
+  { id: 'weekly_13', week: 4, text: 'Wipe wall scuffs, door frames, switch plates & skirting',
     detail: 'Use a damp magic eraser or cloth on any marks on the walls.' },
-  { id: 'weekly_14', text: 'Inspect for mold & pest signs under sinks and balcony', flag: true,
+  { id: 'weekly_14', week: 4, text: 'Inspect for mold & pest signs under sinks and balcony', flag: true,
     detail: 'Check under both sinks and on the balcony corners. Flag any mold, discoloration, or pest signs immediately.' },
 ];
 
@@ -7842,6 +7979,9 @@ function buildItemHTML(item) {
     textHTML = textHTML.replace(/^BIWEEKLY:\s*/i, '');
     textHTML = `<span class="biweekly-badge">Biweekly</span> ${textHTML}`;
   }
+  // A badge is independent of criticality — the SmartLife automation is not a
+  // safety item but it is the one that decides whether the unit is ready.
+  if (item.badge) textHTML += ` <span class="item-badge">${esc(item.badge)}</span>`;
   if (item.critical) {
     textHTML += ` <span class="critical-badge"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Critical</span>`;
   }
@@ -8288,8 +8428,9 @@ function calcProgress(phase) {
       let done  = all.filter(i => state.checklist[i.id]).length;
       done += CONFIRM_LEAVE_ITEMS.filter(i => state.confirmItems[i.id]).length;
       if (state.isWeeklyIncluded) {
-        total += WEEKLY_ITEMS.length;
-        done  += WEEKLY_ITEMS.filter(i => state.checklist[i.id]).length;
+        const weeklyNow = weeklyItemsForSession();
+        total += weeklyNow.length;
+        done  += weeklyNow.filter(i => state.checklist[i.id]).length;
       }
       return total > 0 ? Math.round((done / total) * 100) : 0;
     }
@@ -8302,7 +8443,7 @@ function getAllChecklistItems() {
     ...ARRIVE_ITEMS, ...CHEMICAL_ITEMS,
     ...BEDROOM_ITEMS, ...KITCHEN_ITEMS,
     ...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS,
-    ...(state.isWeeklyIncluded ? WEEKLY_ITEMS : []),
+    ...(state.isWeeklyIncluded ? weeklyItemsForSession() : []),
   ];
 }
 
@@ -8857,7 +8998,10 @@ function buildEmailHtml() {
   ];
 
   if (state.isWeeklyIncluded) {
-    sections.push({ title: 'Weekly Deep Maintenance', items: WEEKLY_ITEMS });
+    sections.push({
+      title: `Weekly Deep Maintenance — week ${weekOfMonth(cleaningDate)} of the month`,
+      items: weeklyItemsForSession(),
+    });
   }
 
   // CSS palette for email (no color-mix, explicit hex)
@@ -9101,7 +9245,9 @@ function buildPayload() {
     { title: 'Bedroom & Living Room', icon: '🛏️', items: BEDROOM_ITEMS },
     { title: 'Kitchen & Bathroom', icon: '🍳', items: KITCHEN_ITEMS },
     { title: 'Final Cleaning', icon: '🧹', items: [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS] },
-    ...(state.isWeeklyIncluded ? [{ title: 'Weekly Deep Maintenance', icon: '📋', items: WEEKLY_ITEMS }] : []),
+    ...(state.isWeeklyIncluded
+      ? [{ title: `Weekly Deep Maintenance — week ${weekOfMonth(cleaningDate)}`, icon: '📋', items: weeklyItemsForSession() }]
+      : []),
   ].map(sec => ({
     title: sec.title,
     icon:  sec.icon,
@@ -9586,7 +9732,7 @@ function renderAllItems() {
   renderItems(KITCHEN_ITEMS,        'kitchen-items');
   renderItems(FINAL_CLEANING_ITEMS, 'final-cleaning-items');
   renderItems(POWER_CHECK_ITEMS,    'power-check-items');
-  renderItems(WEEKLY_ITEMS,         'weekly-items-list');
+  renderItems(weeklyItemsForSession(), 'weekly-items-list');
   initPhaseCheckAll();
 }
 

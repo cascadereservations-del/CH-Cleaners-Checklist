@@ -308,6 +308,43 @@ function _photoFileName(sectionId, index, reading) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  FLAGGED PHOTOS  (v3.9 — 2026-09-13)
+// ═══════════════════════════════════════════════════════════════════
+// A meter photo the app could not trust — a screenshot, an image with no
+// camera data, one the size of the phone's screen, or a file older than the
+// cleaning — is filed apart from the real record instead of sitting beside it.
+//
+// Lloyd's reason: so they can later be deleted or separated from the main
+// photos without picking through every report. Three things make that easy:
+//   1. they go in a "99_FLAGGED" subfolder of the report, not the section folder
+//   2. the file name is prefixed "FLAGGED_", so a single Drive search
+//      — title contains "FLAGGED_" — gathers every one of them, ever
+//   3. the Drive file description carries the reason, so a human can tell a
+//      screenshot from a stale photo without opening it
+//
+// They are kept, not dropped. A photo the checks disliked can still be the
+// only evidence of something, and this never blocked the report (D-084).
+//
+// Note the limit honestly: this uses the checks the BROWSER could make at
+// upload time. The vision verdict is written later, by verify-meter-photo,
+// and lives in Supabase — it is not known when this code runs.
+function _flaggedMeterIndexes(meterChecks) {
+  const flagged = {};
+  if (!meterChecks) return flagged;
+  const prov = meterChecks.provenance || [];
+  for (var i = 0; i < 2; i++) {
+    const pr = prov[i];
+    if (!pr) continue;
+    const reasons = [];
+    if (pr.isPng)       reasons.push('png-not-a-camera-file');
+    if (pr.screenSized) reasons.push('screen-sized');
+    if (!pr.hasExif)    reasons.push('no-camera-data');
+    if (reasons.length) flagged[i] = reasons.join(', ');
+  }
+  return flagged;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  ACTION: INIT — create dated photo subfolder in Drive (v3.7)
 // ═══════════════════════════════════════════════════════════════════
 function _handleInit(e) {
@@ -448,6 +485,10 @@ function _handleSubmit(payload, subId) {
     reportFolder = _reportFolder(cleaningDate, unitName, cleanerName);
   }
 
+  // v3.9: which meter photos the browser's checks distrusted, and why.
+  const flaggedMeters = _flaggedMeterIndexes(payload.meterChecks);
+  var flaggedFolder = null;   // made only if something is actually flagged
+
   // ── Upload photos to Drive (v3.8: supports Storage URL + legacy base64) ──
   const photoLinks = {};
   for (const sectionId in photos) {
@@ -466,6 +507,10 @@ function _handleSubmit(payload, subId) {
           ? (i === 0 ? electricReading : waterReading)
           : null;
         var fileName = _photoFileName(sectionId, i, meterValue);
+
+        // v3.9: a distrusted meter photo is renamed and filed apart.
+        var flagReason = (sectionId === 'meterPhotos') ? flaggedMeters[i] : null;
+        if (flagReason) fileName = 'FLAGGED_' + fileName;
 
         if (photo.data) {
           // ── Legacy path: base64 embedded in payload ──────────
@@ -487,7 +532,26 @@ function _handleSubmit(payload, subId) {
           return; // no data and no url — skip
         }
 
-        var file = sectionFolder.createFile(blob);
+        // v3.9: a flagged photo goes into the report's own 99_FLAGGED
+        // folder rather than the section folder, and carries its reason in the
+        // Drive file description so it can be judged without being opened.
+        var targetFolder = sectionFolder;
+        if (flagReason) {
+          if (!flaggedFolder) flaggedFolder = _childFolder(reportFolder, '99_FLAGGED');
+          targetFolder = flaggedFolder;
+        }
+
+        var file = targetFolder.createFile(blob);
+        if (flagReason) {
+          try {
+            file.setDescription(
+              'FLAGGED by the cleaning checklist on upload: ' + flagReason +
+              '. Kept for the record, not trusted as evidence. Safe to delete in bulk — ' +
+              'search Drive for: title contains "FLAGGED_"');
+          } catch (descErr) {
+            Logger.log('Could not set description on flagged photo: ' + descErr);
+          }
+        }
         // Share so email recipients can open each photo link directly.
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 

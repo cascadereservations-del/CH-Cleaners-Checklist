@@ -311,8 +311,8 @@ function _photoFileName(sectionId, index, reading) {
 //  FLAGGED PHOTOS  (v3.9 — 2026-09-13)
 // ═══════════════════════════════════════════════════════════════════
 // A meter photo the app could not trust — a screenshot, an image with no
-// camera data, one the size of the phone's screen, or a file older than the
-// cleaning — is filed apart from the real record instead of sitting beside it.
+// camera data, one the size of the phone's screen — is filed apart from the
+// real record instead of sitting beside it.
 //
 // Lloyd's reason: so they can later be deleted or separated from the main
 // photos without picking through every report. Three things make that easy:

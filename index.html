@@ -9229,8 +9229,10 @@ function buildPayload() {
 
   const elecNum  = parseFloat(electricVal);
   const waterNum = parseFloat(waterVal);
-  const prevE    = state.prevElectricReading;
-  const prevW    = state.prevWaterReading;
+  // Session 27 (2026-09-17): a zero "previous" is unknown, not a meter reading (Honey's 16 Sep second
+  // turnover went out with prev = 0). submit-cleaning v30 recomputes the deltas from its latest stored reading anyway.
+  const prevE    = state.prevElectricReading > 0 ? state.prevElectricReading : null;
+  const prevW    = state.prevWaterReading    > 0 ? state.prevWaterReading    : null;
   const deltaKwh = (prevE !== null && !isNaN(elecNum))  ? +(elecNum  - prevE).toFixed(2)  : null;
   const deltaM3  = (prevW !== null && !isNaN(waterNum)) ? +(waterNum - prevW).toFixed(3)  : null;
   const nights   = state.numberOfNights;
@@ -9471,6 +9473,9 @@ async function proceedWithSubmission() {
   // and use that folder instead of creating a new one. The field is already sent.
   await ensureSessionFolder().catch(() => {});
 
+  // Session 27: refresh "previous" right before building the payload - the page-load value is stale
+  // when another turnover was submitted since (16 Sep: two turnovers ten minutes apart).
+  await fetchPrevReadings().catch(() => {});
   const payload = buildPayload();
   payload.propertyId = PROPERTY_ID;
 

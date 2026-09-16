@@ -4428,7 +4428,13 @@ const MIDSTAY_PHOTO_MAX      = 8;
 // ── Supply log (v6.8) ────────────────────────────────────────────────────
 const LIQUID_ML_PER_UNIT = 100; // 100 ml = 1 inventory unit for liquid refills
 // Names of "quick" items shown with stepper (case-insensitive substring match)
-const QUICK_ITEM_NAMES = ['coffee', 'bottled water', 'toiletries', 'tissue', 'coffee stick'];
+const QUICK_ITEM_NAMES = ['coffee', 'bottled water', 'toiletries', 'tissue', 'coffee stick', 'sugar'];
+// Session 25 S6/S7 (2026-09-16): the supply log no longer needs a connection. The catalogue
+// is cached per phone, usage rows are staged in the draft and posted right after the report
+// is filed (so they carry cleaning_session_id), and anything that fails to post waits for
+// the next online moment.
+const SUS_CACHE_KEY   = 'ch_sus_items_v1';
+const SUS_PENDING_KEY = 'ch_sus_pending_v1';
 
 // ── Photo quality thresholds (Feature 2) ─────────────────────────────────
 const BLUR_THRESHOLD    = 45;  // C3: lowered from 80 — post-compression Laplacian variance is naturally lower
@@ -5083,6 +5089,7 @@ const state = {
   submissionId:       null,
   isSubmitting:       false,
   pendingOnlineRetry: false,
+  supplyRows:         [],           // usage rows staged by the supply log; posted after submit (S7)
   weekendMandatory:   false,
   elapsedInterval:    null,
   dwellInterval:      null,
@@ -7341,6 +7348,7 @@ function initOfflineDetection() {
 
   window.addEventListener('online', () => {
     updateOnlineStatus();
+    flushPendingSupplyUsage();
     if (state.pendingOnlineRetry && !state.isSubmitting) {
       // Client-side dedup guard [FD-002]: skip retry if this session already succeeded.
       // Prevents double-write when Code.gs v3.6 lacks server-side submissionId dedup.
@@ -7426,6 +7434,7 @@ function saveDraft() {
     confirmItems:    { ...state.confirmItems },
     confirmNotes:    { ...state.confirmNotes },
     supplyLogSaved:  state.supplyLogSaved,
+    supplyRows:      state.supplyRows,
     cleaningType:    state.cleaningType || 'turnover',
     extraExpenses:   collectExtraExpenses(),
     sessionFolderId: state.sessionFolderId,
@@ -7493,6 +7502,7 @@ function applyDraft(draft) {
   state.sessionFolderUrl  = draft.sessionFolderUrl  || null;
   state.numberOfNights    = draft.numberOfNights || 0;
   state.supplyLogSaved    = draft.supplyLogSaved  || false;
+  state.supplyRows        = Array.isArray(draft.supplyRows) ? draft.supplyRows : [];
   if (draft.cleaningType) setCleaningType(draft.cleaningType);
   // v7.8: restore additional expense lines
   if (Array.isArray(draft.extraExpenses) && draft.extraExpenses.length) {
@@ -8345,6 +8355,7 @@ async function proceedWithSubmission() {
       }
       state.isSubmitting = false;
       document.body.classList.remove('submitting');
+      await postSupplyUsage(data.sessionId);
       clearDraft();
       ls(DWELL_KEY, null);
       if (state.dwellInterval) clearInterval(state.dwellInterval);
@@ -8660,18 +8671,25 @@ async function loadSupplyItems() {
 
   if (loadingEl) { loadingEl.style.display = 'block'; loadingEl.textContent = 'Loading supplies…'; }
 
-  if (!navigator.onLine) {
-    if (loadingEl) loadingEl.textContent = '📵 No connection — open again when online to log supplies.';
-    return;
-  }
+  flushPendingSupplyUsage();
 
   try {
-    const url = `${SUPABASE_URL}/rest/v1/inventory_items?property_id=eq.${PROPERTY_ID}&is_active=eq.true&is_consumable=eq.true&select=id,name,category,qty_on_hand,reorder_below,consumption_per_booking&order=name.asc`;
-    const resp = await fetch(url, {
-      headers: { ...(await staffHeaders()), 'Accept': 'application/json' },
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const items = await resp.json();
+    let items = null;
+    if (!navigator.onLine) {
+      try { items = JSON.parse(ls(SUS_CACHE_KEY) || 'null'); } catch { items = null; }
+      if (!Array.isArray(items) || !items.length) {
+        if (loadingEl) loadingEl.textContent = '📵 No connection and no saved supply list yet — open this once while online, then it works offline.';
+        return;
+      }
+    } else {
+      const url = `${SUPABASE_URL}/rest/v1/inventory_items?property_id=eq.${PROPERTY_ID}&is_active=eq.true&is_consumable=eq.true&select=id,name,category,qty_on_hand,reorder_below,consumption_per_booking&order=name.asc`;
+      const resp = await fetch(url, {
+        headers: { ...(await staffHeaders()), 'Accept': 'application/json' },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      items = await resp.json();
+      ls(SUS_CACHE_KEY, JSON.stringify(items));
+    }
 
     _susItems = items.map(item => {
       const isLiquid = isLiquidItem(item.name, item.category);
@@ -8683,12 +8701,13 @@ async function loadSupplyItems() {
         isLiquid,
         isQuick,
         isExtra: false,
-        // v6.8: ALL items pre-filled with typical consumption — cleaner adjusts if needed.
-        // Hidden optional items are still counted unless manually zeroed or "Nothing used" tapped.
-        usedQty: !isLiquid
+        // S7 (2026-09-16): only the visible Everyday Items are pre-filled. Hidden optional
+        // items start at 0 — v6.8 pre-filled them all and Save wrote usage for items the
+        // cleaner never saw, which is why every consumable "used exactly 2" per turnover.
+        usedQty: (!isLiquid && isQuick)
                  ? Math.max(0, defaultCpb)  // stepper items: typical qty
                  : 0,
-        usedMl:  isLiquid
+        usedMl:  (isLiquid && isQuick)
                  ? Math.max(0, defaultCpb * LIQUID_ML_PER_UNIT)  // liquid: typical ml
                  : 0,
       };
@@ -8858,12 +8877,6 @@ async function saveSupplyUsage() {
     return (i.usedQty || 0) > 0;
   });
 
-  if (!navigator.onLine) {
-    showToast('📵 No connection — usage not saved', 'error', 5000); return;
-  }
-
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
-
   const sessionDate = el('cleaningDate')?.value || todayManila();
   const loggedBy    = (el('cleanerName')?.value || '').trim() || 'cleaner';
 
@@ -8880,37 +8893,57 @@ async function saveSupplyUsage() {
       submitted_by_user_id: staffSession.user.id,
     }));
 
-  try {
-    if (rows.length > 0) {
-      const resp = await fetch(`${SUPABASE_URL}/rest/v1/inventory_usage`, {
-        method:  'POST',
-        headers: {
-          ...(await staffHeaders(true)), 'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify(rows),
-      });
-      if (!resp.ok) throw new Error(await resp.text().catch(() => `HTTP ${resp.status}`));
-    }
+  // S6/S7: stage the rows; they are posted with the report (see postSupplyUsage) so each
+  // carries cleaning_session_id and no connection is needed here.
+  state.supplyRows = rows;
+  state.supplyLogSaved = true;
+  saveDraft();
+  const card = el('supply-usage-trigger-card');
+  if (card) card.classList.add('sus-done');
+  updateBottomBar();
 
-    // Mark supply log as saved (compulsory gate)
-    state.supplyLogSaved = true;
-    const card = el('supply-usage-trigger-card');
-    if (card) card.classList.add('sus-done');
-    updateBottomBar();
-
-    const msg = used.length > 0
-      ? `✓ Usage saved for ${used.length} item${used.length !== 1 ? 's' : ''}`
-      : '✓ Usage logged — none used this session';
-    showToast(msg, 'success', 3500);
-    closeSupplyUsageSheet();
-    _susLoaded = false; // re-fetch next open for updated stock
-
-  } catch (err) {
-    showToast(`⚠ Save failed: ${err.message || 'network error'}`, 'error', 5000);
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Usage'; }
-  }
-
+  const msg = rows.length > 0
+    ? `✓ Usage noted for ${rows.length} item${rows.length !== 1 ? 's' : ''} — saved with your report`
+    : '✓ Usage logged — none used this session';
+  showToast(msg, 'success', 3500);
+  closeSupplyUsageSheet();
+  _susLoaded = false; // re-fetch next open for updated stock
   if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Usage'; }
+}
+
+// Posts the staged usage rows once the report is filed (called from the submit success path).
+// A failed post is parked in localStorage and retried on the next online moment or the next
+// time the supply sheet opens — the report itself is already recorded either way.
+async function postSupplyUsage(sessionId) {
+  const rows = (state.supplyRows || []).map(r => ({ ...r, cleaning_session_id: sessionId || null }));
+  if (!rows.length) return;
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/inventory_usage`, {
+      method:  'POST',
+      headers: { ...(await staffHeaders(true)), 'Prefer': 'return=minimal' },
+      body:    JSON.stringify(rows),
+    });
+    if (!resp.ok) throw new Error(await resp.text().catch(() => `HTTP ${resp.status}`));
+    ls(SUS_PENDING_KEY, null);
+  } catch (err) {
+    ls(SUS_PENDING_KEY, JSON.stringify(rows));
+    showToast('⚠ Supply usage will be saved when you are back online', 'error', 5000);
+  }
+  state.supplyRows = [];
+}
+
+async function flushPendingSupplyUsage() {
+  let rows = null;
+  try { rows = JSON.parse(ls(SUS_PENDING_KEY) || 'null'); } catch { rows = null; }
+  if (!Array.isArray(rows) || !rows.length || !navigator.onLine || !staffSession?.user) return;
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/inventory_usage`, {
+      method:  'POST',
+      headers: { ...(await staffHeaders(true)), 'Prefer': 'return=minimal' },
+      body:    JSON.stringify(rows),
+    });
+    if (resp.ok) { ls(SUS_PENDING_KEY, null); showToast('✓ Earlier supply usage saved', 'success', 3000); }
+  } catch { /* next online moment */ }
 }
 
 function markSupplyLogNoneUsed() {
@@ -8919,6 +8952,7 @@ function markSupplyLogNoneUsed() {
     item.usedQty = 0;
     item.usedMl  = 0;
   });
+  state.supplyRows = [];
   state.supplyLogSaved = true;
   const card = el('supply-usage-trigger-card');
   if (card) card.classList.add('sus-done');

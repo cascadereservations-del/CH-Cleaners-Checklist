@@ -3803,7 +3803,7 @@ body.mode-quick .detail-text { display: none; }
         <div class="spc-title">📸 Pre-Cleaning Photos</div>
         <span class="spc-required-badge">⚠ Required &nbsp;·&nbsp; minimum 5 photos</span>
       </div>
-      <p class="spc-hint">Document every area before you touch anything — aim for 10-12 photos. Multiple angles per area gives the best protection. Minimum 5 to proceed.</p>
+      <p class="spc-hint">Shoot every area in your camera first (aim for 10-12), then tap Upload once and pick them all. Minimum 5 to proceed.</p>
       <div class="preclean-guide" aria-label="Required photo areas — cover each area">
         <span class="pcg-chip"><span class="pcg-emoji">🛏</span><span class="pcg-label">Bedroom</span></span>
         <span class="pcg-chip"><span class="pcg-emoji">🛋</span><span class="pcg-label">Living Area</span></span>
@@ -3813,17 +3813,17 @@ body.mode-quick .detail-text { display: none; }
         <span class="pcg-chip"><span class="pcg-emoji">🚪</span><span class="pcg-label">Entrance</span></span>
       </div>
       <div class="photo-option-btns">
-        <button class="photo-option-btn" id="preclean-photo-capture" type="button" aria-label="Capture pre-cleaning photo with camera">
-          <span class="poi">📷</span>
-          <span>Capture Photo</span>
-          <input type="file" id="preclean-photo-cap" accept="image/*" capture="environment"
-                 aria-label="Take pre-cleaning photo with camera">
-        </button>
         <button class="photo-option-btn" id="preclean-photo-upload" type="button" aria-label="Upload pre-cleaning photo from gallery">
           <span class="poi">🖼</span>
           <span>Upload Photo</span>
           <input type="file" id="preclean-photo-file" accept="image/*" multiple
                  aria-label="Upload pre-cleaning photo from gallery">
+        </button>
+        <button class="photo-option-btn" id="preclean-photo-capture" type="button" aria-label="Capture pre-cleaning photo with camera">
+          <span class="poi">📷</span>
+          <span>Capture Photo</span>
+          <input type="file" id="preclean-photo-cap" accept="image/*" capture="environment"
+                 aria-label="Take pre-cleaning photo with camera">
         </button>
       </div>
       <div class="section-photo-thumbs" id="preclean-photo-thumbs" aria-label="Pre-cleaning photo thumbnails"></div>
@@ -3971,7 +3971,7 @@ body.mode-quick .detail-text { display: none; }
     </div>
 
     <p id="p1-gate-hint" class="gate-hint" role="alert" aria-live="polite">
-      Please enter both meter readings, upload both meter photos, and add at least 2 pre-clean photos.
+      Please enter both meter readings, upload both meter photos, and add at least 5 pre-clean photos.
     </p>
 
   </section><!-- /phase-1 -->
@@ -4213,23 +4213,23 @@ body.mode-quick .detail-text { display: none; }
         <span class="pcg-chip"><span class="pcg-emoji">🚪</span><span class="pcg-label">Entrance</span></span>
       </div>
       <div class="photo-option-btns">
-        <button class="photo-option-btn" id="afterclean-photo-capture" type="button" aria-label="Capture after-cleaning photo with camera">
-          <span class="poi">📷</span>
-          <span>Capture Photo</span>
-          <input type="file" id="afterclean-photo-cap" accept="image/*" capture="environment"
-                 aria-label="Take after-cleaning photo with camera">
-        </button>
         <button class="photo-option-btn" id="afterclean-photo-upload" type="button" aria-label="Upload after-cleaning photo from gallery">
           <span class="poi">🖼</span>
           <span>Upload Photo</span>
           <input type="file" id="afterclean-photo-file" accept="image/*" multiple
                  aria-label="Upload after-cleaning photo from gallery">
         </button>
+        <button class="photo-option-btn" id="afterclean-photo-capture" type="button" aria-label="Capture after-cleaning photo with camera">
+          <span class="poi">📷</span>
+          <span>Capture Photo</span>
+          <input type="file" id="afterclean-photo-cap" accept="image/*" capture="environment"
+                 aria-label="Take after-cleaning photo with camera">
+        </button>
       </div>
       <div class="section-photo-thumbs" id="afterclean-photo-thumbs" aria-label="After-cleaning photo thumbnails"></div>
       <span class="spc-count" id="afterclean-photo-count" role="status" aria-live="polite">0 / 12 photos attached</span>
       <p id="p4-photo-gate-hint" class="gate-hint" role="alert" aria-live="polite">
-        Please add at least 2 after-cleaning photos before submitting.
+        Please add at least 5 after-cleaning photos before submitting.
       </p>
     </div>
 
@@ -4238,7 +4238,7 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Gate hint for submit -->
     <p id="p4-gate-hint" class="gate-hint" role="alert" aria-live="polite">
-      Please add at least 2 after-cleaning photos and confirm all 4 "Confirm &amp; Leave" items before submitting.
+      Please add at least 5 after-cleaning photos and confirm all 4 "Confirm &amp; Leave" items before submitting.
     </p>
 
     <!-- Padding at bottom for scroll -->
@@ -5686,6 +5686,15 @@ async function fetchPrevReadings() {
         state.prevElectricReading !== null ? `${state.prevElectricReading} kWh` : '—';
       if (el('prev-water-val')) el('prev-water-val').textContent =
         state.prevWaterReading !== null ? `${state.prevWaterReading} m³` : '—';
+      // Sprint 0 (2026-09-16): tap the chip to copy last time's number into the field,
+      // then overwrite the last digits. Never prefilled silently: a forgotten field
+      // would submit last session's reading as this one's.
+      [['prev-elec-val','electricMeterReading',state.prevElectricReading],['prev-water-val','waterMeterReading',state.prevWaterReading]].forEach(([chip,input,val]) => {
+        const c = el(chip), i = el(input);
+        if (!c || !i || val === null) return;
+        c.style.cursor = 'pointer'; c.title = 'Tap to copy into the field';
+        c.onclick = () => { if (i.value) return; i.value = String(val); i.dispatchEvent(new Event('input', { bubbles: true })); i.focus(); };
+      });
 
       const dateLabel = state.prevReadingDate
         ? new Date(state.prevReadingDate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
@@ -8106,7 +8115,7 @@ function buildPayload() {
       const allItems = [...ARRIVE_ITEMS,...CHEMICAL_ITEMS,...BEDROOM_ITEMS,...KITCHEN_ITEMS,
                         ...FINAL_CLEANING_ITEMS,...POWER_CHECK_ITEMS,...WEEKLY_ITEMS];
       const item = allItems.find(i => i.id === id);
-      allNotes.push({ section: 'Checklist', text: `${item ? item.text : id}: ${flag.note}`, isUrgent: false });
+      allNotes.push({ section: 'Checklist', text: `${item ? item.text : id}: ${flag.note}`, isUrgent: true });
     }
   });
   CONFIRM_LEAVE_ITEMS.forEach(item => {
@@ -8257,6 +8266,7 @@ function buildPayload() {
       ].filter(p => p && p.data && !p.uploaded).length,
       upload_retry_count: state.uploadRetryCount || 0,
     },
+    meterVerified:  !!state.meterVerified,
     submissionId:   state.submissionId,
     cleaningType,
     extraExpenses:  collectExtraExpenses(),

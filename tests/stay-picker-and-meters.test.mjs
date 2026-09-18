@@ -168,10 +168,12 @@ test('a meter photo is named for the reading it proves', () => {
 test('the last phase asks for the SmartLife automation to be switched on', () => {
   assert.match(html, /id: 'check_smartlife_waiting'/);
   assert.match(html, /Smart at the bottom, then Automations/);
-  // It belongs to the final phase's list, not an earlier one.
-  const powerBlock = html.slice(html.indexOf('const POWER_CHECK_ITEMS'),
-                                html.indexOf('const WEEKLY_ITEMS'));
-  assert.ok(powerBlock.includes('check_smartlife_waiting'));
+  // It belongs to the final phase's list, not an earlier one. SPEC-02 promoted
+  // it from a POWER_CHECK_ITEMS tick box to a required Confirm & Leave
+  // judgement; both lists live in phase 4, so the intent is unchanged.
+  const confirmBlock = html.slice(html.indexOf('const CONFIRM_LEAVE_ITEMS'),
+                                  html.indexOf('const confirmItemsNow'));
+  assert.ok(confirmBlock.includes('check_smartlife_waiting'));
 });
 
 test('the picker loads for a date that was already on the field (no change event)', () => {

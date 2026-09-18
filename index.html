@@ -6,6 +6,23 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.7 — The kitchen set is evidence (2026-09-18):   ║
+  ║  - KITCHEN PHOTOS ARE REQUIRED on a turnover or deep clean:    ║
+  ║    two minimum, showing the drawer, the rack and the cookware.  ║
+  ║    Bedroom photos stay optional, and the Step 3 nudge stopped   ║
+  ║    asking for them.                                             ║
+  ║  - NEW CONFIRM & LEAVE ITEM: the utensil set is counted against ║
+  ║    the live catalogue and confirmed, or flagged as an Issue.    ║
+  ║  - THE "WAITING FOR CHECK IN" AUTOMATION IS NO LONGER A TICK    ║
+  ║    BOX. It moved to the end of Confirm & Leave, same id, so the ║
+  ║    report cannot be submitted until it is Confirmed or flagged. ║
+  ║  - Both are per cleaning type: a mid-stay guest is still in the ║
+  ║    unit and an emergency visit is not a handover, so neither    ║
+  ║    asks for the count nor arms the arrival automation.          ║
+  ║  - CONFIRM & LEAVE NOW REACHES THE DATABASE. It only ever       ║
+  ║    existed in the e-mail; checklist_details carries it now, in  ║
+  ║    the shape the admin dashboard already parses.                ║
+  ║                                                              ║
   ║  CHANGELOG v8.6 — Rota, staff list, flagged photos (26-09-13):║
   ║  - WEEKLY DEEP MAINTENANCE IS NOW A ROTA. Fourteen tasks in   ║
   ║    one weekend is a day nobody has. Each belongs to a week of  ║
@@ -3050,6 +3067,17 @@ body.mode-quick .detail-text { display: none; }
   color: var(--earthen-slate) !important;
   line-height: 1.4;
 }
+/* v8.7: the Waiting-for-Check-In confirmation keeps the gold spine and bold
+   text it had as a checklist item — same values as .checklist-item.highlight.
+   Declared above .confirmed / .issue-found so those still win on colour. */
+.confirm-item.highlight {
+  border-left: 5px solid var(--bronze) !important;
+  border-color: var(--bronze);
+  background: var(--accent-soft);
+  box-shadow: 0 2px 10px rgba(201,150,58,.14);
+}
+.confirm-item.highlight .confirm-item-text { font-weight: 800 !important; }
+
 .confirm-item.confirmed { border-left-color: var(--success) !important; }
 .confirm-item.issue-found { border-left-color: var(--error) !important; }
 
@@ -4573,12 +4601,14 @@ body.mode-quick .detail-text { display: none; }
       <!-- JS renders items here -->
     </div>
 
-    <div class="section-photo-card" id="kitchen-photo-card" role="region" aria-label="Kitchen and bathroom photos — optional">
+    <div class="section-photo-card" id="kitchen-photo-card" role="region" aria-label="Kitchen and bathroom photos">
       <div class="spc-header">
         <div class="spc-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Kitchen &amp; Bathroom Photos</div>
-        <span class="spc-optional-badge">Optional</span>
+        <span class="spc-required-badge" id="kitchen-photo-required"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Required &nbsp;·&nbsp; minimum 2 photos</span>
+        <span class="spc-optional-badge" id="kitchen-photo-optional" style="display:none;">Optional</span>
       </div>
-      <p class="spc-optional-hint">Not required to proceed — add photos here only if you want extra documentation for this area. Pre-clean and after-clean photos above are the main record.</p>
+      <p class="spc-hint" id="kitchen-photo-hint-required">Required: at least 2 photos showing the utensil drawer, the dish rack and the cookware, so the set can be checked against the list.</p>
+      <p class="spc-optional-hint" id="kitchen-photo-hint-optional" style="display:none;">Not required to proceed — add photos here only if you want extra documentation for this area. Pre-clean and after-clean photos above are the main record.</p>
       <div class="photo-option-btns">
         <button class="photo-option-btn" id="kitchen-photo-capture" type="button" aria-label="Capture kitchen photo">
           <span class="poi"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span>
@@ -5563,18 +5593,38 @@ const FINAL_CLEANING_ITEMS = [
 const CONFIRM_LEAVE_ITEMS = [
   { id: 'check_9_4',          text: 'AC set to 24°C — fridge confirmed cold',
     detail: 'Set the AC to 24°C before leaving (guests prefer a cool welcome). Open the fridge and feel the interior air — it must be noticeably cold. If the fridge feels warm or room temperature, flag it immediately; food safety is at risk.' },
+  // The set below is the live Kitchen & Dining catalogue as counted on 2026-09-16
+  // (D-145), appliances and furniture dropped.
+  // ponytail: static list; read the catalogue cache if the set starts changing.
+  { id: 'check_utensils_complete', only: ['turnover', 'deep_clean'],
+    text: 'Kitchen utensils complete — photos taken of the drawer, the rack and the cookware',
+    detail: 'Lay the set out the way the Step 3 kitchen photos show it and count it against this list, flagging anything missing, chipped or broken as an Issue: 1 frying pan · 1 casserole · 1 sauce pan · 1 can opener · 6 spoons · 2 knives · 6 forks · 6 teaspoons · 4 highball glasses · 6 wine glasses · 4 plates · 2 soup bowls · 4 ladles · 4 white mugs · 2 coloured mugs.' },
   { id: 'check_ecoflow_charge', text: 'EcoFlow RIVER 3 at 100% charge',
     detail: 'The EcoFlow RIVER 3 is the unit\'s backup power supply during brownouts. Plug it in and confirm the display reads 100%. If below 80%, leave it on charge — do not close the session until it reaches full. This unit stays with the property: it is NOT borrowable and must never leave Cascade Hideaway.' },
   { id: 'check_key_card',      text: 'Guest access verified — key card unlocks door and guest PIN code opens cleanly',
     detail: 'Two checks before you leave: (1) Key card — physically tap the card on the door reader. It must beep and unlock. Leave the key card on the keychain inside the unit for the arriving guest. (2) Guest PIN — enter the code from the current booking on the smart lock keypad. The lock must click open cleanly. If either test fails, call the property manager immediately before leaving.' },
   { id: 'check_guest_code',    text: 'Smart lock battery not low — no dim backlight or warning beep',
     detail: 'After testing the PIN code, check the keypad backlight. If it is noticeably dim or the lock beeps a low-battery warning, replace the AA batteries from the supply box immediately. Flag in this report so the property manager can restock.' },
-];
-
-const POWER_CHECK_ITEMS = [
-  { id: 'check_smartlife_waiting', text: 'Turn on the "Waiting for Check In" automation in SmartLife',
+  // Same id it carried as a Step 4 tick box, so saved drafts and old reports
+  // still resolve it. It is the last thing asked for because it is the last
+  // thing done — after the door is locked.
+  { id: 'check_smartlife_waiting', only: ['turnover', 'deep_clean'],
+    text: '“Waiting for Check In” automation is ON in SmartLife (checked after locking up)',
     highlight: true, badge: 'Do this last',
     detail: 'Open the SmartLife app on your phone, tap Smart at the bottom, then Automations at the top, and tick the switch next to "Waiting for Check In" so it turns on. This is what gets the unit ready for the arriving guest — do it as the last thing before you lock up. If the switch will not stay on, flag it here.' },
+];
+
+/* Confirm & Leave is per cleaning type. A mid-stay guest is still in the unit
+   and an emergency visit is not a handover, so neither asks for the utensil
+   count nor arms the arrival automation. Everything that gates, counts,
+   renders or reports the list goes through here. */
+const confirmItemsNow = () => CONFIRM_LEAVE_ITEMS.filter(i => !i.only || i.only.includes(state.cleaningType));
+
+/* The kitchen set has to be photographed on a handover so the utensil
+   confirmation in Step 4 has evidence behind it. Bedroom stays optional. */
+const kitchenPhotosRequired = () => state.cleaningType === 'turnover' || state.cleaningType === 'deep_clean';
+
+const POWER_CHECK_ITEMS = [
   { id: 'check_ecoflow_stowed', text: 'EcoFlow RIVER 3 stowed in its spot, cable tidy',
     detail: 'After confirming it is charged, place the EcoFlow RIVER 3 back in its designated spot with the charging cable coiled neatly. Confirm it is present and undamaged. It is not borrowable and must stay in the unit at all times — flag immediately if it is missing.' },
   { id: 'check_10_6', text: 'Final power & safety check — windows closed, door locked', critical: true,
@@ -5959,17 +6009,19 @@ function isPhase1Valid() {
 
 function isPhase3Valid() {
   if (state.cleaningType === 'emergency') return true;
-  // v6.9: bedroom/kitchen photos are optional — only supply log is gated
+  // v8.7: kitchen photos are required on a handover (they are the evidence
+  // behind the utensil confirmation). Bedroom photos stay optional.
+  if (kitchenPhotosRequired() && state.kitchenPhotos.length < SECTION_PHOTO_MIN) return false;
   return state.supplyLogSaved;
 }
 
 function isPhase4Valid() {
   if (state.cleaningType === 'emergency') {
-    return CONFIRM_LEAVE_ITEMS.every(i => { const s = state.confirmItems[i.id]; return s === 'confirmed' || s === 'issue'; });
+    return confirmItemsNow().every(i => { const s = state.confirmItems[i.id]; return s === 'confirmed' || s === 'issue'; });
   }
   const afterMin = state.cleaningType === 'mid_stay' ? MIDSTAY_PHOTO_MIN : AFTERCLEAN_PHOTO_MIN;
   const aftercleanOk = state.aftercleanPhotos.length >= afterMin;
-  const confirmOk = CONFIRM_LEAVE_ITEMS.every(item => {
+  const confirmOk = confirmItemsNow().every(item => {
     const s = state.confirmItems[item.id];
     return s === 'confirmed' || s === 'issue';
   });
@@ -6032,10 +6084,10 @@ function buildNudgeMessage(phase) {
     }
     case 3: {
       const missing = [];
-      const bdNeed = SECTION_PHOTO_MIN - state.bedroomPhotos.length;
+      // v8.7: the bedroom line nagged for something no gate ever wanted, and
+      // the kitchen line is only true where the photos are required.
       const ktNeed = SECTION_PHOTO_MIN - state.kitchenPhotos.length;
-      if (bdNeed > 0) missing.push(`${bdNeed} more bedroom photo${bdNeed>1?'s':''}`);
-      if (ktNeed > 0) missing.push(`${ktNeed} more kitchen photo${ktNeed>1?'s':''}`);
+      if (kitchenPhotosRequired() && ktNeed > 0) missing.push(`${ktNeed} more kitchen photo${ktNeed>1?'s':''}`);
       if (!state.supplyLogSaved) missing.push('supply log (tap 📦 Log Supply Usage)');
       if (missing.length === 0) return null;
       return `Almost ready to finish! Still needed: ${missing.join('; ')}. 💛`;
@@ -6044,7 +6096,7 @@ function buildNudgeMessage(phase) {
       const missing = [];
       const acNeed = AFTERCLEAN_PHOTO_MIN - state.aftercleanPhotos.length;
       if (acNeed > 0) missing.push(`${acNeed} more after-clean photo${acNeed>1?'s':''}`);
-      const unconfirmed = CONFIRM_LEAVE_ITEMS.filter(i => !state.confirmItems[i.id]);
+      const unconfirmed = confirmItemsNow().filter(i => !state.confirmItems[i.id]);
       if (unconfirmed.length > 0) missing.push(`${unconfirmed.length} Confirm & Leave item${unconfirmed.length>1?'s':''}`);
       if (missing.length === 0) return null;
       return `Almost done! Still needed: ${missing.join('; ')}. You're so close! 💛`;
@@ -8084,13 +8136,13 @@ function renderConfirmItems() {
   if (!container) return;
   container.innerHTML = '';
 
-  CONFIRM_LEAVE_ITEMS.forEach(item => {
+  confirmItemsNow().forEach(item => {
     const div = document.createElement('div');
-    div.className = 'confirm-item';
+    div.className = item.highlight ? 'confirm-item highlight' : 'confirm-item';
     div.id = `confirm-wrap-${item.id}`;
     div.innerHTML = `
       <div class="confirm-item-header">
-        <div class="confirm-item-text">${esc(item.text)}</div>
+        <div class="confirm-item-text">${esc(item.text)}${item.badge ? ` <span class="item-badge">${esc(item.badge)}</span>` : ''}</div>
         ${item.detail ? `<div style="font-size:var(--font-size-xs);color:var(--text-muted);margin-bottom:var(--space-3);line-height:1.5;padding-top:2px;">${esc(item.detail)}</div>` : ''}
         <div class="confirm-buttons" role="group" aria-label="${esc(item.text)}">
           <button class="confirm-btn" id="conf-ok-${item.id}" type="button"
@@ -8157,6 +8209,18 @@ function renderConfirmItems() {
     // Restore state
     restoreConfirmItem(item.id, div);
   });
+}
+
+/* Mid-stay and emergency do not require the kitchen set, so the card must not
+   claim they do. Toggled by style, not [hidden]: the badge classes set their
+   own display and would override it. */
+function refreshKitchenPhotoRequirement() {
+  const req = kitchenPhotosRequired();
+  const show = (id, on) => { const n = el(id); if (n) n.style.display = on ? '' : 'none'; };
+  show('kitchen-photo-required',       req);
+  show('kitchen-photo-hint-required',  req);
+  show('kitchen-photo-optional',      !req);
+  show('kitchen-photo-hint-optional', !req);
 }
 
 function restoreConfirmItem(itemId, div) {
@@ -8424,9 +8488,9 @@ function calcProgress(phase) {
     }
     case 4: {
       const all = [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS];
-      let total = all.length + CONFIRM_LEAVE_ITEMS.length;
+      let total = all.length + confirmItemsNow().length;
       let done  = all.filter(i => state.checklist[i.id]).length;
-      done += CONFIRM_LEAVE_ITEMS.filter(i => state.confirmItems[i.id]).length;
+      done += confirmItemsNow().filter(i => state.confirmItems[i.id]).length;
       if (state.isWeeklyIncluded) {
         const weeklyNow = weeklyItemsForSession();
         total += weeklyNow.length;
@@ -8449,9 +8513,9 @@ function getAllChecklistItems() {
 
 function calcCompletionRate() {
   const allItems = getAllChecklistItems();
-  const confirmCount = CONFIRM_LEAVE_ITEMS.filter(i => state.confirmItems[i.id]).length;
+  const confirmCount = confirmItemsNow().filter(i => state.confirmItems[i.id]).length;
   const done  = allItems.filter(i => state.checklist[i.id]).length + confirmCount;
-  const total = allItems.length + CONFIRM_LEAVE_ITEMS.length;
+  const total = allItems.length + confirmItemsNow().length;
   return { done, total, rate: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
@@ -8640,6 +8704,11 @@ function applyDraft(draft) {
   state.issueFlags        = {};
   state.confirmItems      = draft.confirmItems || {};
   state.confirmNotes      = draft.confirmNotes || {};
+  // v8.7: the SmartLife automation moved from a Step 4 tick box to a Confirm &
+  // Leave judgement, same id. A draft saved before this version holds the tick.
+  if (state.checklist.check_smartlife_waiting && !state.confirmItems.check_smartlife_waiting) {
+    state.confirmItems.check_smartlife_waiting = 'confirmed';
+  }
   state.sessionFolderId   = draft.sessionFolderId   || null;
   state.sessionFolderUrl  = draft.sessionFolderUrl  || null;
   state.numberOfNights    = draft.numberOfNights || 0;
@@ -8800,7 +8869,7 @@ function openSubmitModal() {
 
   // Count issues
   const issueCount = Object.keys(state.issueFlags).length +
-    CONFIRM_LEAVE_ITEMS.filter(i => state.confirmItems[i.id] === 'issue').length +
+    confirmItemsNow().filter(i => state.confirmItems[i.id] === 'issue').length +
     (state.conditionStatus === 'issue' ? 1 : 0);
 
   const issuesDiv = el('submit-modal-issues');
@@ -8980,7 +9049,7 @@ function buildEmailHtml() {
     }
   });
 
-  CONFIRM_LEAVE_ITEMS.forEach(item => {
+  confirmItemsNow().forEach(item => {
     if (state.confirmItems[item.id] === 'issue') {
       const note = state.confirmNotes[item.id] || '(no note)';
       allIssues.push({ section: 'Confirm & Leave', text: `${item.text}: ${note}`, isUrgent: true });
@@ -9037,7 +9106,7 @@ function buildEmailHtml() {
   }
 
   // Confirm & leave rows
-  const confirmRows = CONFIRM_LEAVE_ITEMS.map(item => {
+  const confirmRows = confirmItemsNow().map(item => {
     const s = state.confirmItems[item.id];
     const icon  = s === 'confirmed' ? '✓' : s === 'issue' ? '⚠' : '○';
     const color = s === 'confirmed' ? brand.success : s === 'issue' ? brand.error : '#999';
@@ -9263,6 +9332,24 @@ function buildPayload() {
     })),
   }));
 
+  // Confirm & Leave never reached the database: checklistDetails carried the
+  // checklist only, so the judgements lived in the e-mail and nowhere else.
+  // Two of them are now required, and a required confirmation has to be
+  // provable after the fact — so they ride here in the shape the dashboard
+  // already parses (B68): {icon, title, items:[{text, checked, critical}]}.
+  // [URGENT] is Code.gs's own marker, so an Issue reads as one in the e-mail.
+  checklistDetails.push({
+    title: 'Confirm & Leave',
+    icon:  '🔒',
+    items: confirmItemsNow().map(item => ({
+      text: state.confirmItems[item.id] === 'issue'
+        ? `[URGENT] ${item.text} — ${state.confirmNotes[item.id] || '(no note)'}`
+        : item.text,
+      checked:  state.confirmItems[item.id] === 'confirmed',
+      critical: false,
+    })),
+  });
+
   // All notes
   const allNotes = [];
   if (state.conditionStatus === 'issue' && state.conditionNote) {
@@ -9276,7 +9363,7 @@ function buildPayload() {
       allNotes.push({ section: 'Checklist', text: `${item ? item.text : id}: ${flag.note}`, isUrgent: false });
     }
   });
-  CONFIRM_LEAVE_ITEMS.forEach(item => {
+  confirmItemsNow().forEach(item => {
     if (state.confirmItems[item.id] === 'issue') {
       allNotes.push({
         section: 'Confirm & Leave',
@@ -10217,6 +10304,10 @@ function setCleaningType(type, opts = {}) {
   // Re-run the gate hint so a stale "guest still checked in" error clears the
   // moment the cleaner (or auto-switch) moves to mid-stay.
   if (typeof refreshDateHintForType === 'function') refreshDateHintForType();
+  // v8.7: the Confirm & Leave list and the kitchen photo requirement are both
+  // per type, so a type change has to rebuild them.
+  if (typeof renderConfirmItems === 'function') renderConfirmItems();
+  if (typeof refreshKitchenPhotoRequirement === 'function') refreshKitchenPhotoRequirement();
   updateBottomBar(); updateProgress(0); saveDraft();
 }
 
@@ -10795,6 +10886,7 @@ async function init() {
 
   // Render confirm & leave
   renderConfirmItems();
+  refreshKitchenPhotoRequirement();
 
   // Meter readings delta
   initMeterDelta();

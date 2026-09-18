@@ -21,7 +21,7 @@
 //   Navigation (HTML page)        → network-first, 3s timeout, cache fallback
 //   Everything else               → network-first, cache fallback
 
-const CACHE_NAME = 'ch-shell-v5-networkfirst';
+const CACHE_NAME = 'ch-shell-v6-networkfirst';
 
 // How long a navigation waits for the network before falling back to the
 // cached shell. Long enough for a normal 3G page load, short enough that a

@@ -16,6 +16,13 @@
  *     Supabase Edge Function (submit-cleaning).
  *  7. Authorise the script when prompted on the first run.
  *
+ *  CHANGELOG v3.10 (2026-09-19, SPEC-15 phase 1):
+ *  - NEW:  _handleSubmit success response also carries
+ *          files: [{ section, name, fileId, url }] for every photo saved,
+ *          so submit-cleaning can store the Drive ids.
+ *  - NEW:  a photo carrying driveFileId (resend-cleaning-report from the
+ *          Drive archive) is linked in place, never downloaded or copied.
+ *
  *  CHANGELOG v3.8:
  *  - FIX:  Photo upload loop now supports Supabase Storage URLs in
  *          addition to legacy base64.  Since frontend v6.6 photos are
@@ -245,6 +252,37 @@ function _handleLastReadings() {
 //  Sorting by name now sorts by time, a month is one folder to archive,
 //  and a meter photo is named for the number it proves.
 // ═══════════════════════════════════════════════════════════════════
+
+// v3.10 (SPEC-15 phase 1): ONE-OFF, run by hand from the editor, never routed from doGet/doPost.
+// Writes archive-index-<timestamp>.json into the photos root: every folder that holds photos, with
+// its path, date and files, so existing cleaning_sessions rows can be matched to their Drive archive.
+// Shared "anyone with the link" like every photo it lists. Delete the file once the backfill is done.
+function exportArchiveIndex() {
+  const root = DriveApp.getFolderById(ROOT_PHOTOS_FOLDER_ID);
+  const out = [];
+  (function walk(folder, path, depth) {
+    const files = [];
+    const it = folder.getFiles();
+    while (it.hasNext()) {
+      const f = it.next();
+      if (!/^image\//.test(f.getMimeType())) continue;
+      files.push({ section: folder.getName(), name: f.getName(), fileId: f.getId(), url: f.getUrl() });
+    }
+    if (files.length) {
+      const parents = folder.getParents();
+      const parent = parents.hasNext() ? parents.next() : null;
+      out.push({ path: path, folderId: folder.getId(), folderUrl: folder.getUrl(),
+        parentId: parent ? parent.getId() : null, parentUrl: parent ? parent.getUrl() : null,
+        created: folder.getDateCreated().toISOString(), files: files });
+    }
+    if (depth >= 5) return;
+    const subs = folder.getFolders();
+    while (subs.hasNext()) { const s = subs.next(); walk(s, path + '/' + s.getName(), depth + 1); }
+  })(root, '', 0);
+  const file = root.createFile('archive-index-' + Date.now() + '.json', JSON.stringify(out), 'application/json');
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  Logger.log('archive index: ' + out.length + ' photo folders, file id ' + file.getId());
+}
 
 function _childFolder(parent, name) {
   const existing = parent.getFoldersByName(name);
@@ -491,6 +529,7 @@ function _handleSubmit(payload, subId) {
 
   // ── Upload photos to Drive (v3.8: supports Storage URL + legacy base64) ──
   const photoLinks = {};
+  const archivedFiles = [];   // v3.10: returned so Supabase can store the Drive ids (SPEC-15)
   for (const sectionId in photos) {
     const sectionPhotos = photos[sectionId];
     if (!sectionPhotos || !sectionPhotos.length) continue;
@@ -502,6 +541,18 @@ function _handleSubmit(payload, subId) {
     sectionPhotos.forEach(function(photo, i) {
       if (!photo) return;
       try {
+        // v3.10: a resend from the Drive archive (SPEC-15) names a file already in Drive.
+        // Link it where it is; never download and re-save it.
+        if (photo.driveFileId) {
+          var existing = DriveApp.getFileById(photo.driveFileId);
+          photoLinks[sectionId].push({
+            name:         photo.name || existing.getName(),
+            url:          existing.getUrl(),
+            sectionLabel: sectionNames[sectionId] || sectionId
+          });
+          archivedFiles.push({ section: sectionId, name: existing.getName(), fileId: existing.getId(), url: existing.getUrl() });
+          return;
+        }
         var blob;
         var meterValue = (sectionId === 'meterPhotos')
           ? (i === 0 ? electricReading : waterReading)
@@ -560,6 +611,7 @@ function _handleSubmit(payload, subId) {
           url:          file.getUrl(),
           sectionLabel: sectionNames[sectionId] || sectionId
         });
+        archivedFiles.push({ section: sectionId, name: file.getName(), fileId: file.getId(), url: file.getUrl() });
 
       } catch (photoErr) {
         Logger.log('Photo error (' + sectionId + ' #' + i + '): ' + photoErr.toString());
@@ -639,7 +691,8 @@ function _handleSubmit(payload, subId) {
     message:      'Report submitted successfully.',
     submissionId: subId || null,
     folderId:     reportFolder.getId(),
-    folderUrl:    reportFolder.getUrl()
+    folderUrl:    reportFolder.getUrl(),
+    files:        archivedFiles
   });
 }
 

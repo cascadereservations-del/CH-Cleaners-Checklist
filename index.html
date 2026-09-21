@@ -3866,7 +3866,7 @@ body.mode-quick .detail-text { display: none; }
 #meter-followup .mf-list li { margin-bottom: 5px; }
 #meter-followup .mf-foot { margin: 0; font-size: .8rem; color: var(--text-secondary); }
 #meter-followup .mf-dismiss {
-  margin-top: var(--space-3); min-height: 40px; padding: 0 var(--space-4);
+  margin: var(--space-3) var(--space-2) 0 0; min-height: 40px; padding: 0 var(--space-4);
   border: 1.5px solid var(--border-strong); border-radius: var(--radius-md);
   background: transparent; color: var(--text-secondary);
   font: 600 .82rem var(--font-body); cursor: pointer;
@@ -4167,8 +4167,9 @@ body.mode-quick .detail-text { display: none; }
     <div id="meter-followup" hidden role="status">
       <div class="mf-head"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> A meter photo needs another look</div>
       <ul class="mf-list" id="meter-followup-list"></ul>
-      <p class="mf-foot">If you still have the photo, send it to Lloyd on Messenger. If not, photograph the meter as it is now and say so — a late reading is worth more than none.</p>
-      <button type="button" class="mf-dismiss" id="meter-followup-dismiss">I have dealt with it</button>
+      <p class="mf-foot" id="meter-followup-foot">If you still have the photo, send it to Lloyd on Messenger. If not, photograph the meter as it is now and say so — a late reading is worth more than none.</p>
+      <button type="button" class="mf-dismiss" data-mf-answer="I sent the photo to Lloyd">I sent the photo to Lloyd</button>
+      <button type="button" class="mf-dismiss" data-mf-answer="I photographed the meter today">I photographed the meter today</button>
     </div>
 
     <!-- Zone: Cleaner -->
@@ -6301,7 +6302,25 @@ async function loadMeterFollowups() {
     });
     if (!resp.ok) return;                 // not applied yet — say nothing
     const rows = await resp.json();
-    if (!Array.isArray(rows) || !rows.length) return;
+    state.meterFollowups = Array.isArray(rows) ? rows : [];
+    /* Only a 'mismatch' blocks. A photo that could not be read is not a fault
+       and a forgotten photo is already handled by the one-time allowance; both
+       still ask, neither stops the next turnover. Widening this is Lloyd's
+       call, not a quiet change here. */
+    state.meterBlocked = state.meterFollowups.some(r => r.vision_verdict === 'mismatch');
+    if (!state.meterFollowups.length) { box.hidden = true; return; }
+    const head = box.querySelector('.mf-head');
+    const foot = el('meter-followup-foot');
+    if (head) {
+      head.innerHTML = state.meterBlocked
+        ? '<svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> Answer this before the next report'
+        : '<svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg> A meter photo needs another look';
+    }
+    if (foot) {
+      foot.textContent = state.meterBlocked
+        ? 'This one has to be answered before the next turnover can be sent. If you still have the photo, send it to Lloyd on Messenger. If not, photograph the meter as it is now. Then tap what you did.'
+        : 'If you still have the photo, send it to Lloyd on Messenger. If not, photograph the meter as it is now and say so — a late reading is worth more than none.';
+    }
     const list = el('meter-followup-list');
     if (list) {
       list.innerHTML = rows.slice(0, 3).map(r => {
@@ -6317,6 +6336,41 @@ async function loadMeterFollowups() {
     }
     box.hidden = false;
   } catch { /* never let a follow-up notice break the page */ }
+}
+
+/* Answering it. Two fixed answers, no typing: a cleaner standing in the unit
+   should tap what she did, not compose a sentence. The answer is written to the
+   record with her name and the time (resolve_meter_followup_v1), which is what
+   lifts the block - a block that cleared itself silently would be worse than no
+   block at all. Every raised report is answered at once: they are all the same
+   question, and leaving one behind would re-raise the card immediately. */
+async function answerMeterFollowups(answer) {
+  const rows = state.meterFollowups || [];
+  if (!rows.length) return;
+  const buttons = Array.from(document.querySelectorAll('#meter-followup [data-mf-answer]'));
+  buttons.forEach(b => { b.disabled = true; });
+  try {
+    for (const r of rows) {
+      if (!r.session_id) continue;
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/resolve_meter_followup_v1`, {
+        method: 'POST',
+        headers: { ...(await staffHeaders(true)) },
+        body: JSON.stringify({ p_session_id: r.session_id, p_answer: answer }),
+      });
+      /* Not applied yet, or offline. Say so rather than hiding the card: hiding
+         it here is exactly the lie that made the old button worthless. */
+      if (!resp.ok) throw new Error(String(resp.status));
+    }
+    state.meterFollowups = [];
+    state.meterBlocked = false;
+    const box = el('meter-followup');
+    if (box) box.hidden = true;
+  } catch {
+    const foot = el('meter-followup-foot');
+    if (foot) foot.textContent = 'That did not save — you may be offline. Try again when you have signal.';
+  } finally {
+    buttons.forEach(b => { b.disabled = false; });
+  }
 }
 
 /* The way out is hidden until it is needed (2026-09-13, Lloyd: "only show
@@ -9533,6 +9587,23 @@ function buildPayload() {
 ═══════════════════════════════════════════════════════════════ */
 async function proceedWithSubmission() {
   if (state.isSubmitting) return;
+
+  /* The graduated meter-mismatch alert (2026-09-21). An unresolved mismatch on
+     an earlier report stops the next turnover. She was told at sign-in and can
+     clear it in one tap, so this is the reminder, not the discovery - and it
+     fires BEFORE anything is marked as submitting, so the draft is untouched
+     and the report is not lost. submit-cleaning refuses the same case with 409,
+     which is what makes this a rule rather than a suggestion. */
+  if (state.meterBlocked && ['turnover', 'deep_clean'].includes(state.cleaningType)) {
+    const statusEl0 = el('submit-status');
+    if (statusEl0) {
+      statusEl0.className = 'visible error';
+      statusEl0.textContent = 'A meter photo from an earlier report still needs an answer. Scroll to the notice at the top and tap what you did about it, then send this report.';
+    }
+    el('meter-followup')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   state.isSubmitting = true;
   document.body.classList.add('submitting');
 
@@ -9610,7 +9681,10 @@ async function proceedWithSubmission() {
       if (state.dwellInterval) clearInterval(state.dwellInterval);
       showSuccessScreen();
     } else {
-      throw new Error(data.msg || 'Server returned an error');
+      // submit-cleaning returns `message` (the 409 meter block says what to do);
+      // older paths return `msg`. Reading only `msg` showed her 'Server returned
+      // an error' and nothing she could act on.
+      throw new Error(data.message || data.msg || 'Server returned an error');
     }
 
   } catch (err) {
@@ -10954,8 +11028,8 @@ async function init() {
   // Feature 4: Inventory usage log
   initInventoryUsage();
   el('meter-skip-btn')?.addEventListener('click', applyMeterSkip);
-  el('meter-followup-dismiss')?.addEventListener('click', () => {
-    const b = el('meter-followup'); if (b) b.hidden = true;
+  document.querySelectorAll('#meter-followup [data-mf-answer]').forEach(btn => {
+    btn.addEventListener('click', () => answerMeterFollowups(btn.dataset.mfAnswer));
   });
   refreshMeterSkipAllowance();
   loadMeterFollowups();

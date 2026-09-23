@@ -9604,6 +9604,31 @@ async function proceedWithSubmission() {
     return;
   }
 
+  /* D-219 (Lloyd 2026-09-23): a meter does not run backwards, so a reading below
+     the last one is refused here, not just warned about. Same place and same
+     reason as the block above: before anything is marked as submitting, so the
+     draft is untouched. submit-cleaning refuses the same case with 409. The
+     previous reading comes from last-readings, which skips rows flagged as wrong
+     numbers - that is how Lloyd unblocks a cleaner whose LAST reading was the typo. */
+  const backwards = [
+    { label: 'electric', unit: 'kWh', id: 'electricMeterReading', prev: state.prevElectricReading },
+    { label: 'water',    unit: 'm³',  id: 'waterMeterReading',    prev: state.prevWaterReading },
+  ].map(m => {
+    const v = parseFloat((el(m.id)?.value || '').trim());
+    return (!isNaN(v) && m.prev !== null && m.prev !== undefined && m.prev > 0 && v < m.prev)
+      ? `${m.label} ${v} ${m.unit} is lower than the last reading (${m.prev})` : null;
+  }).filter(Boolean);
+  if (backwards.length) {
+    const statusEl1 = el('submit-status');
+    if (statusEl1) {
+      statusEl1.className = 'visible error';
+      statusEl1.textContent = `The ${backwards.join(', and the ')}. A meter does not run backwards, so this report was not sent. Read the meter again and type the number exactly as it shows. If the meter really shows this number, take a photo of it and message Lloyd.`;
+    }
+    el(backwards[0].startsWith('electric') ? 'electricMeterReading' : 'waterMeterReading')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   state.isSubmitting = true;
   document.body.classList.add('submitting');
 

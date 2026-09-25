@@ -8753,6 +8753,9 @@ function saveDraft() {
     extraExpenses:   collectExtraExpenses(),
     sessionFolderId: state.sessionFolderId,
     sessionFolderUrl: state.sessionFolderUrl,
+    // Photos upload into a folder named by this id; a reload that minted a new
+    // one split one cleaning across four folders (2026-09-25).
+    submissionId:    state.submissionId,
     // Strip base64/blob refs from photo state — save only metadata + the
     // IndexedDB key (WP2), so a killed app can find the still-pending blob.
     meterPhotoMeta:      state.meterPhotos.map(photoMeta),
@@ -8821,6 +8824,7 @@ function applyDraft(draft) {
   }
   state.sessionFolderId   = draft.sessionFolderId   || null;
   state.sessionFolderUrl  = draft.sessionFolderUrl  || null;
+  state.submissionId      = draft.submissionId      || null; // same photo folder after a reload
   state.numberOfNights    = draft.numberOfNights || 0;
   state.supplyLogSaved    = draft.supplyLogSaved  || false;
   if (draft.cleaningType) setCleaningType(draft.cleaningType);

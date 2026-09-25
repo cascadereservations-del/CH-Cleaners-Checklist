@@ -86,3 +86,14 @@ test('discarding a draft sweeps any still-pending photo blobs out of IndexedDB (
 test('restoring a draft photo with no idbId (never made it into IndexedDB) is marked failed, not a blank queued photo (WP2 fixup)', () => {
   assert.match(html, /photo\.status = 'failed'; \/\/ never made it into IndexedDB either/);
 });
+
+test('a reload keeps the same submissionId, so one cleaning stays in one photo folder (2026-09-25)', () => {
+  // Photos upload into a folder named by state.submissionId. It rode only in
+  // memory, so a reload mid-cleaning minted a new one and split the photos.
+  const saveBody  = html.match(/function saveDraft\(\) \{([\s\S]*?)\n\}/)[1];
+  const applyBody = html.match(/function applyDraft\(draft\) \{([\s\S]*?)\n\}/)[1];
+  assert.match(saveBody, /submissionId:\s*state\.submissionId,/);
+  assert.match(applyBody, /state\.submissionId\s*=\s*draft\.submissionId\s*\|\|\s*null;/);
+  // A successful submit clears the draft, so the next cleaning gets a fresh id.
+  assert.match(html, /done\.push\(state\.submissionId\);[\s\S]{0,700}?clearDraft\(\);/);
+});

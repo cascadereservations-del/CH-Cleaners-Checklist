@@ -6,6 +6,14 @@
   ║  Author: Lloyd Ligason                                        ║
   ║                                                              ║
   ║                                                              ║
+  ║  CHANGELOG v8.8 — Photo counts say what the app checks (10-01):║
+  ║  - The pre-clean and after-clean hints said "at least 2"; the║
+  ║    app needs 5 (4 for a mid-stay). The hints now say so.     ║
+  ║  - After-clean photos: up to 14 (was 12), matching "aim for  ║
+  ║    12-14". No server limit applies to after-clean photos.    ║
+  ║  - Starting fresh reset every photo counter to "0 / 5"; each ║
+  ║    counter now resets to its own maximum.                    ║
+  ║                                                              ║
   ║  CHANGELOG v8.7 — The kitchen set is evidence (2026-09-18):   ║
   ║  - KITCHEN PHOTOS ARE REQUIRED on a turnover or deep clean:    ║
   ║    two minimum, showing the drawer, the rack and the cookware.  ║
@@ -4557,7 +4565,7 @@ body.mode-quick .detail-text { display: none; }
     </div>
 
     <p id="p1-gate-hint" class="gate-hint" role="alert" aria-live="polite">
-      Please enter both meter readings, upload both meter photos, and add at least 2 pre-clean photos.
+      Please enter both meter readings, upload both meter photos, and add at least 5 pre-clean photos (4 for a mid-stay).
     </p>
 
   </section><!-- /phase-1 -->
@@ -4815,9 +4823,9 @@ body.mode-quick .detail-text { display: none; }
         </button>
       </div>
       <div class="section-photo-thumbs" id="afterclean-photo-thumbs" aria-label="After-cleaning photo thumbnails"></div>
-      <span class="spc-count" id="afterclean-photo-count" role="status" aria-live="polite">0 / 12 photos attached</span>
+      <span class="spc-count" id="afterclean-photo-count" role="status" aria-live="polite">0 / 14 photos attached</span>
       <p id="p4-photo-gate-hint" class="gate-hint" role="alert" aria-live="polite">
-        Please add at least 2 after-cleaning photos before submitting.
+        Please add at least 5 after-cleaning photos (4 for a mid-stay) before submitting.
       </p>
     </div>
 
@@ -4826,7 +4834,7 @@ body.mode-quick .detail-text { display: none; }
 
     <!-- Gate hint for submit -->
     <p id="p4-gate-hint" class="gate-hint" role="alert" aria-live="polite">
-      Please add at least 2 after-cleaning photos and confirm all 4 "Confirm &amp; Leave" items before submitting.
+      Please add at least 5 after-cleaning photos (4 for a mid-stay) and confirm all 4 "Confirm &amp; Leave" items before submitting.
     </p>
 
     <!-- Padding at bottom for scroll -->
@@ -5009,7 +5017,7 @@ const SECTION_PHOTO_MAX      = 5;   // bedroom / kitchen maximum
 const PRECLEAN_PHOTO_MIN     = 5;   // pre-clean: 5 areas required
 const PRECLEAN_PHOTO_MAX     = 12;  // pre-clean: aim for 10-12 photos
 const AFTERCLEAN_PHOTO_MIN   = 5;   // after-clean: same full coverage required
-const AFTERCLEAN_PHOTO_MAX   = 12;
+const AFTERCLEAN_PHOTO_MAX   = 14;  // after-clean: aim for 12-14 photos
 const MIDSTAY_PHOTO_MIN      = 4;   // mid-stay: cover major areas (bed/living, CR, kitchen, floors)
 const MIDSTAY_PHOTO_MAX      = 8;
 
@@ -9916,7 +9924,8 @@ function resetApp() {
     const count  = el(`${key}-photo-count`);
     if (thumbs) thumbs.innerHTML = '';
     if (count)  {
-      count.textContent = `0 / ${SECTION_PHOTO_MAX} photos attached`;
+      const max = { preclean: PRECLEAN_PHOTO_MAX, afterclean: AFTERCLEAN_PHOTO_MAX }[key] ?? SECTION_PHOTO_MAX;
+      count.textContent = `0 / ${max} photos attached`;
       count.classList.remove('has-photos', 'min-met');
     }
     const capInp  = el(`${key}-photo-cap`);  if (capInp)  capInp.value  = '';

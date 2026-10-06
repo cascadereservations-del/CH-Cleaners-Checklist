@@ -158,7 +158,7 @@ test('Confirm & Leave reaches the database, not just the e-mail', () => {
 
 test('the shell cache is bumped so the phone does not keep the old checklist', () => {
   assert.ok(!sw.includes('ch-shell-v5-networkfirst'), 'v5 would serve the pre-v8.7 shell');
-  assert.match(sw, /const CACHE_NAME = 'ch-shell-v6-networkfirst';/);
+  assert.match(sw, /const CACHE_NAME = 'ch-shell-v7-networkfirst';/);
 });
 
 test('the highlighted confirmation renders its spine and badge', () => {

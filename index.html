@@ -460,6 +460,7 @@
 <meta name="apple-mobile-web-app-title" content="CH Checklist">
 <meta name="description" content="Cascade Hideaway — Cleaning Checklist App">
 <link rel="manifest" href="manifest.webmanifest">
+<script>(function(){ if (location.pathname.indexOf('/Cascade-Staff/') !== -1 || /[?&]shell=1\b/.test(location.search)) { var m = document.querySelector('link[rel="manifest"]'); if (m) m.remove(); } })(); /* D-324: one install, the shell's */</script>
 <link rel="icon" href="data:,">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <title>Cascade Hideaway — Cleaning Checklist v6.8</title>
@@ -5043,6 +5044,31 @@ const EDGE_CALENDAR_SYNC = `${EDGE_BASE}/calendar-sync`;
 const PROPERTY_ID        = '6ae230f4-c189-4547-84b1-cb6e0b2cc9bd'; // Cascade Bria
 const AUTH_SESSION_KEY   = 'ch_staff_session_v1';
 let staffSession         = null;
+// D-324: inside the one Cascade Staff app (/Cascade-Staff/checklist/ or ?shell=1) sign-in is shared with the shell.
+const FOLDED = location.pathname.indexOf('/Cascade-Staff/') !== -1 || /[?&]shell=1\b/.test(location.search);
+const SHELL_KEY = 'sb-qkgfhsdppslwunarczeq-auth-token'; // supabase-js session the shell stores
+let shellSrc = null; // 'sessionStorage' | 'localStorage' while the session is adopted from the shell
+function adoptShellSession(raw, nowSec) {
+  let s; try { s = JSON.parse(raw || 'null'); } catch { return null; }
+  if (!s || !s.access_token || !s.user || !s.user.id) return null;
+  const exp = Number(s.expires_at) || (nowSec + Number(s.expires_in || 0));
+  if (exp <= nowSec + 60 && !s.refresh_token) return null;
+  return { access_token: s.access_token, refresh_token: s.refresh_token || '', expires_at: exp,
+    user: { id: s.user.id, email: s.user.email || '', display_name: deriveDisplayName(s.user) } };
+}
+function mergeShellTokens(raw, sess, nowSec) {
+  let s; try { s = JSON.parse(raw || 'null'); } catch { return null; }
+  if (!s || typeof s !== 'object') return null;
+  s.access_token = sess.access_token; s.refresh_token = sess.refresh_token; s.expires_at = sess.expires_at;
+  s.expires_in = Math.max(0, sess.expires_at - nowSec);
+  return JSON.stringify(s);
+}
+function readShellSession() { // session storage first, then local: same order as the shell's adapter
+  for (const name of ['sessionStorage', 'localStorage']) {
+    try { const raw = window[name].getItem(SHELL_KEY); if (raw) return { name, raw }; } catch {}
+  }
+  return null;
+}
 
 const DRAFT_KEY          = 'ch_draft_v6';
 const METER_FP_KEY       = 'ch_last_meter_fp'; // last report's meter photo hashes
@@ -5096,11 +5122,16 @@ function staffLoginEmail(raw) {
 
 function saveStaffSession(session) {
   staffSession = session;
+  if (shellSrc) { // adopted: rotated tokens go back to the shell's own key, never into the checklist's
+    try { const raw = window[shellSrc].getItem(SHELL_KEY); const m = raw && mergeShellTokens(raw, session, Math.floor(Date.now() / 1000)); if (m) window[shellSrc].setItem(SHELL_KEY, m); } catch {}
+    return;
+  }
   localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
 }
 
 function clearStaffSession() {
   staffSession = null;
+  if (shellSrc) { shellSrc = null; return; } // adopted: the shell owns that session and this device's PIN
   localStorage.removeItem(AUTH_SESSION_KEY);
   // A PIN is a device-local shortcut for THIS session. Whenever the session
   // ends for any reason (sign-out, disable/delete, a rejected refresh), the
@@ -5176,6 +5207,10 @@ async function authRequest(grantType, body) {
 async function requireStaffSession() {
   if (!staffSession) {
     try { staffSession = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch { clearStaffSession(); }
+  }
+  if (FOLDED && (!staffSession || shellSrc)) { // no own session, or already adopted: take the shell's latest tokens
+    const sh = readShellSession(), a = sh && adoptShellSession(sh.raw, Math.floor(Date.now() / 1000));
+    if (a) { staffSession = a; shellSrc = sh.name; }
   }
   if (!staffSession?.access_token) return null;
   // Backfill display_name on sessions stored before WP1 (identity-from-session
@@ -5477,7 +5512,7 @@ function showPinLockScreen() {
 }
 
 async function promptSetPinIfNeeded() {
-  if (!SUPPORTS_PIN || getPinRecord()) return;
+  if (!SUPPORTS_PIN || getPinRecord() || shellSrc) return; // adopted shell session: the shell already signed her in
   await showPinSetupScreen();
 }
 
@@ -9968,9 +10003,10 @@ function initSuccessButtons() {
   // Feature 3: success-btn-messenger removed; after-clean photos now submitted in-app.
 
   el('success-btn-inventory')?.addEventListener('click', () => {
-    showToast('Opening inventory…');
+    showToast(FOLDED ? 'Back to Staff home…' : 'Opening inventory…');
     // Updated v6.7: link to CH_Inventory GitHub Pages app (was Google Sheets URL)
     const invUrl = 'https://cascadereservations-del.github.io/CH_Inventory/';
+    if (FOLDED) { location.href = '../'; return; } // one app: back to staff home (inventory app is retired)
     window.open(invUrl, '_blank');
   });
 

@@ -81,7 +81,7 @@ self.addEventListener('activate', event => {
         caches.keys()
             .then(keys => Promise.all(
                 keys
-                    .filter(k => k !== CACHE_NAME)
+                    .filter(k => k !== CACHE_NAME && k.indexOf('ch-shell') === 0) // own caches only: same origin as the Staff shell's cs-shell-*
                     .map(k => {
                         console.log('[SW] Evicting old cache:', k);
                         return caches.delete(k);

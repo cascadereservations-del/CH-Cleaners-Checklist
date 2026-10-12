@@ -5209,6 +5209,7 @@ async function requireStaffSession() {
   if (FOLDED && (!staffSession || shellSrc)) { // the shell's session wins; the standalone's own key (same origin) is only a fallback
     const sh = readShellSession(), a = sh && adoptShellSession(sh.raw, Math.floor(Date.now() / 1000));
     if (a) { staffSession = a; shellSrc = sh.name; }
+    else if (shellSrc) { staffSession = null; shellSrc = null; return null; } // adopted, then the shell signed out: signed out here too, never another person's saved login
   }
   if (!staffSession) {
     try { staffSession = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch { clearStaffSession(); }

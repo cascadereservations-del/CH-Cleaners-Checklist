@@ -460,7 +460,7 @@
 <meta name="apple-mobile-web-app-title" content="CH Checklist">
 <meta name="description" content="Cascade Hideaway — Cleaning Checklist App">
 <link rel="manifest" href="manifest.webmanifest">
-<script>(function(){ if (location.pathname.indexOf('/Cascade-Staff/') !== -1 || /[?&]shell=1\b/.test(location.search)) { var m = document.querySelector('link[rel="manifest"]'); if (m) m.remove(); } })(); /* D-324: one install, the shell's */</script>
+<script>(function(){ if (location.pathname.indexOf('/Cascade-Staff/') !== -1) { var m = document.querySelector('link[rel="manifest"]'); if (m) m.remove(); } })(); /* D-324: one install, the shell's */</script>
 <link rel="icon" href="data:,">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <title>Cascade Hideaway — Cleaning Checklist v6.8</title>
@@ -4994,7 +4994,7 @@ body.mode-quick .detail-text { display: none; }
       ↺ Start New Report
     </button>
     <button class="success-action-btn secondary" id="success-btn-inventory" type="button">
-      <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg> Check Inventory
+      <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-box"/></svg> <span id="success-inv-label">Check Inventory</span>
     </button>
   </div>
   <a href="#" id="success-sign-out-link" class="switch-account-link">Sign out</a>
@@ -5044,8 +5044,8 @@ const EDGE_CALENDAR_SYNC = `${EDGE_BASE}/calendar-sync`;
 const PROPERTY_ID        = '6ae230f4-c189-4547-84b1-cb6e0b2cc9bd'; // Cascade Bria
 const AUTH_SESSION_KEY   = 'ch_staff_session_v1';
 let staffSession         = null;
-// D-324: inside the one Cascade Staff app (/Cascade-Staff/checklist/ or ?shell=1) sign-in is shared with the shell.
-const FOLDED = location.pathname.indexOf('/Cascade-Staff/') !== -1 || /[?&]shell=1\b/.test(location.search);
+// D-324: inside the one Cascade Staff app (/Cascade-Staff/checklist/) sign-in is shared with the shell.
+const FOLDED = location.pathname.indexOf('/Cascade-Staff/') !== -1; // pathname only: a crafted standalone URL cannot fold it
 const SHELL_KEY = 'sb-qkgfhsdppslwunarczeq-auth-token'; // supabase-js session the shell stores
 let shellSrc = null; // 'sessionStorage' | 'localStorage' while the session is adopted from the shell
 function adoptShellSession(raw, nowSec) {
@@ -5059,6 +5059,7 @@ function adoptShellSession(raw, nowSec) {
 function mergeShellTokens(raw, sess, nowSec) {
   let s; try { s = JSON.parse(raw || 'null'); } catch { return null; }
   if (!s || typeof s !== 'object') return null;
+  if (s.user && sess.user && s.user.id !== sess.user.id) return null; // another user signed in here: never overwrite the shell's
   s.access_token = sess.access_token; s.refresh_token = sess.refresh_token; s.expires_at = sess.expires_at;
   s.expires_in = Math.max(0, sess.expires_at - nowSec);
   return JSON.stringify(s);
@@ -5145,7 +5146,7 @@ function clearStaffSession() {
 // Mailbox logins (owner/admin) predate that field, so fall back to the
 // e-mail local part until Lloyd runs the one-line SQL update (D-033 §1.1).
 function deriveDisplayName(user) {
-  const meta = user.user_metadata?.display_name || user.app_metadata?.display_name;
+  const meta = user.user_metadata?.display_name || user.app_metadata?.display_name || user.user_metadata?.name;
   if (meta) return String(meta).trim();
   const local = String(user.email || '').split('@')[0];
   const spaced = local.replace(/[._]+/g, ' ').trim();
@@ -5205,12 +5206,12 @@ async function authRequest(grantType, body) {
 }
 
 async function requireStaffSession() {
-  if (!staffSession) {
-    try { staffSession = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch { clearStaffSession(); }
-  }
-  if (FOLDED && (!staffSession || shellSrc)) { // no own session, or already adopted: take the shell's latest tokens
+  if (FOLDED && (!staffSession || shellSrc)) { // the shell's session wins; the standalone's own key (same origin) is only a fallback
     const sh = readShellSession(), a = sh && adoptShellSession(sh.raw, Math.floor(Date.now() / 1000));
     if (a) { staffSession = a; shellSrc = sh.name; }
+  }
+  if (!staffSession) {
+    try { staffSession = JSON.parse(localStorage.getItem(AUTH_SESSION_KEY) || 'null'); } catch { clearStaffSession(); }
   }
   if (!staffSession?.access_token) return null;
   // Backfill display_name on sessions stored before WP1 (identity-from-session
@@ -5241,7 +5242,7 @@ async function requireStaffSession() {
 
 async function staffHeaders(json = false) {
   const session = await requireStaffSession();
-  if (!session) throw new Error('Staff session expired. Sign in again.');
+  if (!session) throw new Error(FOLDED ? 'Signed out of Cascade Staff. Go back and sign in again - your report is saved on this phone.' : 'Staff session expired. Sign in again.');
   return {
     'apikey': SUPABASE_ANON,
     'Authorization': `Bearer ${session.access_token}`,
@@ -5522,6 +5523,7 @@ async function initStaffAuth() {
   const existing = await requireStaffSession();
   if (existing && !staleSessionGuardTripped()) {
     touchLastSeen();
+    if (shellSrc) { gate.hidden = true; return true; } // adopted: the shell already signed her in; the standalone's PIN lock is not hers
     if (SUPPORTS_PIN && getPinRecord()) {
       gate.hidden = true;
       const unlocked = await showPinLockScreen();
@@ -10002,6 +10004,7 @@ function resetApp() {
 function initSuccessButtons() {
   // Feature 3: success-btn-messenger removed; after-clean photos now submitted in-app.
 
+  if (FOLDED && el('success-inv-label')) el('success-inv-label').textContent = 'Back to Staff home';
   el('success-btn-inventory')?.addEventListener('click', () => {
     showToast(FOLDED ? 'Back to Staff home…' : 'Opening inventory…');
     // Updated v6.7: link to CH_Inventory GitHub Pages app (was Google Sheets URL)

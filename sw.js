@@ -22,6 +22,9 @@
 //   Everything else               → network-first, cache fallback
 
 const CACHE_NAME = 'ch-shell-v7-networkfirst';
+// Folded copy (/Cascade-Staff/checklist/) shares Cache Storage with the standalone one: own prefix so neither evicts the other.
+const CACHE_PREFIX = self.location.pathname.indexOf('/Cascade-Staff/') >= 0 ? 'chf-shell' : 'ch-shell';
+const CACHE = CACHE_PREFIX + CACHE_NAME.slice('ch-shell'.length);
 
 // How long a navigation waits for the network before falling back to the
 // cached shell. Long enough for a normal 3G page load, short enough that a
@@ -65,7 +68,7 @@ const NETWORK_ONLY_HOSTS = [
 // ── Install: pre-cache the app shell ─────────────────────────
 self.addEventListener('install', event => {
     event.waitUntil(
-        caches.open(CACHE_NAME)
+        caches.open(CACHE)
             .then(cache => cache.addAll(SHELL_URLS))
             .then(() => self.skipWaiting())
             .catch(err => {
@@ -81,7 +84,7 @@ self.addEventListener('activate', event => {
         caches.keys()
             .then(keys => Promise.all(
                 keys
-                    .filter(k => k !== CACHE_NAME && k.indexOf('ch-shell') === 0) // own caches only: same origin as the Staff shell's cs-shell-*
+                    .filter(k => k !== CACHE && k.indexOf(CACHE_PREFIX + '-') === 0) // own caches only (not cs-shell-* nor the sibling copy's)
                     .map(k => {
                         console.log('[SW] Evicting old cache:', k);
                         return caches.delete(k);
@@ -116,7 +119,7 @@ self.addEventListener('fetch', event => {
                 if (cached) return cached;
                 return fetch(request).then(resp => {
                     if (resp && resp.status === 200 && resp.type !== 'opaque') {
-                        caches.open(CACHE_NAME)
+                        caches.open(CACHE)
                             .then(cache => cache.put(request, resp.clone()))
                             .catch(() => {});
                     }
@@ -143,7 +146,7 @@ self.addEventListener('fetch', event => {
     // to the cached shell, so offline use is unchanged.
     if (request.mode === 'navigate') {
         event.respondWith(
-            caches.open(CACHE_NAME).then(async cache => {
+            caches.open(CACHE).then(async cache => {
                 const cached = await cache.match(request);
                 let timer;
                 const timeout = new Promise(resolve => {
@@ -174,7 +177,7 @@ self.addEventListener('fetch', event => {
         fetch(request)
             .then(resp => {
                 if (resp && resp.status === 200 && url.origin === self.location.origin) {
-                    caches.open(CACHE_NAME)
+                    caches.open(CACHE)
                         .then(cache => cache.put(request, resp.clone()))
                         .catch(() => {});
                 }

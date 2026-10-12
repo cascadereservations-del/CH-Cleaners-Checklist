@@ -38,3 +38,24 @@ test('rotated tokens are written back into the supabase-js shape, other fields k
 test('folded mode never persists an adopted session into the checklist key', () => {
   assert.match(html, /if \(shellSrc\) \{[^}]*\n[^\n]*\n\s*return;/);
 });
+
+test('another user in the checklist never overwrites the shell key', () => {
+  assert.equal(mergeShellTokens(shell, { access_token: 'x', refresh_token: 'y', expires_at: NOW, user: { id: 'other' } }, NOW), null);
+  assert.ok(mergeShellTokens(shell, { access_token: 'x', refresh_token: 'y', expires_at: NOW, user: { id: 'u1' } }, NOW));
+});
+test('folded: the shell session is adopted before the standalone key is read, and the PIN lock is skipped when adopted', () => {
+  const i = html.indexOf('readShellSession(), a = sh');
+  const j = html.indexOf("localStorage.getItem(AUTH_SESSION_KEY) || 'null'", i);
+  assert.ok(i > 0 && j > i);
+  assert.match(html, /if \(shellSrc\) \{ gate\.hidden = true; return true; \}/);
+  assert.match(html, /if \(shellSrc\) \{ shellSrc = null; return; \}/);
+});
+test('folded flag and manifest removal key on the pathname only', () => {
+  assert.doesNotMatch(html, /shell=1/);
+});
+test('the folded service worker uses its own cache prefix; standalone name is unchanged', () => {
+  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  assert.match(sw, /const CACHE_NAME = 'ch-shell-v7-networkfirst';/);
+  assert.match(sw, /'chf-shell' : 'ch-shell'/);
+  assert.match(sw, /k\.indexOf\(CACHE_PREFIX \+ '-'\) === 0/);
+});

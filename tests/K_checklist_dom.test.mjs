@@ -158,7 +158,7 @@ test('DOM: the full turnover payload keeps the six section titles, the issue_che
 });
 
 /* ---- a picked block ---- */
-test('DOM: picking a block stay option makes the date valid (no confirm dialog) and sets the cleaning type to deep_clean', () => {
+test('DOM: picking a block stay option makes the date valid (no confirm dialog) and leaves the cleaning type alone', () => {
   const state = { cleaningType: 'turnover', cleaningDateStatus: 'unknown', checklist: {}, confirmItems: {}, issueFlags: {} };
   const dialogs = [];
   const fields = { stayPick: { value: '0', classList: { add() {}, remove() {} } }, 'stay-pick-hint': { textContent: '', className: '' }, lastGuestName: { value: '' }, 'cleaning-date-hint': { textContent: '', className: '' } };
@@ -173,7 +173,7 @@ test('DOM: picking a block stay option makes the date valid (no confirm dialog) 
   assert.equal(dialogs.length, 1);
   api.setOptions([block]);
   api.applyStayPick();
-  assert.equal(state.cleaningType, 'deep_clean', 'a maintenance visit is not a turnover');
+  assert.equal(state.cleaningType, 'turnover', 'the type is the cleaner choice: pay follows it, so a block pick never changes it');
   assert.equal(state.cleaningDateStatus, 'valid');
   dialogs.length = 0;
   api.runCalendarValidation('2026-10-14', [stay], null);

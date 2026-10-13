@@ -11225,11 +11225,10 @@ function applyStayPick() {
   if (b.kind === 'mid_stay' && state.cleaningType !== 'mid_stay') {
     setCleaningType('mid_stay', { auto: true });
   }
-  // K_: a scheduled maintenance block is a deep-clean style visit, never a turnover (submit-cleaning would mark a turnover incomplete).
-  // The cleaner can still change the type; the date is valid, so no "is this a maintenance clean?" dialog.
+  // K_: a scheduled maintenance block makes the date valid (no "is this a maintenance clean?" dialog). The cleaning type is NOT changed:
+  // pay follows the type (a deep clean pays more), so the cleaner chooses it on Setup.
   K_pickedBlock = b.kind === 'block' ? { checkin_date: b.checkin_date, checkout_date: b.checkout_date } : null;
   if (b.kind === 'block') {
-    if (state.cleaningType !== 'deep_clean') setCleaningType('deep_clean', { auto: true });
     state.cleaningDateStatus = 'valid';
   }
 

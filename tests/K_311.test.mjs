@@ -39,7 +39,13 @@ test('photos: the screen needs every named slot (on a turnover or deep clean), a
   assert.equal(api.K_slotsOk(), false);
   assert.equal(api.K_missingSlots().length, 6);
   state.kitchenPhotos = [{ slot: 'b_toilet' }, { slot: 'b_shower' }, { slot: 'b_sink' }, { slot: 'k_counter' }, { slot: 'k_stove' }, { name: 'untagged old photo' }];
-  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['k_utensils'], 'an untagged photo does not stand in for the utensils photo');
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), [], 'an untagged photo (from a live-v8 draft) fills the first missing slot, so nothing is retaken');
+  state.kitchenPhotos = [{ name: 'v8 a', slot: null }, { name: 'v8 b', slot: null }];
+  assert.equal(api.K_missingSlots().length, 4, 'a v8 draft with 2 kitchen photos needs only 4 more of the six');
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['b_sink', 'k_counter', 'k_stove', 'k_utensils'], 'the old photos fill the first slots in order');
+  state.kitchenPhotos = [{ slot: 'k_utensils' }, { slot: null }];
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['b_shower', 'b_sink', 'k_counter', 'k_stove'], 'a tagged photo keeps its slot; the loose one takes the first free one');
+  state.kitchenPhotos = [{ slot: 'b_toilet' }, { slot: 'b_shower' }, { slot: 'b_sink' }, { slot: 'k_counter' }, { slot: 'k_stove' }];
   state.kitchenPhotos.push({ slot: 'k_utensils' });
   assert.equal(api.K_slotsOk(), true);
   state.kitchenPhotos = [];
@@ -159,6 +165,19 @@ test('picker: one chronological list, Missed first (oldest first, days late), th
   assert.ok(htmlOut.indexOf('Missed: no report yet') < htmlOut.indexOf("Today's turnover") && htmlOut.indexOf("Today's turnover") < htmlOut.indexOf('Staying now'));
   assert.match(htmlOut, /<optgroup label="⚠ Missed: no report yet">/, 'glyph and words');
   assert.match(api.K_stayOptionsHtml(api.K_groupStays([row({ event_id: 'x', checkout_date: '2026-10-13' })], '2026-10-14'), b => 'x'), /Missed · 1 day late/, 'singular');
+});
+
+test('picker: a stay that was extended (same guest, next booking starts on the checkout date) is not Missed; a different guest still is', () => {
+  const { api } = load();
+  const first = row({ event_id: 'a', guest_name: ' Ana Cruz ', checkin_date: '2026-10-01', checkout_date: '2026-10-05' });
+  const second = row({ event_id: 'b', guest_name: 'ana cruz', checkin_date: '2026-10-05', checkout_date: '2026-10-09', already_reported: true });
+  assert.deepEqual(api.K_groupStays([first], '2026-10-14', [first, second]).missed.map(b => b.event_id), [], 'chained: the guest never left, no turnover was due (the successor is already reported, so it is only in the full list)');
+  const other = row({ event_id: 'c', guest_name: 'Someone Else', checkin_date: '2026-10-05', checkout_date: '2026-10-09' });
+  assert.deepEqual(api.K_groupStays([first], '2026-10-14', [first, other]).missed.map(b => b.event_id), ['a'], 'same dates, a different guest: still listed');
+  const later = row({ event_id: 'd', guest_name: 'Ana Cruz', checkin_date: '2026-10-06', checkout_date: '2026-10-09' });
+  assert.deepEqual(api.K_groupStays([first], '2026-10-14', [first, later]).missed.map(b => b.event_id), ['a'], 'a gap day: a real departure');
+  assert.deepEqual(api.K_groupStays([row({ event_id: 'n', guest_name: null, checkout_date: '2026-10-05' })], '2026-10-14', [row({ event_id: 'n', guest_name: null, checkout_date: '2026-10-05' }), row({ event_id: 'm', guest_name: null, checkin_date: '2026-10-05', checkout_date: '2026-10-08' })]).missed.length, 1, 'two nameless rows are not the same guest');
+  assert.match(html, /K_groupStays\(reportable, todayManila\(\), rows\)/, 'the full server list is passed, reported rows included');
 });
 
 test('picker: a block is never under Missed, whatever its dates', () => {

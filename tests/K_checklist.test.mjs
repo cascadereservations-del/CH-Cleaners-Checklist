@@ -297,7 +297,7 @@ test('motion and targets: the completion tick respects prefers-reduced-motion; f
 
 test('the shell cache is bumped for the new checklist', () => {
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-  assert.match(sw, /const CACHE_NAME = 'ch-shell-v8-networkfirst';/);
+  assert.match(sw, /const CACHE_NAME = 'ch-shell-v9-networkfirst';/);
 });
 
 test('kept contracts: photo section keys, [URGENT], flags, per-type only logic, details shape', () => {

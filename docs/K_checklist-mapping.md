@@ -55,29 +55,30 @@ behind a "How to do it" or "What this covers" expander so a screen stays near on
 | check_balcony | Wipe balcony | check_8_1 | merged (covers) | 5 |
 | check_9_1 | Walkthrough as the guest | check_9_1 "Walk through as the guest and look for fingerprints, dust and smudges from different angles" | kept (DO-CONFIRM); "See the standard" living | 5 |
 | check_vacuum_charge | Vacuum on charge, empty bin | check_vacuum_charge | kept (READ-DO), highlight | 5 |
-| check_ecoflow_stowed | EcoFlow stowed, cable tidy | check_ecoflow_charge | merged into the existing Confirm & Leave line (covers) | 6 (gated) |
+| check_ecoflow_stowed | EcoFlow stowed, cable tidy | check_9_4 | in `covers` of check_9_4 (3.1.1: the EcoFlow line `check_ecoflow_charge`, which had absorbed it, was itself merged into the AC and fridge line; `covers: ['check_ecoflow_charge','check_ecoflow_stowed']`) | 5 (gated) |
+| (new in 3.1.1) | | check_bin_outside "Check the garbage bin outside; spray insecticide and disinfectant on its lid and around it" | NEW ordinary tick, no old id; last line on Finish (the trip outside with the last trash, before the door-side checks on Lock up); `only` turnover, deep_clean, mid_stay; detail names the odourless insecticide | 5 |
 | check_10_6 | Final power and safety, windows closed, door locked | check_10_6 | kept, KILLER (gated, critical); shown in the Lock up set before the SmartLife line | 6 (gated) |
 
-Counts: 37 ordinary ticks -> 20 ordinary lines (P2 6, P3 6, P4 5, P5 3) + 3 new gated killers (check_2_4, check_7_5, check_10_6) = 23 lines;
+Counts: 37 ordinary ticks -> 20 old-id ordinary lines (P2 6, P3 6, P4 5, P5 3) + 1 new line (check_bin_outside, P5) = 21 ordinary lines, + 3 gated killers (check_2_4, check_7_5, check_10_6);
 `covers` lists 14 absorbed ids (check_4_5 is a line again); the other 23 old ids survive as lines (the 3 killers are among the 23; check_ecoflow_stowed is one of the 14 and is absorbed into the gated EcoFlow line).
 
-## Gated items (confirm or report an issue), 7 to 9 per cleaning type
+## Gated items (confirm or report an issue), 4 to 8 per cleaning type
 
-Each gated item sits on the screen where the work happens (`phase` on the item; Confirm & Leave items default to Lock up). `confirmItemsNow()` is
-unchanged (6 for turnover and deep_clean, 4 for mid_stay and emergency). `K_gatedAll()` is the union with the three killers (K_KILLER_ITEMS), in screen order.
+Each gated item sits on the screen where the work happens (`phase` on the item; Confirm & Leave items default to Lock up). `confirmItemsNow()` is 5 for turnover and
+deep_clean, 3 for mid_stay and emergency (the EcoFlow line merged into check_9_4). `K_gatedAll()` is the union with the three killers (K_KILLER_ITEMS), in screen order.
 
 | Screen | Gated items |
 |---|---|
 | 2 Arrive & Prep | check_2_4 (killer: linen stains; not urgent; photo) |
 | 4 Bathroom & Kitchen | check_7_5 (killer: smell; not urgent; photo), check_utensils_complete (turnover, deep_clean) with the kitchen photos |
-| 5 Finish | check_9_4 (AC and fridge), check_ecoflow_charge (also covers check_ecoflow_stowed) |
+| 5 Finish | check_9_4 (AC, fridge and EcoFlow in one line; covers check_ecoflow_charge and check_ecoflow_stowed) |
 | 6 Lock up | check_key_card, check_guest_code, check_10_6 (killer: windows, lights, door; URGENT; photo), check_smartlife_waiting (turnover, deep_clean), SmartLife last |
 
 | Cleaning type | Gated total | Of which new killers |
 |---|---|---|
-| turnover, deep_clean | 9 | check_2_4, check_7_5, check_10_6 |
-| mid_stay | 7 | the same three |
-| emergency | 5 | check_10_6 only |
+| turnover, deep_clean | 8 | check_2_4, check_7_5, check_10_6 |
+| mid_stay | 6 | the same three |
+| emergency | 4 | check_10_6 only |
 
 The Lock up heading and intro count only the Lock up items (4 for a turnover, 3 for the other types). A screen gate asks only for its OWN gated items:
 2 -> check_2_4; 4 -> supply log, kitchen photos (existing) and its gated items; 5 -> after-clean photos and its gated items; 6 -> the existing
@@ -90,3 +91,11 @@ optional `issue_<id>` photo.
 Meter logic, photo minimums and sections (`section_meter`, `section_preclean`, `section_afterclean`), `issue_<itemId>` keys, `[URGENT]`, flags C/H/F/D/T
 (the check_7_5 flag button is replaced by the Issue Found control, which writes the same `issue_` style note under Confirm & Leave), the weekly
 tasks, `triggersInventory`, `confirmItemsNow()`, the submit payload keys, sign-in.
+
+## 3.1.1 notes
+
+- Photos: the Bathroom & Kitchen card asks for six named photos (Toilet, Shower and drain, Sink and mirror; Counter and sink, Stove and appliances,
+  Utensils: drawer, rack and cookware laid out). Photos from a draft saved before the slots existed (no slot) fill the first missing slots in order.
+- Picker: stays 30 days back (client passes `p_lookback: 30`); a stay whose checkout date is another booking's check-in date for the same guest
+  (an extended stay) is never listed as Missed.
+- Draft marker `_k: 2` = EcoFlow merged into check_9_4 (confirmed only if both old answers were; an issue on either carries over with its note).

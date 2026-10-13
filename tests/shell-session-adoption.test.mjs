@@ -55,7 +55,7 @@ test('folded flag and manifest removal key on the pathname only', () => {
 });
 test('the folded service worker uses its own cache prefix; standalone name is unchanged', () => {
   const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
-  assert.match(sw, /const CACHE_NAME = 'ch-shell-v8-networkfirst';/);
+  assert.match(sw, /const CACHE_NAME = 'ch-shell-v9-networkfirst';/);
   assert.match(sw, /'chf-shell' : 'ch-shell'/);
   assert.match(sw, /k\.indexOf\(CACHE_PREFIX \+ '-'\) === 0/);
 });

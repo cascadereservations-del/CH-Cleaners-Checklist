@@ -5933,7 +5933,13 @@ function K_gatedAll() {
 /* A line that applies to some cleaning types only (plants and hangers are not a mid-stay or emergency job). */
 const K_only = items => items.filter(i => !i.only || i.only.includes(state.cleaningType));
 /* Which of the six named photos are still missing (empty when the screen does not ask for them). */
-const K_missingSlots = () => (!kitchenPhotosRequired() ? [] : K_PHOTO_SLOTS.filter(s => !(state.kitchenPhotos || []).some(p => p && p.slot === s.id)));
+const K_missingSlots = () => {
+  if (!kitchenPhotosRequired()) return [];
+  const photos = state.kitchenPhotos || [];
+  const taken = new Set(photos.filter(p => p && p.slot).map(p => p.slot));
+  let loose = photos.filter(p => p && !p.slot).length;   // photos from a draft saved before the slots existed fill the first free slots, in order
+  return K_PHOTO_SLOTS.filter(s => { if (taken.has(s.id)) return false; if (loose > 0) { loose--; return false; } return true; });
+};
 const K_slotsOk = () => K_missingSlots().length === 0;
 let K_activeSlot = 'b_toilet';   // the slot the next photo is filed under
 const K_gatedForPhase = ph => K_gatedAll().filter(i => K_itemPhase(i) === ph);
@@ -5997,9 +6003,13 @@ function K_migrateDraft(d, lines, gated, phaseMap) {
 function K_daysLate(todayStr, checkoutStr) {
   return Math.round((Date.parse(todayStr + 'T00:00:00Z') - Date.parse(checkoutStr + 'T00:00:00Z')) / 86400000);
 }
-function K_groupStays(rows, todayStr) {
+function K_groupStays(rows, todayStr, allRows = rows) {
+  // a stay that was EXTENDED (the same guest's next booking starts on this checkout date) never left: no turnover clean was due.
+  // allRows is the server's whole list, reported rows included (the successor is usually the reported one).
+  const nm = b => String(b.guest_name || '').trim().toLowerCase();
+  const extended = b => !!nm(b) && allRows.some(o => o !== b && nm(o) === nm(b) && o.checkin_date === b.checkout_date);
   const byDate = f => (a, b) => String(a[f]).localeCompare(String(b[f]));
-  const missed = rows.filter(b => b.kind === 'checkout' && b.checkout_date < todayStr).sort(byDate('checkout_date'))
+  const missed = rows.filter(b => b.kind === 'checkout' && b.checkout_date < todayStr && !extended(b)).sort(byDate('checkout_date'))
     .map(b => Object.assign({}, b, { daysLate: K_daysLate(todayStr, b.checkout_date) }));
   const today = rows.filter(b => b.kind === 'checkout' && b.checkout_date >= todayStr).sort(byDate('checkout_date'));
   const mid = rows.filter(b => b.kind === 'mid_stay').sort(byDate('checkin_date'));
@@ -9128,7 +9138,7 @@ function K_renderSlots() {
   let area = '';
   K_PHOTO_SLOTS.forEach(s => {
     if (s.area !== area) { area = s.area; const h = document.createElement('div'); h.className = 'K_slot-area'; h.textContent = area; box.appendChild(h); }
-    const done = (state.kitchenPhotos || []).some(p => p && p.slot === s.id);
+    const done = !need.some(n => n.id === s.id);
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'K_slot' + (done ? ' done' : '') + (s.id === K_activeSlot ? ' active' : '');
     b.setAttribute('aria-pressed', String(s.id === K_activeSlot));
@@ -11331,7 +11341,7 @@ async function loadCleanableBookings(dateStr) {
       const from = stayReportableFrom(b);
       return from !== null && now >= from;
     });
-    const stayGroups = K_groupStays(reportable, todayManila());
+    const stayGroups = K_groupStays(reportable, todayManila(), rows);
     _stayOptions = [...stayGroups.missed, ...stayGroups.today, ...stayGroups.mid, ...stayGroups.block];
     const notYet = unreported.length - _stayOptions.length;
 

@@ -1,5 +1,5 @@
 // sw.js — Cascade Hideaway Cleaning Checklist
-// Service Worker  v1.2  |  2026-09-13
+// Service Worker  v1.3  |  2026-10-13 (CACHE_NAME ch-shell-v8: s82 lane K, six-screen checklist; phones evict the old shell)
 //
 // v1.2: Navigation is NETWORK-FIRST with a 3s timeout, not
 //       stale-while-revalidate. SWR always served the PREVIOUS deploy on the
@@ -21,7 +21,7 @@
 //   Navigation (HTML page)        → network-first, 3s timeout, cache fallback
 //   Everything else               → network-first, cache fallback
 
-const CACHE_NAME = 'ch-shell-v7-networkfirst';
+const CACHE_NAME = 'ch-shell-v8-networkfirst';
 // Folded copy (/Cascade-Staff/checklist/) shares Cache Storage with the standalone one: own prefix so neither evicts the other.
 const CACHE_PREFIX = self.location.pathname.indexOf('/Cascade-Staff/') >= 0 ? 'chf-shell' : 'ch-shell';
 const CACHE = CACHE_PREFIX + CACHE_NAME.slice('ch-shell'.length);

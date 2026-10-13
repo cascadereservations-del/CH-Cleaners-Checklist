@@ -48,10 +48,10 @@ test('mapping: every one of the 37 old ids survives as a line or sits in exactly
   const count = new Map(OLD_IDS.map(id => [id, 0]));
   for (const l of all) {
     if (count.has(l.id)) count.set(l.id, count.get(l.id) + 1);
-    for (const c of l.covers || []) { assert.ok(count.has(c), `${l.id} covers an id that was never an old line: ${c}`); count.set(c, count.get(c) + 1); }
+    for (const c of l.covers || []) { if (c === 'check_ecoflow_charge') continue; /* a former gated line, merged into check_9_4 in 3.1.1 */ assert.ok(count.has(c), `${l.id} covers an id that was never an old line: ${c}`); count.set(c, count.get(c) + 1); }
   }
   for (const [id, n] of count) assert.equal(n, 1, `${id} must appear exactly once (kept or covered), found ${n}`);
-  assert.equal(lines.length, 20, 'ordinary lines (19 plus the disinfect line split back out of check_4_1)');
+  assert.equal(lines.length, 21, 'ordinary lines (19, the disinfect line split back out of check_4_1, and the new garbage-bin line)');
   assert.deepEqual(api.K_KILLER_ITEMS.map(i => i.id), ['check_2_4', 'check_7_5', 'check_10_6']);
   const ids = all.map(i => i.id);
   assert.equal(new Set(ids).size, ids.length, 'no id is declared twice');
@@ -62,7 +62,7 @@ test('mapping: a merged line has one surviving id plus covers, and the phases ho
   assert.deepEqual([...api.ARRIVE_ITEMS, ...api.CHEMICAL_ITEMS].map(i => i.id), ['check_0_1', 'check_1_4', 'check_1_5', 'check_1_9', 'check_2_1', 'check_3_1']);
   assert.deepEqual(api.BEDROOM_ITEMS.map(i => i.id), ['check_4_1', 'check_4_5', 'check_5_2', 'check_5_9', 'check_5_10', 'check_1_8']);
   assert.deepEqual(api.KITCHEN_ITEMS.map(i => i.id), ['check_7_4', 'check_drain_screen', 'check_6_1', 'check_7_6', 'check_7_7']);
-  assert.deepEqual(api.FINAL_CLEANING_ITEMS.map(i => i.id), ['check_8_1', 'check_9_1', 'check_vacuum_charge']);
+  assert.deepEqual(api.FINAL_CLEANING_ITEMS.map(i => i.id), ['check_8_1', 'check_9_1', 'check_vacuum_charge', 'check_bin_outside']);
   assert.equal(api.POWER_CHECK_ITEMS.length, 0);
   assert.ok(api.KITCHEN_ITEMS.find(i => i.id === 'check_7_7').triggersInventory, 'triggersInventory stays on the refill line');
   assert.ok(api.ARRIVE_ITEMS.find(i => i.id === 'check_1_9').flag && api.KITCHEN_ITEMS.find(i => i.id === 'check_drain_screen').flag, 'flags survive');
@@ -83,7 +83,7 @@ test('draft migration: a merged line is ticked only if ALL the old ids it covers
   assert.equal(m.checklist.check_5_2, false, 'pillows were not ticked');
   assert.equal(m.checklist.check_4_1, true, 'all three old ids ticked');
   assert.equal(m.checklist.check_1_5, false, 'check_1_7 was never ticked');
-  assert.equal(m._k, 1);
+  assert.equal(m._k, 2);
   assert.equal(d._k, undefined, 'the old object is not mutated');
 });
 
@@ -96,7 +96,7 @@ test('draft migration: old phase indexes map to the new ones; killers ticked bec
     issueFlags: { check_1_11: { note: 'filter light red' }, check_7_5: { note: 'drain smells' } } });
   assert.equal(m.confirmItems.check_2_4, 'confirmed');
   assert.equal(m.confirmItems.check_10_6, 'confirmed');
-  assert.equal(m.confirmItems.check_9_4, 'confirmed', 'existing answers stay');
+  assert.equal(m.confirmItems.check_9_4, undefined, 'check_9_4 was confirmed but the EcoFlow half was never answered: the merged line asks again');
   assert.equal(m.confirmItems.check_7_5, 'issue', 'a flagged note becomes an Issue Found');
   assert.equal(m.confirmNotes.check_7_5, 'drain smells');
   assert.equal(m.issueFlags.check_1_4.note, 'filter light red', 'a covered id flag note moves to the line that absorbed it');
@@ -123,28 +123,28 @@ test('gating: each killer item gates only its own screen, and Issue Found counts
 test('gating: Lock up is the door-side pause point; AC, fridge and EcoFlow moved to Finish, utensils to the kitchen', () => {
   const { api, state } = load();
   assert.deepEqual(api.K_gatedForPhase(6).map(i => i.id), ['check_key_card', 'check_guest_code', 'check_10_6', 'check_smartlife_waiting']);
-  assert.deepEqual(api.K_gatedForPhase(5).map(i => i.id), ['check_9_4', 'check_ecoflow_charge']);
-  assert.equal(api.confirmItemsNow().length, 6, 'confirmItemsNow() is unchanged');
+  assert.deepEqual(api.K_gatedForPhase(5).map(i => i.id), ['check_9_4']);
+  assert.equal(api.confirmItemsNow().length, 5, 'confirmItemsNow(): 6 minus the EcoFlow line merged into check_9_4 (3.1.1)');
   state.cleaningType = 'mid_stay';
   assert.deepEqual(api.K_gatedForPhase(6).map(i => i.id), ['check_key_card', 'check_guest_code', 'check_10_6']);
   assert.deepEqual(api.K_gatedForPhase(2).map(i => i.id), ['check_2_4'], 'a mid-stay still inspects the linen');
   state.cleaningType = 'emergency';
-  assert.deepEqual(api.K_gatedAll().map(i => i.id), ['check_9_4', 'check_ecoflow_charge', 'check_key_card', 'check_guest_code', 'check_10_6'], 'an emergency visit is not a clean: no linen or smell gate, power and safety still asked');
+  assert.deepEqual(api.K_gatedAll().map(i => i.id), ['check_9_4', 'check_key_card', 'check_guest_code', 'check_10_6'], 'an emergency visit is not a clean: no linen or smell gate, power and safety still asked');
 });
 
 test('gating: isPhaseValid enforces the killers; the real phase gate function is wired to them', () => {
   const m = html.match(/function isPhaseValid\(phase\) \{[\s\S]*?\n\}/);
   assert.ok(m, 'isPhaseValid');
   assert.match(m[0], /case 2: return K_gatedOk\(2\)/);
-  assert.match(m[0], /case 4: return isPhase3Valid\(\) && K_gatedOk\(4\)/);
+  assert.match(m[0], /case 4: return isPhase3Valid\(\) && K_slotsOk\(\) && K_gatedOk\(4\)/);
   assert.match(m[0], /case 6: return isPhase4Valid\(\) && K_gatedOk\(6\)/);
   assert.match(html, /btnSubmit\.disabled = !isPhaseValid\(PHASE_COUNT - 1\)/, 'Submit is gated by the last phase');
   // run it for real
-  const { api, state } = load({ kitchenPhotos: ['a', 'b'], supplyLogSaved: true, aftercleanPhotos: ['1', '2', '3', '4', '5'], bedroomPhotos: [], meterPhotos: [null, null] });
+  const { api, state } = load({ kitchenPhotos: ['b_toilet', 'b_shower', 'b_sink', 'k_counter', 'k_stove', 'k_utensils'].map(s => ({ slot: s })), supplyLogSaved: true, aftercleanPhotos: ['1', '2', '3', '4', '5'], bedroomPhotos: [], meterPhotos: [null, null] });
   const src = [m[0], html.match(/function isPhase3Valid\(\)[\s\S]*?\n\}/)[0], html.match(/function isPhase4Valid\(\)[\s\S]*?\n\}/)[0], html.match(/function K_afterPhotosOk\(\)[\s\S]*?\n\}/)[0],
     'const SECTION_PHOTO_MIN = 2, MIDSTAY_PHOTO_MIN = 4, AFTERCLEAN_PHOTO_MIN = 5;', 'const isPhase0Valid = () => true, isPhase1Valid = () => true;',
     'return isPhaseValid;'].join('\n');
-  const isPhaseValid = new Function('state', 'K_gatedOk', 'confirmItemsNow', 'kitchenPhotosRequired', src)(state, api.K_gatedOk, api.confirmItemsNow, () => true);
+  const isPhaseValid = new Function('state', 'K_gatedOk', 'K_slotsOk', 'confirmItemsNow', 'kitchenPhotosRequired', src)(state, api.K_gatedOk, () => state.kitchenPhotos.length >= 6, api.confirmItemsNow, () => true);
   assert.equal(isPhaseValid(2), false, 'linen unanswered');
   state.confirmItems.check_2_4 = 'confirmed';
   assert.equal(isPhaseValid(2), true);
@@ -152,8 +152,8 @@ test('gating: isPhaseValid enforces the killers; the real phase gate function is
   state.confirmItems.check_7_5 = 'issue';
   state.confirmItems.check_utensils_complete = 'confirmed';
   assert.equal(isPhaseValid(4), true);
-  assert.equal(isPhaseValid(5), false, 'Finish also asks for AC and fridge, and the EcoFlow');
-  state.confirmItems.check_9_4 = 'confirmed'; state.confirmItems.check_ecoflow_charge = 'confirmed';
+  assert.equal(isPhaseValid(5), false, 'Finish also asks for the AC, fridge and EcoFlow line');
+  state.confirmItems.check_9_4 = 'confirmed';
   assert.equal(isPhaseValid(5), true);
   for (const i of api.confirmItemsNow()) state.confirmItems[i.id] = 'confirmed';
   assert.equal(isPhaseValid(6), false, 'every Confirm & Leave item answered but the final power and safety check is not');

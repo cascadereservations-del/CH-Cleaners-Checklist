@@ -58,7 +58,7 @@ test('both new confirmations are asked for on a handover and skipped otherwise',
     setType(type);
     assert.ok(!ids().includes('check_utensils_complete'), `${type} must not ask for the utensil count`);
     assert.ok(!ids().includes('check_smartlife_waiting'), `${type} must not arm the arrival automation`);
-    assert.equal(ids().length, 4, `${type} keeps the original four items`);
+    assert.equal(ids().length, 3, `${type} keeps the original items, minus the EcoFlow line merged into the AC line (3.1.1)`);
   }
 });
 
@@ -103,9 +103,11 @@ test('Step 3 will not advance on a turnover until the kitchen set is photographe
   const { state, isPhase3Valid } = loadGates();
   assert.equal(isPhase3Valid(), false, 'no kitchen photos');
   state.kitchenPhotos = ['a'];
-  assert.equal(isPhase3Valid(), false, 'one is not the minimum of two');
+  assert.equal(isPhase3Valid(), false, 'one is not the minimum of three');
   state.kitchenPhotos = ['a', 'b'];
-  assert.equal(isPhase3Valid(), true, 'two passes');
+  assert.equal(isPhase3Valid(), false, 'two is not the minimum of three (3.1.1: three per area)');
+  state.kitchenPhotos = ['a', 'b', 'c'];
+  assert.equal(isPhase3Valid(), true, 'three passes');
 
   // A mid-stay guest is still in the unit: nothing to hand over, nothing to count.
   state.cleaningType = 'mid_stay';

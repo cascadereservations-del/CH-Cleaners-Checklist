@@ -4010,6 +4010,36 @@ body.mode-quick .K_covers { display: none; }
   .K_done { animation: none; }
   .K_tick circle, .K_tick path { animation: none; stroke-dashoffset: 0; }
 }
+
+/* ═══ 3.1.1: header photo, frosted panel, colour code per area, named photo slots ═══ */
+#phase-0 { --K_hue: #7C8E99; } #phase-1 { --K_hue: #6F93B8; } #phase-2 { --K_hue: #C58B45; } #phase-3 { --K_hue: #B97690; }
+#phase-4 { --K_hue: #4FA39E; } #phase-5 { --K_hue: #84A05F; } #phase-6 { --K_hue: #8378C4; }
+#dot-0.active, #dot-0.completed { background: #7C8E99; } #dot-1.active, #dot-1.completed { background: #6F93B8; }
+#dot-2.active, #dot-2.completed { background: #C58B45; } #dot-3.active, #dot-3.completed { background: #B97690; }
+#dot-4.active, #dot-4.completed { background: #4FA39E; } #dot-5.active, #dot-5.completed { background: #84A05F; }
+#dot-6.active, #dot-6.completed { background: #8378C4; }
+.phase-header .K_step i { background: var(--K_hue, var(--earthen-gold)); }
+.phase .checklist-item:not(.critical-item):not(.item-flagged), .phase .section-photo-card { border-left: 4px solid var(--K_hue, var(--border)); }
+.phase .confirm-item:not(.confirmed):not(.issue-found):not(.highlight) { border-left: 4px solid var(--K_hue, var(--earthen-gold)) !important; }
+html.K_folded .phase-header { min-height: 176px; display: flex; flex-direction: column; justify-content: flex-end; }
+html.K_folded .phase-header .K_panel { position: relative; z-index: 1; background: rgba(22,13,6,0.84); border-radius: 12px; padding: var(--space-3) var(--space-4); margin-right: 52px; }
+html.K_folded .phase-header .K_panel h1 { padding-right: 0; }
+html.K_folded .phase-header .phase-tagline { color: rgba(244,236,226,0.94); }
+.phase-header.K_hasimg { background-image: linear-gradient(to top, rgba(18,10,4,0.82) 0%, rgba(18,10,4,0.38) 55%, rgba(18,10,4,0.04) 100%), var(--K_img); background-size: cover; background-position: center; }
+@supports ((backdrop-filter: blur(6px)) or (-webkit-backdrop-filter: blur(6px))) {
+  html.K_folded .phase-header.K_hasimg .K_panel { background: rgba(22,13,6,0.74); -webkit-backdrop-filter: blur(8px) saturate(1.1); backdrop-filter: blur(8px) saturate(1.1); }
+}
+html.K_folded .phase-header.K_hasimg .K_zone { background: rgba(22,13,6,0.74); border-radius: 12px; padding: 5px; box-sizing: border-box; }
+.photo-thumb-wrap .K_slotcap { position: absolute; left: 3px; top: 3px; max-width: calc(100% - 6px); font-size: 0.62rem; font-weight: 700; padding: 2px 5px; border-radius: 100px; background: rgba(0,0,0,0.7); color: #fff; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.K_slots { display: grid; grid-template-columns: 1fr; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.K_slot-area { font-size: var(--font-size-xs); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-2); }
+.K_slot { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: var(--space-2) var(--space-3); text-align: left; font: inherit; font-size: var(--font-size-sm); font-weight: 600;
+  color: var(--text-primary); background: var(--surface); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; }
+.K_slot.active { border-color: var(--earthen-gold); box-shadow: 0 0 0 2px rgba(198,172,142,0.45); }
+.K_slot.done { background: var(--success-bg); border-color: var(--success); }
+.K_slot-state { flex-shrink: 0; min-width: 4.6em; font-size: var(--font-size-xs); font-weight: 800; color: var(--text-muted); }
+.K_slot.done .K_slot-state { color: var(--success); }
+.K_slot-label { flex: 1; min-width: 0; line-height: 1.3; }
 </style>
 </head>
 <body class="mode-detail">
@@ -4748,10 +4778,11 @@ body.mode-quick .K_covers { display: none; }
     <div class="section-photo-card" id="kitchen-photo-card" role="region" aria-label="Kitchen and bathroom photos">
       <div class="spc-header">
         <div class="spc-title"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Kitchen &amp; Bathroom Photos</div>
-        <span class="spc-required-badge" id="kitchen-photo-required"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Required &nbsp;·&nbsp; minimum 2 photos</span>
+        <span class="spc-required-badge" id="kitchen-photo-required"><svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-alert"/></svg> Required &nbsp;·&nbsp; 3 bathroom + 3 kitchen photos</span>
         <span class="spc-optional-badge" id="kitchen-photo-optional" style="display:none;">Optional</span>
       </div>
-      <p class="spc-hint" id="kitchen-photo-hint-required">Required: at least 2 photos showing the utensil drawer, the dish rack and the cookware, so the set can be checked against the list.</p>
+      <p class="spc-hint" id="kitchen-photo-hint-required">Required: one photo for each of the six spots below. Tap a spot, then take the photo. The utensils photo shows the drawer, the rack and the cookware laid out, so the set can be checked against the list.</p>
+      <div class="K_slots" id="K_slots" role="group" aria-label="Which photo is this?"></div>
       <p class="spc-optional-hint" id="kitchen-photo-hint-optional" style="display:none;">Not required to proceed — add photos here only if you want extra documentation for this area. Pre-clean and after-clean photos above are the main record.</p>
       <div class="photo-option-btns">
         <button class="photo-option-btn" id="kitchen-photo-capture" type="button" aria-label="Capture kitchen photo">
@@ -5106,7 +5137,7 @@ body.mode-quick .K_covers { display: none; }
 const SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbxNPXXbihH0kO0_dRETzcNeqXTH0xV1B_PxnCln6D7p5CK53W-smpVmoI59ZcqTt3L8/exec';
 
 // ── Photo limits (per-section, v6.8) ─────────────────────────────────────
-const SECTION_PHOTO_MIN      = 2;   // bedroom / kitchen minimum
+const SECTION_PHOTO_MIN      = 3;   // bedroom / kitchen minimum (3.1.1: 3 per area; the kitchen screen asks for named slots, see K_PHOTO_SLOTS)
 const SECTION_PHOTO_MAX      = 5;   // bedroom / kitchen maximum
 const PRECLEAN_PHOTO_MIN     = 5;   // pre-clean: 5 areas required
 const PRECLEAN_PHOTO_MAX     = 12;  // pre-clean: aim for 10-12 photos
@@ -5142,6 +5173,7 @@ const AUTH_SESSION_KEY   = 'ch_staff_session_v1';
 let staffSession         = null;
 // D-324: inside the one Cascade Staff app (/Cascade-Staff/checklist/) sign-in is shared with the shell.
 const FOLDED = location.pathname.indexOf('/Cascade-Staff/') !== -1; // pathname only: a crafted standalone URL cannot fold it
+if (FOLDED) document.documentElement.classList.add('K_folded');   // 3.1.1: reserves the header height before any photo loads
 const SHELL_KEY = 'sb-qkgfhsdppslwunarczeq-auth-token'; // supabase-js session the shell stores
 let shellSrc = null; // 'sessionStorage' | 'localStorage' while the session is adopted from the shell
 function adoptShellSession(raw, nowSec) {
@@ -5717,7 +5749,20 @@ const PHASE_COUNT        = 7;
 /* K_ (session 82): the Clean screen became two (Bedroom & Living, Bathroom & Kitchen) and the old Finish became Finish + Lock up.
    A draft or ch_phase saved before the split maps 0,1,2,3,4 -> 0,1,2,3,5 (old Finish lands on the new Finish, which holds its first half). */
 const K_PHASE_FROM_V1    = [0, 1, 2, 3, 5];
-const K_PHASE_ZONES      = ['door', 'plug', 'door', 'bed', 'bath', 'plug', 'door'];  // zone illustration per phase (sprite ids K_z-*)
+const K_PHASE_ZONES      = ['door', 'plug', 'door', 'bed', 'bath', 'plug', 'door'];
+/* 3.1.1: the Bathroom & Kitchen photo card asks for six NAMED photos, three per area (was: any 2). All six ride in the same payload key as
+   before (section_kitchen); each photo's file name carries its slot id (kitchen_b_toilet_<date>_<time>.jpg), so nothing downstream changes.
+   The server counts these as "other" photos and requires none of them (submit-cleaning index.ts ~554-558), so the rule is client-side. */
+const K_PHOTO_SLOTS = [
+  { id: 'b_toilet',    area: 'Bathroom', label: 'Toilet' },
+  { id: 'b_shower',    area: 'Bathroom', label: 'Shower and drain' },
+  { id: 'b_sink',      area: 'Bathroom', label: 'Sink and mirror' },
+  { id: 'k_counter',   area: 'Kitchen',  label: 'Counter and sink' },
+  { id: 'k_stove',     area: 'Kitchen',  label: 'Stove and appliances' },
+  { id: 'k_utensils',  area: 'Kitchen',  label: 'Utensils: drawer, rack and cookware laid out' },
+];
+const K_KITCHEN_PHOTO_MAX = 12;
+const K_slotLabel = id => { const s = K_PHOTO_SLOTS.find(x => x.id === id); return s ? s.label : ''; };  // zone illustration per phase (sprite ids K_z-*)
 
 /* ═══════════════════════════════════════════════════════════════
    CHECKLIST DATA
@@ -5811,6 +5856,9 @@ const FINAL_CLEANING_ITEMS = [
     sub: ['Look at mirrors, glass and surfaces from different angles, from the door and from the bed'] },
   { id: 'check_vacuum_charge', text: 'Empty the vacuum bin and put it on charge', highlight: true,
     detail: 'Leave it charged and the bin empty for the next use.' },
+  /* 3.1.1: new line (no old id). Last on Finish: it is the trip outside with the last trash, before the door-side checks on Lock up. */
+  { id: 'check_bin_outside', text: 'Check the garbage bin outside; spray insecticide and disinfectant on its lid and around it', only: ['turnover', 'deep_clean', 'mid_stay'],
+    detail: 'Take the last trash out first. Spray the odourless insecticide on the bin lid and around the bin, then the disinfectant. Check the bin is closed and nothing is on the ground beside it.' },
 ];
 
 /* K_: the KILLER items. Anything that causes a guest complaint, damage or a safety problem is confirmed or reported as an issue, and the
@@ -5830,16 +5878,14 @@ const K_KILLER_ITEMS = [
 ];
 /* The Confirm & Leave set proper. Per type (confirmItemsNow) it is unchanged: 4 items for a mid-stay or emergency, 6 for a handover. */
 const CONFIRM_LEAVE_ITEMS = [
-  { id: 'check_9_4',          phase: 5, text: 'AC set to 24°C — fridge confirmed cold',
-    detail: 'Set the AC to 24°C before leaving (guests prefer a cool welcome). Open the fridge and feel the interior air — it must be noticeably cold. If the fridge feels warm or room temperature, flag it immediately; food safety is at risk.' },
+  { id: 'check_9_4',          phase: 5, text: 'AC set to 24°C, fridge cold, EcoFlow RIVER 3 at 100%', covers: ['check_ecoflow_charge', 'check_ecoflow_stowed'],
+    detail: 'AC: set it to 24°C before leaving (guests prefer a cool welcome). Fridge: open it and feel the interior air; it must be noticeably cold, and if it feels warm or room temperature, flag it immediately (food safety is at risk). EcoFlow RIVER 3: it is the unit\'s backup power during brownouts. Plug it in and confirm the display reads 100%; if below 80%, leave it on charge and do not close the session until it is full. Then put it back in its designated spot with the cable coiled neatly. It is NOT borrowable and must never leave Cascade Hideaway; report it at once if it is missing.' },
   // The set below is the live Kitchen & Dining catalogue as counted on 2026-09-16
   // (D-145), appliances and furniture dropped.
   // ponytail: static list; read the catalogue cache if the set starts changing.
   { id: 'check_utensils_complete', phase: 4, only: ['turnover', 'deep_clean'],
     text: 'Kitchen utensils complete — photos taken of the drawer, the rack and the cookware',
-    detail: 'Lay the set out the way the Step 3 kitchen photos show it and count it against this list, flagging anything missing, chipped or broken as an Issue: 1 frying pan · 1 casserole · 1 sauce pan · 1 can opener · 6 spoons · 2 knives · 6 forks · 6 teaspoons · 4 highball glasses · 6 wine glasses · 4 plates · 2 soup bowls · 4 ladles · 4 white mugs · 2 coloured mugs.' },
-  { id: 'check_ecoflow_charge', phase: 5, text: 'EcoFlow RIVER 3 at 100% charge, stowed in its spot with the cable tidy', covers: ['check_ecoflow_stowed'],
-    detail: 'The EcoFlow RIVER 3 is the unit\'s backup power supply during brownouts. Plug it in and confirm the display reads 100%. If below 80%, leave it on charge — do not close the session until it reaches full. Then put it back in its designated spot with the charging cable coiled neatly. This unit stays with the property: it is NOT borrowable and must never leave Cascade Hideaway; report it at once if it is missing.' },
+    detail: 'Take the "Utensils" photo on this screen (the sixth spot in the photo card): lay the set out the way that photo shows it and count it against this list, flagging anything missing, chipped or broken as an Issue: 1 frying pan · 1 casserole · 1 sauce pan · 1 can opener · 6 spoons · 2 knives · 6 forks · 6 teaspoons · 4 highball glasses · 6 wine glasses · 4 plates · 2 soup bowls · 4 ladles · 4 white mugs · 2 coloured mugs.' },
   { id: 'check_key_card',      text: 'Guest access verified — key card unlocks door and guest PIN code opens cleanly',
     detail: 'Two checks before you leave: (1) Key card — physically tap the card on the door reader. It must beep and unlock. Leave the key card on the keychain inside the unit for the arriving guest. (2) Guest PIN — enter the code from the current booking on the smart lock keypad. The lock must click open cleanly. If either test fails, call the property manager immediately before leaving.' },
   { id: 'check_guest_code',    text: 'Smart lock battery not low — no dim backlight or warning beep',
@@ -5886,6 +5932,10 @@ function K_gatedAll() {
 }
 /* A line that applies to some cleaning types only (plants and hangers are not a mid-stay or emergency job). */
 const K_only = items => items.filter(i => !i.only || i.only.includes(state.cleaningType));
+/* Which of the six named photos are still missing (empty when the screen does not ask for them). */
+const K_missingSlots = () => (!kitchenPhotosRequired() ? [] : K_PHOTO_SLOTS.filter(s => !(state.kitchenPhotos || []).some(p => p && p.slot === s.id)));
+const K_slotsOk = () => K_missingSlots().length === 0;
+let K_activeSlot = 'b_toilet';   // the slot the next photo is filed under
 const K_gatedForPhase = ph => K_gatedAll().filter(i => K_itemPhase(i) === ph);
 const K_answered      = id => { const s = state.confirmItems[id]; return s === 'confirmed' || s === 'issue'; };
 const K_gatedOk       = ph => K_gatedForPhase(ph).every(i => K_answered(i.id));
@@ -5897,7 +5947,7 @@ const K_TICK_KILLERS  = ['check_2_4', 'check_7_5', 'check_10_6'];
 
 /* Pure: an old draft (no _k marker) -> the shape this version reads. Nothing is discarded.
    lines = every ordinary line, gated = the confirm set, phaseMap = K_PHASE_FROM_V1. */
-function K_migrateDraft(d, lines, gated, phaseMap) {
+function K_migrateDraftV1(d, lines, gated, phaseMap) {
   if (!d || d._k) return d;
   const old = d.checklist || {};
   const out = Object.assign({}, d, { _k: 1 });
@@ -5916,6 +5966,55 @@ function K_migrateDraft(d, lines, gated, phaseMap) {
   out.checklist = ck; out.confirmItems = cf; out.confirmNotes = nt; out.issueFlags = fl;
   if (typeof d.phase === 'number') out.phase = phaseMap[d.phase] != null ? phaseMap[d.phase] : d.phase;
   return out;
+}
+
+/* Step 2 (3.1.1): check_ecoflow_charge was merged into check_9_4 ("AC, fridge, EcoFlow"). The merged line is Confirmed only if BOTH old ones were
+   Confirmed; an Issue on either carries over (both notes kept); anything else is unanswered again. Nothing is discarded. */
+function K_migrateDraftV2(d) {
+  if (!d || d._k >= 2) return d;
+  const out = Object.assign({}, d, { _k: 2 });
+  const cf = Object.assign({}, d.confirmItems || {}), nt = Object.assign({}, d.confirmNotes || {});
+  const a = cf.check_9_4, b = cf.check_ecoflow_charge;
+  const merged = (a === 'issue' || b === 'issue') ? 'issue' : (a === 'confirmed' && b === 'confirmed') ? 'confirmed' : null;
+  const notes = [];
+  if (a === 'issue' && nt.check_9_4) notes.push(nt.check_9_4);
+  if (b === 'issue' && nt.check_ecoflow_charge) notes.push('EcoFlow: ' + nt.check_ecoflow_charge);
+  if (merged) cf.check_9_4 = merged; else delete cf.check_9_4;
+  if (notes.length) nt.check_9_4 = notes.join(' / '); else delete nt.check_9_4;
+  delete cf.check_ecoflow_charge; delete nt.check_ecoflow_charge;
+  out.confirmItems = cf; out.confirmNotes = nt;
+  return out;
+}
+function K_migrateDraft(d, lines, gated, phaseMap) {
+  if (!d || d._k >= 2) return d;
+  return K_migrateDraftV2(d._k ? d : K_migrateDraftV1(d, lines, gated, phaseMap));
+}
+
+/* 3.1.1: the stay picker is one chronological list in four groups, never a flat sort by kind:
+   Missed (checkout passed, no report: oldest first, with the days late), today's turnover, staying now, scheduled maintenance.
+   A block is never "missed": only a stay with a checkout date can be. Stays that already have a report stay OUT of the list (the server
+   drops them); the hint says how many. */
+function K_daysLate(todayStr, checkoutStr) {
+  return Math.round((Date.parse(todayStr + 'T00:00:00Z') - Date.parse(checkoutStr + 'T00:00:00Z')) / 86400000);
+}
+function K_groupStays(rows, todayStr) {
+  const byDate = f => (a, b) => String(a[f]).localeCompare(String(b[f]));
+  const missed = rows.filter(b => b.kind === 'checkout' && b.checkout_date < todayStr).sort(byDate('checkout_date'))
+    .map(b => Object.assign({}, b, { daysLate: K_daysLate(todayStr, b.checkout_date) }));
+  const today = rows.filter(b => b.kind === 'checkout' && b.checkout_date >= todayStr).sort(byDate('checkout_date'));
+  const mid = rows.filter(b => b.kind === 'mid_stay').sort(byDate('checkin_date'));
+  const block = rows.filter(b => b.kind === 'block').sort(byDate('checkin_date'));
+  return { missed, today, mid, block };
+}
+function K_stayOptionsHtml(groups, label) {
+  let i = 0;
+  const opt = (b, prefix) => `<option value="${i++}">${escapeHtml(prefix + label(b))}</option>`;
+  const grp = (name, arr, f) => (arr.length ? `<optgroup label="${escapeHtml(name)}">${arr.map(f).join('')}</optgroup>` : '');
+  return '<option value="">Choose the stay…</option>'
+    + grp('⚠ Missed: no report yet', groups.missed, b => opt(b, `Missed · ${b.daysLate} day${b.daysLate === 1 ? '' : 's'} late · `))
+    + grp("Today's turnover", groups.today, b => opt(b, ''))
+    + grp('Staying now', groups.mid, b => opt(b, ''))
+    + grp('Scheduled maintenance', groups.block, b => opt(b, ''));
 }
 
 /* Mirror of public.k_calendar_row_offered for the rows the browser can read (a cleaner may read calendar_events). A stay is always
@@ -5974,6 +6073,11 @@ function K_initStepHeaders() {
     if (!hdr || hdr.querySelector('.K_step')) continue;
     const num = hdr.querySelector('.phase-num');
     if (num) num.textContent = `Step ${i + 1} of ${PHASE_COUNT} · ${PHASE_LABELS[i]}`;
+    // a panel behind the title (frosted in CSS when folded and the photo is there; plain otherwise)
+    const panel = document.createElement('div');
+    panel.className = 'K_panel';
+    [...hdr.children].filter(c => c.matches && c.matches('.phase-num, h1, .phase-tagline')).forEach(c => panel.appendChild(c));
+    hdr.insertBefore(panel, hdr.firstChild);
     const bar = document.createElement('div');
     bar.className = 'K_step'; bar.setAttribute('aria-hidden', 'true');
     bar.innerHTML = `<i style="width:${Math.round(((i + 1) / PHASE_COUNT) * 100)}%"></i>`;
@@ -5983,6 +6087,21 @@ function K_initStepHeaders() {
     ill.innerHTML = `<svg viewBox="0 0 24 24"><use href="#K_z-${K_PHASE_ZONES[i]}"/></svg>`;
     hdr.appendChild(ill);
   }
+}
+
+/* 3.1.1: each screen's header carries a real house photo, but only when folded into Cascade Staff and only once the image has loaded
+   (standalone keeps the drawn header). Loaded the first time the screen is shown. The header height is reserved in CSS, so nothing shifts. */
+const K_HEADER_PHOTOS = ['living', 'tv-wall', 'laundry', 'bed', 'bathroom', 'room', 'entrance'];
+const K_headerLoaded = {};
+function K_headerPhoto(i) {
+  if (!FOLDED || K_headerLoaded[i]) return;
+  K_headerLoaded[i] = true;
+  const hdr = document.querySelector(`#phase-${i} .phase-header`);
+  if (!hdr) return;
+  const src = `../guide/img/standard/${K_HEADER_PHOTOS[i]}.webp`;
+  const im = new Image();
+  im.onload = () => { hdr.style.setProperty('--K_img', `url("${src}")`); hdr.classList.add('K_hasimg'); };
+  im.src = src;   // an error is ignored on purpose: the drawn header stays
 }
 
 /* "See the standard": the house photo for a finish-standard line. Only when folded into Cascade Staff (../guide/img/standard/) and only
@@ -6320,6 +6439,7 @@ function goToPhase(newPhase, skipGate = false) {
   if (typeof refreshCheckAllButtons === 'function') refreshCheckAllButtons();
   ls(PHASE_KEY, String(newPhase));
   saveDraft();
+  K_headerPhoto(newPhase);
   K_reportProgress(newPhase);                                  // shell hand-off; never awaited, never blocks
   if (!skipGate && going_forward) K_phaseDone(PHASE_LABELS[oldPhase]);
 }
@@ -6362,7 +6482,7 @@ function isPhaseValid(phase) {
     case 1: return isPhase1Valid();
     case 2: return K_gatedOk(2);     // K_: the linen inspection is answered
     case 3: return true;             // K_: Bedroom & Living gates nothing
-    case 4: return isPhase3Valid() && K_gatedOk(4); // supply log + kitchen photos (Feature 1) + the smell check
+    case 4: return isPhase3Valid() && K_slotsOk() && K_gatedOk(4); // supply log + kitchen photos (Feature 1) + the smell check
     case 5: return K_afterPhotosOk() && K_gatedOk(5); // K_: Finish asks for the after-clean photos and its own gated items
     case 6: return isPhase4Valid() && K_gatedOk(6);   // K_: Lock up asks for the Confirm & Leave set + the final power and safety check (a killer)
     default: return true;
@@ -6499,7 +6619,9 @@ function buildNudgeMessage(phase) {
       // v8.7: the bedroom line nagged for something no gate ever wanted, and
       // the kitchen line is only true where the photos are required.
       const ktNeed = SECTION_PHOTO_MIN - state.kitchenPhotos.length;
-      if (kitchenPhotosRequired() && ktNeed > 0) missing.push(`${ktNeed} more kitchen photo${ktNeed>1?'s':''}`);
+      const noSlot = K_missingSlots();
+      if (noSlot.length) missing.push(`${noSlot.length} named photo${noSlot.length>1?'s':''} (${noSlot.map(s => s.label.split(':')[0]).join(', ')})`);
+      else if (kitchenPhotosRequired() && ktNeed > 0) missing.push(`${ktNeed} more kitchen photo${ktNeed>1?'s':''}`);
       if (!state.supplyLogSaved) missing.push('supply log (tap 📦 Log Supply Usage)');
       const smell = K_gatedForPhase(4).filter(i => !K_answered(i.id)).length;
       if (smell) missing.push(`${smell} check${smell>1?'s':''} to answer (Confirmed, or Issue Found)`);
@@ -7509,7 +7631,8 @@ function renderPhotoThumb(wrapEl, photo, onRetry, imgClass = 'photo-thumb') {
   const src = photo.objectUrl || photo.url || '';
   const status = photo.status || 'done';
   wrapEl.innerHTML = `
-    <img class="${imgClass}" src="${src}" alt="Photo">
+    <img class="${imgClass}" src="${src}" alt="Photo${photo.slot ? ': ' + K_slotLabel(photo.slot) : ''}">
+    ${photo.slot ? `<span class="K_slotcap">${esc(K_slotLabel(photo.slot).split(':')[0])}</span>` : ''}
     <span class="photo-status-badge status-${status}"${status === 'failed' ? ' role="button" tabindex="0"' : ''}>${photoStatusLabel(status)}</span>
   `;
   if (status === 'failed' && onRetry) {
@@ -7549,7 +7672,7 @@ function photoMeta(p) {
   if (!p) return null;
   return {
     name: p.name, url: p.url || '', fileId: p.fileId || '', uploaded: p.uploaded || false,
-    status: p.status || (p.uploaded ? 'done' : 'queued'), idbId: p.idbId || null,
+    status: p.status || (p.uploaded ? 'done' : 'queued'), idbId: p.idbId || null, slot: p.slot || null,
   };
 }
 
@@ -7559,7 +7682,7 @@ function photoMeta(p) {
 // half of the contract (the other half is the `online` listener below).
 async function restorePhotoFromMeta(meta) {
   if (!meta) return null;
-  const photo = { name: meta.name, url: meta.url || null, fileId: meta.fileId || null, uploaded: meta.uploaded, data: null, idbId: null, objectUrl: null, status: meta.uploaded ? 'done' : 'queued' };
+  const photo = { name: meta.name, url: meta.url || null, fileId: meta.fileId || null, uploaded: meta.uploaded, data: null, idbId: null, objectUrl: null, status: meta.uploaded ? 'done' : 'queued', slot: meta.slot || null };
   if (!meta.uploaded) {
     // _blob only ever lived in memory, so a page reload always loses it —
     // idbId is the only thing that can survive to be restored from.
@@ -8020,7 +8143,7 @@ function initSectionPhotos() {
     { key: 'kitchen',   capId: 'kitchen-photo-cap',   fileId: 'kitchen-photo-file',
       thumbsId: 'kitchen-photo-thumbs',   countId: 'kitchen-photo-count',
       capBtnId: 'kitchen-photo-capture',  upBtnId: 'kitchen-photo-upload',
-      label: 'kitchen',  photoMin: SECTION_PHOTO_MIN, photoMax: SECTION_PHOTO_MAX },
+      label: 'kitchen',  photoMin: SECTION_PHOTO_MIN, photoMax: K_KITCHEN_PHOTO_MAX },
     // Feature 3: after-clean section — same coverage as preclean (v6.8)
     { key: 'afterclean', capId: 'afterclean-photo-cap',  fileId: 'afterclean-photo-file',
       thumbsId: 'afterclean-photo-thumbs', countId: 'afterclean-photo-count',
@@ -8108,6 +8231,7 @@ function initSectionPhotos() {
       if (capBtn)    capBtn.style.opacity = atMax ? '0.45' : '';
       if (upBtn)     upBtn.style.opacity  = atMax ? '0.45' : '';
       if (key === 'preclean') updateP1StickySummary();
+      if (key === 'kitchen') K_renderSlots();
       updateBottomBar();
     }
 
@@ -8175,16 +8299,18 @@ function initSectionPhotos() {
           if (!keep) return;
         }
 
-        const fname  = `${label}_${todayManila()}_${Date.now()}.jpg`;
+        const slotId = key === 'kitchen' ? K_activeSlot : null;   // 3.1.1: the named spot this photo is for
+        const fname  = `${label}${slotId ? '_' + slotId : ''}_${todayManila()}_${Date.now()}.jpg`;
         const id     = uuid();
         const stored = await idbPutPhoto(id, blob);
         const photo = {
           // idbPutPhoto can fail silently (quota, blocked storage); _blob is
           // the same-session in-memory fallback resolvePhotoDataUrl() uses then.
           idbId: stored ? id : null, _blob: blob, objectUrl: URL.createObjectURL(blob), name: fname,
-          uploaded: false, url: null, fileId: null, data: null, status: 'queued',
+          uploaded: false, url: null, fileId: null, data: null, status: 'queued', slot: slotId,
         };
         photos.push(photo);
+        if (slotId) K_advanceSlot();
 
         appendThumbWrap(photo);
         updateSectionCount();
@@ -8973,7 +9099,7 @@ function calcProgress(phase) {
     case 3: return K_phaseProgress(K_only(BEDROOM_ITEMS), 3);
     case 4: return K_phaseProgress(KITCHEN_ITEMS, 4);
     case 5: {
-      const all = [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS];
+      const all = [...K_only(FINAL_CLEANING_ITEMS), ...POWER_CHECK_ITEMS];
       const g5 = K_gatedForPhase(5);
       let total = all.length + g5.length;
       let done  = all.filter(i => state.checklist[i.id]).length + g5.filter(i => state.confirmItems[i.id]).length;
@@ -8990,6 +9116,32 @@ function calcProgress(phase) {
     }
     default: return 0;
   }
+}
+
+/* The six named photo spots: tap one, then Capture or Upload; each chip says done or needed (glyph and word). */
+function K_renderSlots() {
+  const box = el('K_slots');
+  if (!box) return;
+  const need = K_missingSlots();
+  if (need.length && !need.some(s => s.id === K_activeSlot)) K_activeSlot = need[0].id;
+  box.innerHTML = '';
+  let area = '';
+  K_PHOTO_SLOTS.forEach(s => {
+    if (s.area !== area) { area = s.area; const h = document.createElement('div'); h.className = 'K_slot-area'; h.textContent = area; box.appendChild(h); }
+    const done = (state.kitchenPhotos || []).some(p => p && p.slot === s.id);
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'K_slot' + (done ? ' done' : '') + (s.id === K_activeSlot ? ' active' : '');
+    b.setAttribute('aria-pressed', String(s.id === K_activeSlot));
+    b.dataset.slot = s.id;
+    b.innerHTML = `<span class="K_slot-state">${done ? '&#10003; Done' : 'Needed'}</span><span class="K_slot-label">${esc(s.label)}</span>`;
+    b.addEventListener('click', () => { K_activeSlot = s.id; K_renderSlots(); });
+    box.appendChild(b);
+  });
+}
+function K_advanceSlot() {
+  const need = K_missingSlots();
+  const next = need.find(s => s.id !== K_activeSlot) || need[0];
+  if (next) K_activeSlot = next.id;
 }
 
 function K_renderBedroom() { renderItems(K_only(BEDROOM_ITEMS), 'bedroom-items'); updateProgress(3); }
@@ -9016,7 +9168,7 @@ function getAllChecklistItems() {
   return [
     ...ARRIVE_ITEMS, ...CHEMICAL_ITEMS,
     ...K_only(BEDROOM_ITEMS), ...KITCHEN_ITEMS,
-    ...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS,
+    ...K_only(FINAL_CLEANING_ITEMS), ...POWER_CHECK_ITEMS,
     ...(state.isWeeklyIncluded ? weeklyItemsForSession() : []),
   ];
 }
@@ -9128,7 +9280,7 @@ function initMessengerButtons() {
 function saveDraft() {
   const draft = {
     _v:              DRAFT_VERSION,
-    _k:              1,                 // K_: this draft uses the s82 line set and phase numbers
+    _k:              2,                 // K_: 1 = the s82 line set and phase numbers; 2 = EcoFlow merged into check_9_4 (3.1.1)
     _saved:          Date.now(),
     phase:           state.phase,
     cleanerName:     el('cleanerName')?.value || '',
@@ -9581,7 +9733,7 @@ function buildEmailHtml() {
     { title: 'Arrive & Prep', items: [...ARRIVE_ITEMS, ...CHEMICAL_ITEMS] },
     { title: 'Bedroom & Living Room', items: K_only(BEDROOM_ITEMS) },
     { title: 'Kitchen & Bathroom', items: KITCHEN_ITEMS },
-    { title: 'Final Cleaning', items: [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS] },
+    { title: 'Final Cleaning', items: [...K_only(FINAL_CLEANING_ITEMS), ...POWER_CHECK_ITEMS] },
   ];
 
   if (state.isWeeklyIncluded) {
@@ -9833,7 +9985,7 @@ function buildPayload() {
     { title: 'Arrive & Prep', icon: '🚪', items: [...ARRIVE_ITEMS, ...CHEMICAL_ITEMS] },
     { title: 'Bedroom & Living Room', icon: '🛏️', items: K_only(BEDROOM_ITEMS) },
     { title: 'Kitchen & Bathroom', icon: '🍳', items: KITCHEN_ITEMS },
-    { title: 'Final Cleaning', icon: '🧹', items: [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS] },
+    { title: 'Final Cleaning', icon: '🧹', items: [...K_only(FINAL_CLEANING_ITEMS), ...POWER_CHECK_ITEMS] },
     ...(state.isWeeklyIncluded
       ? [{ title: `Weekly Deep Maintenance — week ${weekOfMonth(cleaningDate)}`, icon: '📋', items: weeklyItemsForSession() }]
       : []),
@@ -10392,7 +10544,7 @@ function renderAllItems() {
   renderItems(CHEMICAL_ITEMS,       'chemical-items');
   renderItems(K_only(BEDROOM_ITEMS), 'bedroom-items');
   renderItems(KITCHEN_ITEMS,        'kitchen-items');
-  renderItems(FINAL_CLEANING_ITEMS, 'final-cleaning-items');
+  renderItems(K_only(FINAL_CLEANING_ITEMS), 'final-cleaning-items');
   renderItems(POWER_CHECK_ITEMS,    'power-check-items');
   renderItems(weeklyItemsForSession(), 'weekly-items-list');
   initPhaseCheckAll();
@@ -11157,7 +11309,8 @@ async function loadCleanableBookings(dateStr) {
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_cleanable_bookings`, {
       method: 'POST',
       headers: { ...(await staffHeaders(true)) },
-      body: JSON.stringify({ p_date: dateStr, p_property_id: PROPERTY_ID }),
+      // 3.1.1: stays are looked for 30 days back (the function default is 10; blocks have no look-back at all)
+      body: JSON.stringify({ p_date: dateStr, p_property_id: PROPERTY_ID, p_lookback: 30 }),
     });
     if (resp.status === 404) { _stayRpcMissing = true; wrap.style.display = 'none'; return; }
     if (!resp.ok) { wrap.style.display = 'none'; return; }
@@ -11174,17 +11327,15 @@ async function loadCleanableBookings(dateStr) {
     // away, or a guest who has not arrived. Counted so the hint can say so
     // rather than showing an unexplained empty picker.
     const now = Date.now();
-    _stayOptions = unreported
-      .filter(b => {
-        const from = stayReportableFrom(b);
-        return from !== null && now >= from;
-      })
-      .sort((a, b) => stayOrderKey(a) - stayOrderKey(b));
+    const reportable = unreported.filter(b => {
+      const from = stayReportableFrom(b);
+      return from !== null && now >= from;
+    });
+    const stayGroups = K_groupStays(reportable, todayManila());
+    _stayOptions = [...stayGroups.missed, ...stayGroups.today, ...stayGroups.mid, ...stayGroups.block];
     const notYet = unreported.length - _stayOptions.length;
 
-    sel.innerHTML = '<option value="">Choose the stay…</option>' +
-      _stayOptions.map((b, i) =>
-        `<option value="${i}">${escapeHtml(stayLabel(b))}</option>`).join('');
+    sel.innerHTML = K_stayOptionsHtml(stayGroups, stayLabel);
 
     wrap.style.display = 'block';
 
@@ -11198,14 +11349,17 @@ async function loadCleanableBookings(dateStr) {
       return;
     }
 
-    hint.textContent = _stayOptions.length === 1
-      ? 'One stay needs a report for this date.'
-      : `${_stayOptions.length} stays could match this date — pick the one you cleaned.`;
-    hint.className = '';
+    const nMissed = stayGroups.missed.length;
+    hint.textContent = nMissed
+      ? `⚠ Missed: ${nMissed} stay${nMissed === 1 ? '' : 's'} still ${nMissed === 1 ? 'has' : 'have'} no report, oldest first. Pick the one you cleaned.`
+      : _stayOptions.length === 1
+        ? 'One stay needs a report for this date.'
+        : `${_stayOptions.length} stays could match this date — pick the one you cleaned.`;
+    hint.className = nMissed ? 'warn' : '';
 
     // One candidate and nothing typed yet: choose it. Fewer taps, and the
     // cleaner can still change it.
-    if (_stayOptions.length === 1 && !el('lastGuestName')?.value) {
+    if (_stayOptions.length === 1 && !nMissed && !el('lastGuestName')?.value) {   // a missed stay is never chosen for her
       sel.value = '0';
       applyStayPick();
     }
@@ -11470,6 +11624,8 @@ async function init() {
   renderConfirmItems();
   refreshKitchenPhotoRequirement();
   K_initStepHeaders();
+  K_headerPhoto(0);
+  K_renderSlots();
 
   // Meter readings delta
   initMeterDelta();

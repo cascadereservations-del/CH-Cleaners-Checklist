@@ -108,7 +108,7 @@ test('DOM: the gated items render on the screens where the work happens', () => 
   const ids = c => c.children.map(ch => /id="conf-ok-([^"]+)"/.exec(ch._html)[1]);
   assert.deepEqual(ids(els['confirm-items-p2']), ['check_2_4']);
   assert.deepEqual(ids(els['confirm-items-p4']), ['check_7_5', 'check_utensils_complete']);
-  assert.deepEqual(ids(els['confirm-items-p5']), ['check_9_4', 'check_ecoflow_charge']);
+  assert.deepEqual(ids(els['confirm-items-p5']), ['check_9_4']);
   assert.deepEqual(ids(els['confirm-leave-items']), ['check_key_card', 'check_guest_code', 'check_10_6', 'check_smartlife_waiting']);
 });
 

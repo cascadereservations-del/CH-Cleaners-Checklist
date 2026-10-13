@@ -4635,7 +4635,7 @@ body.mode-quick .K_covers { display: none; }
     <div class="phase-header">
       <span class="phase-num">Step 3 of 7 · Arrive &amp; Prep</span>
       <h1>Arrive &amp; Prep</h1>
-      <p class="phase-tagline">Open up, check the unit, spray chemicals &amp; start the timer</p>
+      <p class="phase-tagline">Open the windows, lights on, check the unit, then spray and start the timer</p>
     </div>
 
     <div class="phase-progress"><div class="phase-progress-bar" id="p2-progress"></div></div>
@@ -4820,6 +4820,9 @@ body.mode-quick .K_covers { display: none; }
       <!-- JS renders items here -->
     </div>
 
+    <!-- K_: gated items done on this screen (AC and fridge, EcoFlow) -->
+    <div class="K_gated" id="confirm-items-p5" role="region" aria-label="Check before you go on"></div>
+
     <!-- Weekly Deep Maintenance toggle -->
     <label class="weekly-toggle-row" id="weekly-toggle-row" for="weekly-toggle">
       <input type="checkbox" id="weekly-toggle" name="weeklyToggle"
@@ -4884,7 +4887,7 @@ body.mode-quick .K_covers { display: none; }
     <div class="phase-header">
       <span class="phase-num">Step 7 of 7 · Lock up</span>
       <h1>Lock up</h1>
-      <p class="phase-tagline">Power, safety, confirm &amp; leave</p>
+      <p class="phase-tagline">At the door: key card, lock, power, SmartLife</p>
     </div>
 
     <div class="phase-progress"><div class="phase-progress-bar" id="p6-progress"></div></div>
@@ -5331,7 +5334,14 @@ async function requireStaffSession() {
         // sign-out and must never raise this app's PIN screen. Take the newer session the shell stored, if it has one.
         if (FOLDED) {
           const sh = readShellSession(), a = sh && adoptShellSession(sh.raw, Math.floor(Date.now() / 1000));
-          if (a && (a.refresh_token !== tried || a.expires_at > Math.floor(Date.now() / 1000) + 60)) { staffSession = a; shellSrc = sh.name; return staffSession; }
+          const nowS = Math.floor(Date.now() / 1000);
+          if (a && (a.refresh_token !== tried || a.expires_at > nowS + 60)) {
+            staffSession = a; shellSrc = sh.name;
+            if (a.expires_at > nowS + 60) return staffSession;
+            // the shell's session is newer but its access token has lapsed: refresh with the shell's token, once (no loop)
+            try { return await authRequest('refresh_token', { refresh_token: a.refresh_token }); }
+            catch (e2) { if (e2 instanceof AuthRejectedError) { clearStaffSession(); return null; } return staffSession; }
+          }
         }
         clearStaffSession(); return null;
       }
@@ -5725,8 +5735,8 @@ const K_GATE_HINT_ID = { 4: 'p3', 5: 'p4-photo', 6: 'p4' };
 
 /* Phase 2, Arrive & Prep */
 const ARRIVE_ITEMS = [
-  { id: 'check_0_1',   text: 'Gather tools and supplies, open windows, lights on',
-    covers: ['check_1_1'],
+  { id: 'check_0_1',   text: 'Gather your tools and supplies',
+    covers: ['check_1_1'],   // K_: check_1_1 (windows open, lights on) is the Arrive & Prep tagline now, not a tick
     sub: ['Mop, broom, vacuum, microfibre cloths (at least 4), toilet brush, disinfectant spray, glass cleaner, bathroom cleaner, stain remover',
           'Replacement supplies: toiletries, dish soap, sponge, toilet paper, paper towels'] },
   { id: 'check_1_4',   text: 'Check every appliance works, purifier filter green', flag: true,
@@ -5752,28 +5762,29 @@ const CHEMICAL_ITEMS = [
 
 /* Phase 3, Bedroom & Living */
 const BEDROOM_ITEMS = [
-  { id: 'check_4_1',  text: 'Reset the room: dusted, disinfected, decor straight, mirrors streak-free', disinfect: true,
-    covers: ['check_4_5', 'check_5_8'], standard: 'living',
+  { id: 'check_4_1',  text: 'Reset the room: dusted top to bottom, decor straight, mirrors streak-free',
+    covers: ['check_5_8'], standard: 'living',
     sub: ['Dust top to bottom: fan blades, shelves, TV unit, bedside tables, skirting boards',
-          'Disinfect light switches, door handles, remote controls, AC remote, bedside lamps',
           'Straighten all decor; polish mirrors with a dry microfibre cloth so no streaks remain'] },
-  { id: 'check_5_2',  text: 'Make the bed to hotel standard, pillows plumped in a row',
+  { id: 'check_4_5',  text: 'Disinfect switches, handles and both remotes', disinfect: true,
+    detail: 'Light switches, door handles, the TV remote and the AC remote, bedside lamps.' },
+  { id: 'check_5_2',  text: 'Make the bed to hotel standard, pillows plumped in a row, no hair on the sheets',
     covers: ['check_5_6'], standard: 'bed',
     sub: ['Pull the sheets tight; no bumps, folds or loose corners; tuck in all sides',
           'Plump every pillow firmly and set them in a straight, neat row'] },
-  { id: 'check_5_9',  text: 'Count the wardrobe hangers: 8 needed', flag: true,
+  { id: 'check_5_9',  text: 'Count the wardrobe hangers: 8 needed', flag: true, only: ['turnover', 'deep_clean'],
     detail: 'Report a shortage with the flag.' },
   { id: 'check_5_10', text: 'Reset the steamer; top up room fragrance if low',
     covers: ['check_5_7'],
     detail: 'Steamer: tank empty, cord coiled, back in its spot. Fragrance refills come from the supplies stock.' },
-  { id: 'check_1_8',  text: 'Water plants only if soil is dry; snake plants in if 2+ nights',
+  { id: 'check_1_8',  text: 'Water plants only if soil is dry; snake plants in if 2+ nights', only: ['turnover', 'deep_clean'],
     covers: ['check_snake_room'],
     detail: 'Push a finger 2 cm into the soil; water only if dry all the way down, and when in doubt skip. The number of nights is on the Setup screen.' },
 ];
 
 /* Phase 4, Bathroom & Kitchen. The smell check (check_7_5) is a gated item (K_KILLER_ITEMS). */
 const KITCHEN_ITEMS = [
-  { id: 'check_7_4',  text: 'Scrub toilet, shower, sink; mirror and glass streak-free', disinfect: true,
+  { id: 'check_7_4',  text: 'Scrub toilet, shower, sink; mirror and glass streak-free, shower drain and floor hair-free', disinfect: true,
     covers: ['check_7_2'], standard: 'bathroom',
     sub: ['Toilet bowl, seat and rim; shower floor; bathroom sink',
           'Bathroom mirror and any glass: final wipe with a dry microfibre cloth'] },
@@ -5787,7 +5798,7 @@ const KITCHEN_ITEMS = [
     detail: 'Note the quantity of anything damaged or missing.' },
   { id: 'check_7_7',  text: 'Replace the dish sponge; refill supplies to standard', triggersInventory: true,
     covers: ['check_6_5'],
-    detail: 'Shampoo, soap, toilet paper, dish soap, paper towels. Check the inventory app for minimum levels.' },
+    detail: 'Shampoo, soap, toilet paper, dish soap, paper towels, and the towel and linen set: the full set for the next guest\'s party. Check the inventory app for minimum levels.' },
 ];
 
 /* Phase 5, Finish */
@@ -5807,27 +5818,27 @@ const FINAL_CLEANING_ITEMS = [
    `phase` = the screen that asks for it (Confirm & Leave items default to 5). `only` = cleaning types that ask (an emergency visit is
    not a clean). `covers` = old tick ids this line absorbed. */
 const K_KILLER_ITEMS = [
-  { id: 'check_2_4', phase: 2, only: ['turnover', 'deep_clean', 'mid_stay'], critical: true,
+  { id: 'check_2_4', phase: 2, only: ['turnover', 'deep_clean', 'mid_stay'], critical: true, urgent: false, photo: true,
     text: 'Strip bed and towels; inspect each for stains and pre-treat',
     detail: 'Inspect every sheet, pillowcase and towel. Pre-treat each stain with stain remover before washing: stained items that go through the wash untreated can be ruined for good. If you find a stain you cannot lift, choose Issue Found and say which item.' },
-  { id: 'check_7_5', phase: 4, only: ['turnover', 'deep_clean', 'mid_stay'], critical: true,
-    text: 'Flush, smell-check the toilet, wipe the vent. No odour',
-    detail: 'Flush several times, then wipe the vent grille with a damp cloth. A smell is the first thing a guest mentions: if it persists after cleaning, choose Issue Found.' },
-  { id: 'check_10_6', phase: 6, before: 'check_smartlife_waiting', critical: true,
+  { id: 'check_7_5', phase: 4, only: ['turnover', 'deep_clean', 'mid_stay'], critical: true, urgent: false, photo: true,
+    text: 'Flush and smell-check the toilet; sniff the AC, bin and fridge. Nothing smells',
+    detail: 'Flush several times, wipe the bathroom vent grille with a damp cloth, then sniff the AC, the bin and the fridge. A smell is the first thing a guest mentions: if one persists after cleaning, choose Issue Found.' },
+  { id: 'check_10_6', phase: 6, before: 'check_smartlife_waiting', critical: true, photo: true,
     text: 'Final check: windows latched, lights off, door locked',
     detail: 'Latch every window. Switch off all lights. Test the door lock. Follow the Power and Safety card above for the fridge, water heater and WiFi.' },
 ];
 /* The Confirm & Leave set proper. Per type (confirmItemsNow) it is unchanged: 4 items for a mid-stay or emergency, 6 for a handover. */
 const CONFIRM_LEAVE_ITEMS = [
-  { id: 'check_9_4',          text: 'AC set to 24°C — fridge confirmed cold',
+  { id: 'check_9_4',          phase: 5, text: 'AC set to 24°C — fridge confirmed cold',
     detail: 'Set the AC to 24°C before leaving (guests prefer a cool welcome). Open the fridge and feel the interior air — it must be noticeably cold. If the fridge feels warm or room temperature, flag it immediately; food safety is at risk.' },
   // The set below is the live Kitchen & Dining catalogue as counted on 2026-09-16
   // (D-145), appliances and furniture dropped.
   // ponytail: static list; read the catalogue cache if the set starts changing.
-  { id: 'check_utensils_complete', only: ['turnover', 'deep_clean'],
+  { id: 'check_utensils_complete', phase: 4, only: ['turnover', 'deep_clean'],
     text: 'Kitchen utensils complete — photos taken of the drawer, the rack and the cookware',
     detail: 'Lay the set out the way the Step 3 kitchen photos show it and count it against this list, flagging anything missing, chipped or broken as an Issue: 1 frying pan · 1 casserole · 1 sauce pan · 1 can opener · 6 spoons · 2 knives · 6 forks · 6 teaspoons · 4 highball glasses · 6 wine glasses · 4 plates · 2 soup bowls · 4 ladles · 4 white mugs · 2 coloured mugs.' },
-  { id: 'check_ecoflow_charge', text: 'EcoFlow RIVER 3 at 100% charge, stowed in its spot with the cable tidy', covers: ['check_ecoflow_stowed'],
+  { id: 'check_ecoflow_charge', phase: 5, text: 'EcoFlow RIVER 3 at 100% charge, stowed in its spot with the cable tidy', covers: ['check_ecoflow_stowed'],
     detail: 'The EcoFlow RIVER 3 is the unit\'s backup power supply during brownouts. Plug it in and confirm the display reads 100%. If below 80%, leave it on charge — do not close the session until it reaches full. Then put it back in its designated spot with the charging cable coiled neatly. This unit stays with the property: it is NOT borrowable and must never leave Cascade Hideaway; report it at once if it is missing.' },
   { id: 'check_key_card',      text: 'Guest access verified — key card unlocks door and guest PIN code opens cleanly',
     detail: 'Two checks before you leave: (1) Key card — physically tap the card on the door reader. It must beep and unlock. Leave the key card on the keychain inside the unit for the arriving guest. (2) Guest PIN — enter the code from the current booking on the smart lock keypad. The lock must click open cleanly. If either test fails, call the property manager immediately before leaving.' },
@@ -5869,11 +5880,18 @@ function K_gatedAll() {
     const at = k.before ? base.findIndex(i => i.id === k.before) : -1;
     if (at >= 0) base.splice(at, 0, k); else base.push(k);
   });
-  return killers.filter(k => k.phase !== PHASE_COUNT - 1).concat(base);
+  // chronological: the screens in order, the order inside a screen kept
+  return killers.filter(k => k.phase !== PHASE_COUNT - 1).concat(base).map((it, n) => [it, n])
+    .sort((a, b) => K_itemPhase(a[0]) - K_itemPhase(b[0]) || a[1] - b[1]).map(p => p[0]);
 }
+/* A line that applies to some cleaning types only (plants and hangers are not a mid-stay or emergency job). */
+const K_only = items => items.filter(i => !i.only || i.only.includes(state.cleaningType));
 const K_gatedForPhase = ph => K_gatedAll().filter(i => K_itemPhase(i) === ph);
 const K_answered      = id => { const s = state.confirmItems[id]; return s === 'confirmed' || s === 'issue'; };
 const K_gatedOk       = ph => K_gatedForPhase(ph).every(i => K_answered(i.id));
+/* Gated issues that travel as a normal flagged note (not urgent): the linen stain and the smell. Only final power and safety, and the old
+   Confirm & Leave items, stay [URGENT]. */
+const K_isUrgentIssue = item => item.urgent !== false;
 /* Old ordinary ticks that are now gated judgements: a ticked one in an old draft becomes Confirmed (the SmartLife precedent, v8.7). */
 const K_TICK_KILLERS  = ['check_2_4', 'check_7_5', 'check_10_6'];
 
@@ -5912,6 +5930,7 @@ function K_blockOffered(ev, dateStr) {
 /* Progress for the shell (cleaning_progress_set_v1). Never blocks the cleaner; a missing function (404 / PGRST202) switches it off
    for the session. */
 let K_progressOff = false;
+let K_pickedBlock = null;   // the block stay option the cleaner picked: a scheduled maintenance visit, valid for its own date
 async function K_reportProgress(ph) {
   if (K_progressOff || !navigator.onLine || !staffSession) return;
   try {
@@ -5979,7 +5998,8 @@ function K_bindStandard(wrap, item) {
     b.setAttribute('aria-label', `See the standard: ${item.standard} photo`);
     b.innerHTML = `<img src="${src}" alt="" width="56" height="56" loading="lazy"><span>See the standard</span>`;
     b.addEventListener('click', () => K_openStandard(src, item.standard));
-    wrap.appendChild(b);
+    // inside the collapsed "What this covers": nothing above or below it moves when the image arrives
+    (wrap.querySelector('details.K_covers') || wrap).appendChild(b);
   };
   img.src = src;   // an error is ignored on purpose: no thumbnail, no broken image
 }
@@ -6343,7 +6363,7 @@ function isPhaseValid(phase) {
     case 2: return K_gatedOk(2);     // K_: the linen inspection is answered
     case 3: return true;             // K_: Bedroom & Living gates nothing
     case 4: return isPhase3Valid() && K_gatedOk(4); // supply log + kitchen photos (Feature 1) + the smell check
-    case 5: return K_afterPhotosOk();                 // K_: Finish asks for the after-clean photos
+    case 5: return K_afterPhotosOk() && K_gatedOk(5); // K_: Finish asks for the after-clean photos and its own gated items
     case 6: return isPhase4Valid() && K_gatedOk(6);   // K_: Lock up asks for the Confirm & Leave set + the final power and safety check (a killer)
     default: return true;
   }
@@ -6482,13 +6502,17 @@ function buildNudgeMessage(phase) {
       if (kitchenPhotosRequired() && ktNeed > 0) missing.push(`${ktNeed} more kitchen photo${ktNeed>1?'s':''}`);
       if (!state.supplyLogSaved) missing.push('supply log (tap 📦 Log Supply Usage)');
       const smell = K_gatedForPhase(4).filter(i => !K_answered(i.id)).length;
-      if (smell) missing.push('the smell check (Confirmed, or Issue Found)');
+      if (smell) missing.push(`${smell} check${smell>1?'s':''} to answer (Confirmed, or Issue Found)`);
       if (missing.length === 0) return null;
       return `Almost ready to finish! Still needed: ${missing.join('; ')}. 💛`;
     }
     case 5: {
       const acNeed = AFTERCLEAN_PHOTO_MIN - state.aftercleanPhotos.length;
-      return acNeed > 0 && state.cleaningType !== 'emergency' ? `Almost there. ${acNeed} more after-clean photo${acNeed>1?'s':''} to go (need ${AFTERCLEAN_PHOTO_MIN}).` : null;
+      const miss5 = [];
+      if (acNeed > 0 && state.cleaningType !== 'emergency') miss5.push(`${acNeed} more after-clean photo${acNeed>1?'s':''} (need ${AFTERCLEAN_PHOTO_MIN})`);
+      const un5 = K_gatedForPhase(5).filter(i => !K_answered(i.id)).length;
+      if (un5) miss5.push(`${un5} check${un5>1?'s':''} to answer (Confirmed, or Issue Found)`);
+      return miss5.length ? `Almost there. Still needed: ${miss5.join('; ')}.` : null;
     }
     case 6: {
       const missing = [];
@@ -8587,7 +8611,7 @@ async function handleIssuePhoto(itemId, input, wrapEl) {
 ═══════════════════════════════════════════════════════════════ */
 function renderConfirmItems() {
   // K_: the gated items sit on the screen where the work happens; the Confirm & Leave set stays on the last one.
-  const groups = { 2: 'confirm-items-p2', 4: 'confirm-items-p4' };
+  const groups = { 2: 'confirm-items-p2', 4: 'confirm-items-p4', 5: 'confirm-items-p5' };
   groups[PHASE_COUNT - 1] = 'confirm-leave-items';
   Object.keys(groups).forEach(k => { const c = el(groups[k]); if (c) c.innerHTML = ''; });
 
@@ -8620,6 +8644,14 @@ function renderConfirmItems() {
         </label>
         <textarea id="conf-note-${item.id}" placeholder="What's wrong with ${esc(item.text)}?" rows="2"
                   style="font-size:15px;min-height:56px;"></textarea>
+        ${item.photo ? `<div style="position:relative;display:inline-block;margin-top:var(--space-2);">
+          <button class="issue-photo-btn" type="button" aria-label="Add a photo of the problem (optional)">
+            <svg class="ch-ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Add photo
+            <input type="file" class="issue-photo-input-${item.id}" accept="image/*" aria-label="Photo of the problem: ${esc(item.text)}"
+                   style="position:absolute;inset:0;opacity:0;cursor:pointer;min-height:unset;border:none;padding:0;">
+          </button>
+        </div>
+        <img id="issue-preview-${item.id}" class="issue-photo-preview" src="" alt="Photo of the problem">` : ''}
       </div>`;
 
     container.appendChild(div);
@@ -8648,6 +8680,7 @@ function renderConfirmItems() {
           btn.classList.add(newState === 'confirmed' ? 'confirmed' : 'issue');
           btn.setAttribute('aria-pressed','true');
         }
+        if (!K_isUrgentIssue(item)) K_syncFlag(item.id);   // a stain or a smell travels as an ordinary flagged note, like the old flag button
         updateBottomBar();
         updateProgress(K_itemPhase(item));
         saveDraft();
@@ -8659,9 +8692,13 @@ function renderConfirmItems() {
     if (noteTxt) {
       noteTxt.addEventListener('input', () => {
         state.confirmNotes[item.id] = noteTxt.value;
+        if (!K_isUrgentIssue(item)) K_syncFlag(item.id);
         saveDraft();
       });
     }
+    // the issue photo: same handler and same issue_<id> payload key as the flag button's photo
+    const issuePhoto = div.querySelector(`.issue-photo-input-${item.id}`);
+    if (issuePhoto) issuePhoto.addEventListener('change', () => handleIssuePhoto(item.id, issuePhoto, div));
 
     // Restore state
     restoreConfirmItem(item.id, div);
@@ -8933,12 +8970,13 @@ function calcProgress(phase) {
       return Math.round((done / total) * 100);
     }
     case 2: return K_phaseProgress([...ARRIVE_ITEMS, ...CHEMICAL_ITEMS], 2);
-    case 3: return K_phaseProgress(BEDROOM_ITEMS, 3);
+    case 3: return K_phaseProgress(K_only(BEDROOM_ITEMS), 3);
     case 4: return K_phaseProgress(KITCHEN_ITEMS, 4);
     case 5: {
       const all = [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS];
-      let total = all.length;
-      let done  = all.filter(i => state.checklist[i.id]).length;
+      const g5 = K_gatedForPhase(5);
+      let total = all.length + g5.length;
+      let done  = all.filter(i => state.checklist[i.id]).length + g5.filter(i => state.confirmItems[i.id]).length;
       if (state.isWeeklyIncluded) {
         const weeklyNow = weeklyItemsForSession();
         total += weeklyNow.length;
@@ -8954,6 +8992,19 @@ function calcProgress(phase) {
   }
 }
 
+function K_renderBedroom() { renderItems(K_only(BEDROOM_ITEMS), 'bedroom-items'); updateProgress(3); }
+
+/* Keep state.issueFlags[id] in step with the Confirm control for the not-urgent killers: Issue Found = a flag with the note (and the photo,
+   if one is added), Confirmed or cleared = no flag. */
+function K_syncFlag(id) {
+  if (state.confirmItems[id] === 'issue') {
+    if (!state.issueFlags[id]) state.issueFlags[id] = { note: '', photoData: null, photoUrl: null, photoFileId: null };
+    state.issueFlags[id].note = state.confirmNotes[id] || '';
+  } else {
+    delete state.issueFlags[id];
+  }
+}
+
 function K_phaseProgress(items, ph) {
   const g = K_gatedForPhase(ph);
   const total = items.length + g.length;
@@ -8964,7 +9015,7 @@ function K_phaseProgress(items, ph) {
 function getAllChecklistItems() {
   return [
     ...ARRIVE_ITEMS, ...CHEMICAL_ITEMS,
-    ...BEDROOM_ITEMS, ...KITCHEN_ITEMS,
+    ...K_only(BEDROOM_ITEMS), ...KITCHEN_ITEMS,
     ...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS,
     ...(state.isWeeklyIncluded ? weeklyItemsForSession() : []),
   ];
@@ -9336,7 +9387,7 @@ function openSubmitModal() {
 
   // Count issues
   const issueCount = Object.keys(state.issueFlags).length +
-    K_gatedAll().filter(i => state.confirmItems[i.id] === 'issue').length +
+    K_gatedAll().filter(i => state.confirmItems[i.id] === 'issue' && K_isUrgentIssue(i)).length +
     (state.conditionStatus === 'issue' ? 1 : 0);
 
   const issuesDiv = el('submit-modal-issues');
@@ -9510,14 +9561,14 @@ function buildEmailHtml() {
   Object.entries(state.issueFlags).forEach(([id, flag]) => {
     if (flag.note) {
       const allItems = [...ARRIVE_ITEMS, ...CHEMICAL_ITEMS, ...BEDROOM_ITEMS, ...KITCHEN_ITEMS,
-                        ...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS, ...WEEKLY_ITEMS];
+                        ...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS, ...WEEKLY_ITEMS, ...K_KILLER_ITEMS];
       const item = allItems.find(i => i.id === id);
       allIssues.push({ section: 'Checklist', text: `[${item ? item.text : id}] ${flag.note}`, isUrgent: false });
     }
   });
 
   K_gatedAll().forEach(item => {
-    if (state.confirmItems[item.id] === 'issue') {
+    if (state.confirmItems[item.id] === 'issue' && K_isUrgentIssue(item)) {
       const note = state.confirmNotes[item.id] || '(no note)';
       allIssues.push({ section: 'Confirm & Leave', text: `${item.text}: ${note}`, isUrgent: true });
     }
@@ -9528,7 +9579,7 @@ function buildEmailHtml() {
   // Checklist sections for email
   const sections = [
     { title: 'Arrive & Prep', items: [...ARRIVE_ITEMS, ...CHEMICAL_ITEMS] },
-    { title: 'Bedroom & Living Room', items: BEDROOM_ITEMS },
+    { title: 'Bedroom & Living Room', items: K_only(BEDROOM_ITEMS) },
     { title: 'Kitchen & Bathroom', items: KITCHEN_ITEMS },
     { title: 'Final Cleaning', items: [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS] },
   ];
@@ -9780,7 +9831,7 @@ function buildPayload() {
   // Checklist details for email (grouped by section)
   const checklistDetails = [
     { title: 'Arrive & Prep', icon: '🚪', items: [...ARRIVE_ITEMS, ...CHEMICAL_ITEMS] },
-    { title: 'Bedroom & Living Room', icon: '🛏️', items: BEDROOM_ITEMS },
+    { title: 'Bedroom & Living Room', icon: '🛏️', items: K_only(BEDROOM_ITEMS) },
     { title: 'Kitchen & Bathroom', icon: '🍳', items: KITCHEN_ITEMS },
     { title: 'Final Cleaning', icon: '🧹', items: [...FINAL_CLEANING_ITEMS, ...POWER_CHECK_ITEMS] },
     ...(state.isWeeklyIncluded
@@ -9810,7 +9861,7 @@ function buildPayload() {
     icon:  '🔒',
     items: K_gatedAll().map(item => ({
       text: state.confirmItems[item.id] === 'issue'
-        ? `[URGENT] ${item.text} — ${state.confirmNotes[item.id] || '(no note)'}`
+        ? `${K_isUrgentIssue(item) ? '[URGENT] ' : ''}${item.text} — ${state.confirmNotes[item.id] || '(no note)'}`
         : item.text,
       checked:  state.confirmItems[item.id] === 'confirmed',
       critical: !!item.critical,        // K_: the three killers keep the e-mail's Critical Items Summary
@@ -9825,13 +9876,13 @@ function buildPayload() {
   Object.entries(state.issueFlags).forEach(([id, flag]) => {
     if (flag.note) {
       const allItems = [...ARRIVE_ITEMS,...CHEMICAL_ITEMS,...BEDROOM_ITEMS,...KITCHEN_ITEMS,
-                        ...FINAL_CLEANING_ITEMS,...POWER_CHECK_ITEMS,...WEEKLY_ITEMS];
+                        ...FINAL_CLEANING_ITEMS,...POWER_CHECK_ITEMS,...WEEKLY_ITEMS,...K_KILLER_ITEMS];
       const item = allItems.find(i => i.id === id);
       allNotes.push({ section: 'Checklist', text: `${item ? item.text : id}: ${flag.note}`, isUrgent: false });
     }
   });
   K_gatedAll().forEach(item => {
-    if (state.confirmItems[item.id] === 'issue') {
+    if (state.confirmItems[item.id] === 'issue' && K_isUrgentIssue(item)) {
       allNotes.push({
         section: 'Confirm & Leave',
         text: `${item.text}: ${state.confirmNotes[item.id] || '(no note)'}`,
@@ -10120,7 +10171,7 @@ async function proceedWithSubmission() {
       showSuccessScreen();
       // K_: tell the Cascade Staff shell that framed us (same origin only); the shell shows its own done card
       K_handBack(data,
-        Object.values(state.issueFlags).filter(f => f && f.note).length + K_gatedAll().filter(i => state.confirmItems[i.id] === 'issue').length,
+        Object.values(state.issueFlags).filter(f => f && f.note).length + K_gatedAll().filter(i => state.confirmItems[i.id] === 'issue' && K_isUrgentIssue(i)).length,
         [...state.meterPhotos, ...state.precleanPhotos, ...state.aftercleanPhotos, ...state.bedroomPhotos, ...state.kitchenPhotos].filter(Boolean).length);
     } else {
       // submit-cleaning returns `message` (the 409 meter block says what to do);
@@ -10339,7 +10390,7 @@ function initSuccessButtons() {
 function renderAllItems() {
   renderItems(ARRIVE_ITEMS,         'arrive-items');
   renderItems(CHEMICAL_ITEMS,       'chemical-items');
-  renderItems(BEDROOM_ITEMS,        'bedroom-items');
+  renderItems(K_only(BEDROOM_ITEMS), 'bedroom-items');
   renderItems(KITCHEN_ITEMS,        'kitchen-items');
   renderItems(FINAL_CLEANING_ITEMS, 'final-cleaning-items');
   renderItems(POWER_CHECK_ITEMS,    'power-check-items');
@@ -10826,6 +10877,7 @@ function setCleaningType(type, opts = {}) {
   // v8.7: the Confirm & Leave list and the kitchen photo requirement are both
   // per type, so a type change has to rebuild them.
   if (typeof renderConfirmItems === 'function') renderConfirmItems();
+  if (typeof K_renderBedroom === 'function') K_renderBedroom();
   if (typeof refreshKitchenPhotoRequirement === 'function') refreshKitchenPhotoRequirement();
   updateBottomBar(); updateProgress(0); saveDraft();
 }
@@ -10918,7 +10970,8 @@ function runCalendarValidation(dateStr, events, matchResult) {
   const isCheckout = events.some(ev => ev.checkout_date === dateStr && ev.status !== 'cancelled' && ev.status !== 'blocked');
   const isCheckin  = events.some(ev => ev.checkin_date  === dateStr && ev.status !== 'cancelled' && ev.status !== 'blocked');
   const isBlocked  = events.some(ev => ev.status === 'blocked' && K_blockOffered(ev, dateStr)) ||
-                     !!(matchResult && matchResult.blocked);
+                     !!(matchResult && matchResult.blocked) ||
+                     !!(K_pickedBlock && K_pickedBlock.checkin_date <= dateStr && dateStr < K_pickedBlock.checkout_date);
 
   if (isCheckout || isCheckin || isBlocked) {
     state.cleaningDateStatus = 'valid';
@@ -11171,6 +11224,13 @@ function applyStayPick() {
   // A guest still in residence means this is the scheduled mid-stay refresh.
   if (b.kind === 'mid_stay' && state.cleaningType !== 'mid_stay') {
     setCleaningType('mid_stay', { auto: true });
+  }
+  // K_: a scheduled maintenance block is a deep-clean style visit, never a turnover (submit-cleaning would mark a turnover incomplete).
+  // The cleaner can still change the type; the date is valid, so no "is this a maintenance clean?" dialog.
+  K_pickedBlock = b.kind === 'block' ? { checkin_date: b.checkin_date, checkout_date: b.checkout_date } : null;
+  if (b.kind === 'block') {
+    if (state.cleaningType !== 'deep_clean') setCleaningType('deep_clean', { auto: true });
+    state.cleaningDateStatus = 'valid';
   }
 
   applyBookingAutofill({

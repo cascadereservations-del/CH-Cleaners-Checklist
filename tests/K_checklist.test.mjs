@@ -51,7 +51,7 @@ test('mapping: every one of the 37 old ids survives as a line or sits in exactly
     for (const c of l.covers || []) { assert.ok(count.has(c), `${l.id} covers an id that was never an old line: ${c}`); count.set(c, count.get(c) + 1); }
   }
   for (const [id, n] of count) assert.equal(n, 1, `${id} must appear exactly once (kept or covered), found ${n}`);
-  assert.equal(lines.length, 19, 'ordinary lines');
+  assert.equal(lines.length, 20, 'ordinary lines (19 plus the disinfect line split back out of check_4_1)');
   assert.deepEqual(api.K_KILLER_ITEMS.map(i => i.id), ['check_2_4', 'check_7_5', 'check_10_6']);
   const ids = all.map(i => i.id);
   assert.equal(new Set(ids).size, ids.length, 'no id is declared twice');
@@ -60,7 +60,7 @@ test('mapping: every one of the 37 old ids survives as a line or sits in exactly
 test('mapping: a merged line has one surviving id plus covers, and the phases hold the planned lines', () => {
   const { api } = load();
   assert.deepEqual([...api.ARRIVE_ITEMS, ...api.CHEMICAL_ITEMS].map(i => i.id), ['check_0_1', 'check_1_4', 'check_1_5', 'check_1_9', 'check_2_1', 'check_3_1']);
-  assert.deepEqual(api.BEDROOM_ITEMS.map(i => i.id), ['check_4_1', 'check_5_2', 'check_5_9', 'check_5_10', 'check_1_8']);
+  assert.deepEqual(api.BEDROOM_ITEMS.map(i => i.id), ['check_4_1', 'check_4_5', 'check_5_2', 'check_5_9', 'check_5_10', 'check_1_8']);
   assert.deepEqual(api.KITCHEN_ITEMS.map(i => i.id), ['check_7_4', 'check_drain_screen', 'check_6_1', 'check_7_6', 'check_7_7']);
   assert.deepEqual(api.FINAL_CLEANING_ITEMS.map(i => i.id), ['check_8_1', 'check_9_1', 'check_vacuum_charge']);
   assert.equal(api.POWER_CHECK_ITEMS.length, 0);
@@ -108,22 +108,25 @@ test('draft migration: old phase indexes map to the new ones; killers ticked bec
 test('gating: each killer item gates only its own screen, and Issue Found counts as an answer', () => {
   const { api, state } = load();
   assert.deepEqual(api.K_gatedForPhase(2).map(i => i.id), ['check_2_4']);
-  assert.deepEqual(api.K_gatedForPhase(4).map(i => i.id), ['check_7_5']);
+  assert.deepEqual(api.K_gatedForPhase(4).map(i => i.id), ['check_7_5', 'check_utensils_complete'], 'the smell check, then the utensil count beside the kitchen photos');
   assert.deepEqual(api.K_gatedForPhase(3).map(i => i.id), []);
   assert.equal(api.K_gatedOk(2), false); assert.equal(api.K_gatedOk(4), false);
   state.confirmItems.check_2_4 = 'confirmed';
   assert.equal(api.K_gatedOk(2), true); assert.equal(api.K_gatedOk(4), false, 'answering the linen check does not open the smell check');
   state.confirmItems.check_7_5 = 'issue';
+  assert.equal(api.K_gatedOk(4), false, 'the utensil count is still open');
+  state.confirmItems.check_utensils_complete = 'confirmed';
   assert.equal(api.K_gatedOk(4), true);
   assert.equal(api.K_gatedOk(3), true, 'Bedroom & Living gates nothing');
 });
 
-test('gating: the Lock up set is the Confirm & Leave set plus the final power and safety check, SmartLife last', () => {
+test('gating: Lock up is the door-side pause point; AC, fridge and EcoFlow moved to Finish, utensils to the kitchen', () => {
   const { api, state } = load();
-  assert.deepEqual(api.K_gatedForPhase(6).map(i => i.id), ['check_9_4', 'check_utensils_complete', 'check_ecoflow_charge', 'check_key_card', 'check_guest_code', 'check_10_6', 'check_smartlife_waiting']);
+  assert.deepEqual(api.K_gatedForPhase(6).map(i => i.id), ['check_key_card', 'check_guest_code', 'check_10_6', 'check_smartlife_waiting']);
+  assert.deepEqual(api.K_gatedForPhase(5).map(i => i.id), ['check_9_4', 'check_ecoflow_charge']);
   assert.equal(api.confirmItemsNow().length, 6, 'confirmItemsNow() is unchanged');
   state.cleaningType = 'mid_stay';
-  assert.deepEqual(api.K_gatedForPhase(6).map(i => i.id), ['check_9_4', 'check_ecoflow_charge', 'check_key_card', 'check_guest_code', 'check_10_6']);
+  assert.deepEqual(api.K_gatedForPhase(6).map(i => i.id), ['check_key_card', 'check_guest_code', 'check_10_6']);
   assert.deepEqual(api.K_gatedForPhase(2).map(i => i.id), ['check_2_4'], 'a mid-stay still inspects the linen');
   state.cleaningType = 'emergency';
   assert.deepEqual(api.K_gatedAll().map(i => i.id), ['check_9_4', 'check_ecoflow_charge', 'check_key_card', 'check_guest_code', 'check_10_6'], 'an emergency visit is not a clean: no linen or smell gate, power and safety still asked');
@@ -147,7 +150,11 @@ test('gating: isPhaseValid enforces the killers; the real phase gate function is
   assert.equal(isPhaseValid(2), true);
   assert.equal(isPhaseValid(4), false, 'smell unanswered');
   state.confirmItems.check_7_5 = 'issue';
+  state.confirmItems.check_utensils_complete = 'confirmed';
   assert.equal(isPhaseValid(4), true);
+  assert.equal(isPhaseValid(5), false, 'Finish also asks for AC and fridge, and the EcoFlow');
+  state.confirmItems.check_9_4 = 'confirmed'; state.confirmItems.check_ecoflow_charge = 'confirmed';
+  assert.equal(isPhaseValid(5), true);
   for (const i of api.confirmItemsNow()) state.confirmItems[i.id] = 'confirmed';
   assert.equal(isPhaseValid(6), false, 'every Confirm & Leave item answered but the final power and safety check is not');
   state.confirmItems.check_10_6 = 'confirmed';
@@ -160,11 +167,11 @@ test('header: the Confirm & Leave count is the real count, not a hard-coded 4', 
   assert.doesNotMatch(html, /All 4 required/);
   const { api, state, els } = load();
   api.K_refreshConfirmCopy();
-  assert.equal(els.K_req_tag.textContent, 'All 7 required');
-  assert.match(els.K_confirm_intro.textContent, /each of the 7 items/);
+  assert.equal(els.K_req_tag.textContent, 'All 4 required', 'turnover: key card, guest code, final check, SmartLife');
+  assert.match(els.K_confirm_intro.textContent, /each of the 4 items/);
   state.cleaningType = 'mid_stay';
   api.K_refreshConfirmCopy();
-  assert.equal(els.K_req_tag.textContent, 'All 5 required');
+  assert.equal(els.K_req_tag.textContent, 'All 3 required');
 });
 
 test('block filter mirror: a stay is always offered, a block only when staff scheduled maintenance for a date it covers', () => {
@@ -258,7 +265,7 @@ test('single sign-on: a refresh token the shell already used is not a sign-out w
 });
 
 test('structure: no duplicate element ids, the six-plus-one phases exist, and every script parses', () => {
-  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]);
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]).filter(id => !id.includes('${'));
   const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
   assert.deepEqual([...new Set(dup)], [], 'duplicate ids');
   for (let i = 0; i < 7; i++) assert.ok(html.includes(`id="phase-${i}"`), `phase-${i}`);
@@ -277,7 +284,7 @@ test('structure: new top-level names carry the K_ prefix and are declared once',
 test('the standard photo shows only when folded and the image loaded (never a broken image)', () => {
   const fn = html.match(/function K_bindStandard\(wrap, item\) \{[\s\S]*?\n\}/)[0];
   assert.match(fn, /if \(!item\.standard \|\| !FOLDED\) return;/);
-  assert.match(fn, /img\.onload = \(\) => \{[\s\S]*wrap\.appendChild\(b\);/, 'the button is added in onload only');
+  assert.match(fn, /img\.onload = \(\) => \{[\s\S]*\(wrap\.querySelector\('details\.K_covers'\) \|\| wrap\)\.appendChild\(b\);/, 'the button is added in onload only, inside the collapsed details so nothing shifts');
   assert.doesNotMatch(fn, /onerror/);
   assert.match(html, /const K_STD_BASE = '\.\.\/guide\/img\/standard\/';/);
 });
@@ -297,7 +304,7 @@ test('kept contracts: photo section keys, [URGENT], flags, per-type only logic, 
   assert.ok(html.includes("photos['section_meter']"), 'section_meter');
   assert.ok(html.includes('photos[`section_${key}`]'), 'section_preclean / section_afterclean are built from the key');
   assert.match(html, /\['preclean', 'bedroom', 'kitchen', 'afterclean'\]/);
-  assert.match(html, /\[URGENT\] \$\{item\.text\}/);
+  assert.ok(html.includes("K_isUrgentIssue(item) ? '[URGENT] ' : ''"), '[URGENT] marker is kept for the urgent items');
   assert.match(html, /const confirmItemsNow = \(\) => CONFIRM_LEAVE_ITEMS\.filter\(i => !i\.only \|\| i\.only\.includes\(state\.cleaningType\)\);/);
   assert.match(html, /issue_\$\{id\}/);
   assert.match(html, /critical: !!item\.critical,/, 'killers keep the Critical Items Summary');

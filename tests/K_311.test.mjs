@@ -26,27 +26,29 @@ function load(type = 'turnover', extra = {}, fns = []) {
 }
 
 /* ---------- 1. photos ---------- */
-test('photos: six named slots, three per area, with the exact names asked for; the minimum is 3', () => {
+test('photos: two named kitchen slots (utensils, cookware), no bathroom slots; the kitchen minimum is 2 and the bedroom minimum stays 3', () => {
   const { api } = load();
-  assert.deepEqual(api.K_PHOTO_SLOTS.filter(s => s.area === 'Kitchen').map(s => s.label), ['Counter and sink', 'Stove and appliances', 'Utensils: drawer, rack and cookware laid out']);
-  assert.deepEqual(api.K_PHOTO_SLOTS.filter(s => s.area === 'Bathroom').map(s => s.label), ['Toilet', 'Shower and drain', 'Sink and mirror']);
-  assert.equal(Number(/const SECTION_PHOTO_MIN\s+= (\d+);/.exec(html)[1]), 3);
-  assert.ok(api.K_KITCHEN_PHOTO_MAX >= 6, 'the section can hold all six');
+  assert.deepEqual(api.K_PHOTO_SLOTS.filter(s => s.area === 'Kitchen').map(s => s.label), ['Kitchen utensils: drawer and rack', 'Plates and cookware: check the condition of the pans']);
+  assert.deepEqual(api.K_PHOTO_SLOTS.map(s => s.id), ['k_utensils', 'k_cookware']);
+  assert.equal(api.K_PHOTO_SLOTS.filter(s => s.area === 'Bathroom').length, 0, 'bathroom photos are no longer required');
+  assert.equal(Number(/const SECTION_PHOTO_MIN\s+= (\d+);/.exec(html)[1]), 3, 'the bedroom minimum is unchanged');
+  assert.equal(Number(/const K_KITCHEN_PHOTO_MIN\s+= (\d+);/.exec(html)[1]), 2);
+  assert.ok(api.K_KITCHEN_PHOTO_MAX >= 4, 'extra photos stay allowed');
 });
 
-test('photos: the screen needs every named slot (on a turnover or deep clean), a photo in the wrong slot does not count, other types need none', () => {
+test('photos: the screen needs both named slots (on a turnover or deep clean), a photo in the wrong slot does not count, other types need none', () => {
   const { api, state } = load('turnover');
   assert.equal(api.K_slotsOk(), false);
-  assert.equal(api.K_missingSlots().length, 6);
-  state.kitchenPhotos = [{ slot: 'b_toilet' }, { slot: 'b_shower' }, { slot: 'b_sink' }, { slot: 'k_counter' }, { slot: 'k_stove' }, { name: 'untagged old photo' }];
-  assert.deepEqual(api.K_missingSlots().map(s => s.id), [], 'an untagged photo (from a live-v8 draft) fills the first missing slot, so nothing is retaken');
-  state.kitchenPhotos = [{ name: 'v8 a', slot: null }, { name: 'v8 b', slot: null }];
-  assert.equal(api.K_missingSlots().length, 4, 'a v8 draft with 2 kitchen photos needs only 4 more of the six');
-  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['b_sink', 'k_counter', 'k_stove', 'k_utensils'], 'the old photos fill the first slots in order');
-  state.kitchenPhotos = [{ slot: 'k_utensils' }, { slot: null }];
-  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['b_shower', 'b_sink', 'k_counter', 'k_stove'], 'a tagged photo keeps its slot; the loose one takes the first free one');
-  state.kitchenPhotos = [{ slot: 'b_toilet' }, { slot: 'b_shower' }, { slot: 'b_sink' }, { slot: 'k_counter' }, { slot: 'k_stove' }];
-  state.kitchenPhotos.push({ slot: 'k_utensils' });
+  assert.equal(api.K_missingSlots().length, 2);
+  state.kitchenPhotos = [{ slot: 'k_utensils' }, { name: 'untagged old photo' }];
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), [], 'an untagged photo (from an older draft) fills the first missing slot, so nothing is retaken');
+  state.kitchenPhotos = [{ name: 'v8 a', slot: null }];
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['k_cookware'], 'an older draft with 1 photo needs only the second');
+  state.kitchenPhotos = [{ slot: 'k_cookware' }, { slot: null }];
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), [], 'a tagged photo keeps its slot; the loose one takes the free one');
+  state.kitchenPhotos = [{ slot: 'b_toilet' }];
+  assert.deepEqual(api.K_missingSlots().map(s => s.id), ['k_utensils', 'k_cookware'], 'a photo tagged with a retired bathroom slot does not count');
+  state.kitchenPhotos = [{ slot: 'k_utensils' }, { slot: 'k_cookware' }];
   assert.equal(api.K_slotsOk(), true);
   state.kitchenPhotos = [];
   state.cleaningType = 'deep_clean'; assert.equal(api.K_slotsOk(), false);
@@ -69,22 +71,22 @@ test('photos: the slot chips render with a glyph and a word, mark the active one
   const { api, state } = load('turnover', { el: id => (id === 'K_slots' ? box : null), document: { createElement: () => new El() } }, ['K_renderSlots', 'K_advanceSlot']);
   api.K_renderSlots();
   const chips = box.children.filter(c => c.dataset.slot);
-  assert.equal(chips.length, 6);
+  assert.equal(chips.length, 2);
   assert.ok(chips.every(c => /Needed/.test(c.innerHTML)), 'a word as well as a colour');
-  assert.equal(chips.find(c => c._at['aria-pressed'] === 'true').dataset.slot, 'b_toilet');
-  state.kitchenPhotos.push({ slot: 'b_toilet' });
+  assert.equal(chips.find(c => c._at['aria-pressed'] === 'true').dataset.slot, 'k_utensils');
+  state.kitchenPhotos.push({ slot: 'k_utensils' });
   api.K_advanceSlot();
-  assert.equal(api.getActive(), 'b_shower', 'next needed slot');
+  assert.equal(api.getActive(), 'k_cookware', 'next needed slot');
   box.children = []; api.K_renderSlots();
   assert.match(box.children.filter(c => c.dataset.slot)[0].innerHTML, /&#10003; Done/);
-  chips[5].listeners.click();
-  assert.equal(api.getActive(), 'k_utensils', 'tapping a spot makes it the active one');
+  chips[1].listeners.click();
+  assert.equal(api.getActive(), 'k_cookware', 'tapping a spot makes it the active one');
 });
 
 test('photos: the utensils confirm line points at its photo slot, and the server lines are untouched', () => {
   const { api } = load();
   const u = api.CONFIRM_LEAVE_ITEMS.find(i => i.id === 'check_utensils_complete');
-  assert.match(u.detail, /Take the "Utensils" photo on this screen/);
+  assert.match(u.detail, /Take the two kitchen photos on this screen/);
   assert.equal(u.phase, 4, 'on the same screen as the photo card');
 });
 

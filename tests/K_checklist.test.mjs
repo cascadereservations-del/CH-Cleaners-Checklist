@@ -140,11 +140,11 @@ test('gating: isPhaseValid enforces the killers; the real phase gate function is
   assert.match(m[0], /case 6: return isPhase4Valid\(\) && K_gatedOk\(6\)/);
   assert.match(html, /btnSubmit\.disabled = !isPhaseValid\(PHASE_COUNT - 1\)/, 'Submit is gated by the last phase');
   // run it for real
-  const { api, state } = load({ kitchenPhotos: ['b_toilet', 'b_shower', 'b_sink', 'k_counter', 'k_stove', 'k_utensils'].map(s => ({ slot: s })), supplyLogSaved: true, aftercleanPhotos: ['1', '2', '3', '4', '5'], bedroomPhotos: [], meterPhotos: [null, null] });
+  const { api, state } = load({ kitchenPhotos: ['k_utensils', 'k_cookware'].map(s => ({ slot: s })), supplyLogSaved: true, aftercleanPhotos: ['1', '2', '3', '4', '5'], bedroomPhotos: [], meterPhotos: [null, null] });
   const src = [m[0], html.match(/function isPhase3Valid\(\)[\s\S]*?\n\}/)[0], html.match(/function isPhase4Valid\(\)[\s\S]*?\n\}/)[0], html.match(/function K_afterPhotosOk\(\)[\s\S]*?\n\}/)[0],
-    'const SECTION_PHOTO_MIN = 2, MIDSTAY_PHOTO_MIN = 4, AFTERCLEAN_PHOTO_MIN = 5;', 'const isPhase0Valid = () => true, isPhase1Valid = () => true;',
+    'const SECTION_PHOTO_MIN = 3, K_KITCHEN_PHOTO_MIN = 2, MIDSTAY_PHOTO_MIN = 4, AFTERCLEAN_PHOTO_MIN = 5;', 'const isPhase0Valid = () => true, isPhase1Valid = () => true;',
     'return isPhaseValid;'].join('\n');
-  const isPhaseValid = new Function('state', 'K_gatedOk', 'K_slotsOk', 'confirmItemsNow', 'kitchenPhotosRequired', src)(state, api.K_gatedOk, () => state.kitchenPhotos.length >= 6, api.confirmItemsNow, () => true);
+  const isPhaseValid = new Function('state', 'K_gatedOk', 'K_slotsOk', 'confirmItemsNow', 'kitchenPhotosRequired', src)(state, api.K_gatedOk, () => state.kitchenPhotos.length >= 2, api.confirmItemsNow, () => true);
   assert.equal(isPhaseValid(2), false, 'linen unanswered');
   state.confirmItems.check_2_4 = 'confirmed';
   assert.equal(isPhaseValid(2), true);

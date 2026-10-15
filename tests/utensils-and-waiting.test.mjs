@@ -74,7 +74,7 @@ test('kitchen photos gate Step 3 on a handover only', () => {
   }
 
   const phase3 = html.match(/function isPhase3Valid\(\)[\s\S]*?\n\}/)[0];
-  assert.match(phase3, /kitchenPhotosRequired\(\) && state\.kitchenPhotos\.length < SECTION_PHOTO_MIN/);
+  assert.match(phase3, /kitchenPhotosRequired\(\) && state\.kitchenPhotos\.length < K_KITCHEN_PHOTO_MIN/);
   assert.ok(!/bedroomPhotos/.test(phase3), 'bedroom photos stay optional');
 });
 
@@ -83,6 +83,7 @@ test('kitchen photos gate Step 3 on a handover only', () => {
 function loadGates() {
   const src = [
     html.match(/const SECTION_PHOTO_MIN\s+= \d+;/)[0],
+    html.match(/const K_KITCHEN_PHOTO_MIN\s*= \d+;/)[0],
     html.match(/const MIDSTAY_PHOTO_MIN\s+= \d+;/)[0],
     html.match(/const AFTERCLEAN_PHOTO_MIN\s+= \d+;/)[0],
     html.match(/const CONFIRM_LEAVE_ITEMS = \[[\s\S]*?\n\];/)[0],
@@ -103,11 +104,9 @@ test('Step 3 will not advance on a turnover until the kitchen set is photographe
   const { state, isPhase3Valid } = loadGates();
   assert.equal(isPhase3Valid(), false, 'no kitchen photos');
   state.kitchenPhotos = ['a'];
-  assert.equal(isPhase3Valid(), false, 'one is not the minimum of three');
+  assert.equal(isPhase3Valid(), false, 'one is not the minimum of two (3.4.1: utensils, plates and cookware)');
   state.kitchenPhotos = ['a', 'b'];
-  assert.equal(isPhase3Valid(), false, 'two is not the minimum of three (3.1.1: three per area)');
-  state.kitchenPhotos = ['a', 'b', 'c'];
-  assert.equal(isPhase3Valid(), true, 'three passes');
+  assert.equal(isPhase3Valid(), true, 'two passes');
 
   // A mid-stay guest is still in the unit: nothing to hand over, nothing to count.
   state.cleaningType = 'mid_stay';

@@ -21,7 +21,7 @@
 //   Navigation (HTML page)        → network-first, 3s timeout, cache fallback
 //   Everything else               → network-first, cache fallback
 
-const CACHE_NAME = 'ch-shell-v9-networkfirst';
+const CACHE_NAME = 'ch-shell-v10-networkfirst';
 // Folded copy (/Cascade-Staff/checklist/) shares Cache Storage with the standalone one: own prefix so neither evicts the other.
 const CACHE_PREFIX = self.location.pathname.indexOf('/Cascade-Staff/') >= 0 ? 'chf-shell' : 'ch-shell';
 const CACHE = CACHE_PREFIX + CACHE_NAME.slice('ch-shell'.length);

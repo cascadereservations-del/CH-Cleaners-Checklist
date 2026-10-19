@@ -852,8 +852,8 @@ body.submitting { pointer-events: none; }
 #nav-cue { position: fixed; left: 0; right: 0; bottom: var(--bottom-bar-height); z-index: 99; box-sizing: border-box; padding: 0.5rem var(--space-4); background: var(--earthen-ivory, #faf6ee); border-top: 1px solid var(--border); color: var(--text-primary); font-size: 0.875rem; line-height: 1.35; cursor: pointer; text-align: center; }
 #nav-cue[hidden] { display: none; }
 #btn-next:disabled, #btn-submit:disabled { pointer-events: none; }
-.phase::after { content: ''; display: block; height: 3.25rem; }
-@media (min-width: 768px) { #nav-cue { max-width: 820px; left: 50%; right: auto; width: 820px; transform: translateX(-50%); } }
+.phase::after { content: ''; display: block; height: 5.5rem; }
+@media (min-width: 960px) { #nav-cue { max-width: 820px; left: 50%; right: auto; width: 820px; transform: translateX(-50%); } }
 .s94-precheck { margin-top: var(--space-2); font-size: 0.875rem; line-height: 1.35; color: var(--text-secondary); }
 .s94-precheck[hidden] { display: none; }
 .s94-precheck.pass { color: #2d6a3e; }
@@ -7811,6 +7811,7 @@ async function S94_precheck(i) {
   photo._pcKey = key;
   const show = (cls, text, retake) => {
     if (state.meterPhotos[i] !== photo) return;          // replaced while we waited
+    if (photo._pcKey !== key) return;                    // an older reply never overwrites a newer one
     box.className = 's94-precheck ' + cls; box.textContent = text; box.hidden = !text;
     if (retake) {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Retake photo';
@@ -7991,11 +7992,12 @@ function initMeterPhotos() {
       const photo = await restorePhotoFromMeta(meta);
       if (!photo) return;
       state.meterPhotos[i] = photo;
+      if (photo.uploaded && photo.fileId) S94_precheck(i);   // a draft-restored, already-uploaded photo is checked again after a reload
       if (triggerBtn) triggerBtn.classList.add('has-photo');
       renderMeterThumb();
       updatePhotoCounter();
       if (photo.status === 'queued') {
-        enqueuePhotoUpload(() => uploadPhotoRecord(photo, `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
+        enqueuePhotoUpload(() => uploadPhotoRecord(photo, `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); S94_precheck(i); }));
       }
     }
     METER_PHOTO_API[i] = { restoreFromDraft: restoreMeterFromDraft };
@@ -8024,6 +8026,7 @@ function initMeterPhotos() {
         // Mark trigger button as has-photo
         if (triggerBtn) triggerBtn.classList.add('has-photo');
 
+        const pc = el(`meter-precheck-${i}`); if (pc) { pc.hidden = true; pc.textContent = ''; }   // the old photo's check does not apply to the new one
         state.meterPhotos[i] = {
           // idbPutPhoto can fail silently (quota, blocked storage); _blob is
           // the same-session in-memory fallback resolvePhotoDataUrl() uses then.
@@ -10608,6 +10611,7 @@ function resetApp() {
     const stat     = el(`meter-photo-${i}-status`);
     const trigBtn  = el(`meter-photo-${i}-btn`);
     if (prev) prev.innerHTML = '';
+    const pcEl = el(`meter-precheck-${i}`); if (pcEl) { pcEl.hidden = true; pcEl.textContent = ''; }
     if (stat) { stat.textContent = ''; }
     if (trigBtn) { trigBtn.classList.remove('has-photo'); }
     const inp = el(`meter-photo-${i}`); if (inp) inp.value = '';

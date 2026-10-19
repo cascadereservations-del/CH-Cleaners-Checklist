@@ -7802,11 +7802,13 @@ async function uploadPhotoDrive(slotOrId, dataUrl, fileName) {
 const S94_PRECHECK_MS = 20000;
 async function S94_precheck(i) {
   const photo = state.meterPhotos[i], box = el('meter-precheck-' + i);
-  if (!photo || !box || photo.status !== 'done' || !photo.fileId || photo._pc) return;
-  photo._pc = true;
+  if (!photo || !box || photo.status !== 'done' || !photo.fileId) return;
   const meter = i === 0 ? 'electric' : 'water';
   const typedRaw = (el(i === 0 ? 'electricMeterReading' : 'waterMeterReading')?.value || '').trim();
   const typed = typedRaw !== '' && Number.isFinite(Number(typedRaw)) ? Number(typedRaw) : undefined;
+  const key = String(typed);
+  if (photo._pcKey === key) return;                      // same photo, same typed number: already asked
+  photo._pcKey = key;
   const show = (cls, text, retake) => {
     if (state.meterPhotos[i] !== photo) return;          // replaced while we waited
     box.className = 's94-precheck ' + cls; box.textContent = text; box.hidden = !text;
@@ -7816,21 +7818,27 @@ async function S94_precheck(i) {
       box.appendChild(document.createElement('br')); box.appendChild(b);
     }
   };
-  show('checking', 'Checking the photo\u2026');
+  if (!photo._pcShown) show('checking', 'Checking the photo\u2026');
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), S94_PRECHECK_MS);
+  const call = async () => fetch(EDGE_BASE + '/verify-meter-photo', {
+    method: 'POST', headers: await staffHeaders(true), signal: ctl.signal,
+    body: JSON.stringify({ mode: 'precheck', path: photo.fileId, meter, typed }),
+  });
   try {
-    const resp = await fetch(EDGE_BASE + '/verify-meter-photo', {
-      method: 'POST', headers: await staffHeaders(true), signal: ctl.signal,
-      body: JSON.stringify({ mode: 'precheck', path: photo.fileId, meter, typed }),
-    });
-    const r = await resp.json();
-    if (!r || r.ok !== true) return show('', '');
+    let resp = await call();
+    if (resp.status === 401) {                           // expired token: refresh the session once, ask once more
+      if (staffSession) staffSession.expires_at = 0;
+      resp = await call();
+    }
+    const r = resp.status === 200 ? await resp.json() : null;
+    if (!r || r.ok !== true || (r.meter && r.meter !== meter)) { photo._pcKey = null; return show('', ''); }   // anything but a clean 200 for THIS meter: unavailable, say nothing
     const note = typeof r.message === 'string' ? r.message : '';
+    photo._pcShown = true;
     if (r.status === 'pass') show('pass', '\u2713 ' + (r.reading != null ? 'Photo reads ' + r.reading + '.' : 'Photo looks clear.'));
-    else if (r.status === 'retake') show('retake', note || 'This photo is hard to read. Please retake it.', true);
+    else if (r.status === 'retake') show('retake', note || (r.reason === 'not_a_meter' ? 'This does not look like a meter. Please retake the photo.' : 'This photo is hard to read. Please retake it.'), true);
     else if (r.status === 'check_number') show('check_number', note || 'The photo reads ' + r.reading + '. Please check the number you typed.');
-    else show('', '');                                    // unavailable or unknown: say nothing
-  } catch { show('', ''); }
+    else { photo._pcShown = false; show('', ''); }       // unavailable or unknown: say nothing
+  } catch { photo._pcKey = null; show('', ''); }
   finally { clearTimeout(timer); }
 }
 
@@ -7898,6 +7906,10 @@ function S94_scrollToFirst() {
 }
 
 function S94_initCue() {
+  // a changed typed reading asks again (the server answers from its cache), once the typing pauses
+  [['electricMeterReading', 0], ['waterMeterReading', 1]].forEach(([id, i]) => {
+    let t = null; el(id)?.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => S94_precheck(i), 800); });
+  });
   el('nav-cue')?.addEventListener('click', S94_scrollToFirst);
   // a disabled button swallows the tap (pointer-events:none), so the bar itself hears it
   el('bottom-bar')?.addEventListener('click', e => {

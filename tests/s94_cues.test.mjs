@@ -20,3 +20,17 @@ test('s94: the cue line sits under the nav, is polite, and is wired into updateB
   assert.match(html, /#btn-next:disabled, #btn-submit:disabled \{ pointer-events: none; \}/);
   assert.match(html, /S94_initCue\(\);/);
 });
+
+test('s94: S94_unmet runs and names what is missing in plain words', () => {
+  const src = html.split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+  const s = src.indexOf('function S94_unmet('), e = src.indexOf('\n}\n', s) + 3;
+  const make = (vals, state) => new Function('el', 'state', 'K_gatedForPhase', 'K_answered', 'K_missingSlots', 'kitchenPhotosRequired', 'K_KITCHEN_PHOTO_MIN', 'PRECLEAN_PHOTO_MIN', 'MIDSTAY_PHOTO_MIN', 'AFTERCLEAN_PHOTO_MIN',
+    src.slice(s, e) + '; return S94_unmet;')(id => ({ value: vals[id] || '' }), state, () => [], () => true, () => [], () => false, 2, 5, 4, 5);
+  const base = { cleaningType: 'turnover', precleanPhotos: [1, 2], aftercleanPhotos: [], kitchenPhotos: [], meterPhotos: [null, { x: 1 }], supplyLogSaved: false };
+  const p0 = make({ cleanerName: 'Honey' }, base)(0).map(x => x.t);
+  assert.deepEqual(p0, ['cleaning date', 'last guest name']);
+  const p1 = make({ electricMeterReading: '12' }, base)(1);
+  assert.deepEqual(p1.map(x => x.t), ['water meter reading', 'electric meter photo', '3 more pre-clean photos']);
+  assert.equal(p1[2].id, 'preclean-photo-card');
+  assert.deepEqual(make({}, base)(4).map(x => x.t), ['log supply usage']);
+});

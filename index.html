@@ -848,6 +848,17 @@ body.submitting { pointer-events: none; }
   color: var(--earthen-ivory);
 }
 
+/* s94: why Next or Submit is blocked; a tap on the dead button scrolls to the first missing item */
+#nav-cue { position: fixed; left: 0; right: 0; bottom: var(--bottom-bar-height); z-index: 99; box-sizing: border-box; padding: 0.5rem var(--space-4); background: var(--earthen-ivory, #faf6ee); border-top: 1px solid var(--border); color: var(--text-primary); font-size: 0.875rem; line-height: 1.35; cursor: pointer; text-align: center; }
+#nav-cue[hidden] { display: none; }
+#btn-next:disabled, #btn-submit:disabled { pointer-events: none; }
+.phase::after { content: ''; display: block; height: 3.25rem; }
+@media (min-width: 768px) { #nav-cue { max-width: 820px; left: 50%; right: auto; width: 820px; transform: translateX(-50%); } }
+.s94-precheck { margin-top: var(--space-2); font-size: 0.875rem; line-height: 1.35; color: var(--text-secondary); }
+.s94-precheck[hidden] { display: none; }
+.s94-precheck.pass { color: #2d6a3e; }
+.s94-precheck.retake, .s94-precheck.check_number { color: var(--error); }
+.s94-precheck button { margin-top: 0.375rem; min-height: 44px; padding: 0 1rem; border-radius: 8px; border: 1.5px solid var(--earthen-slate); background: var(--surface); color: var(--earthen-slate); font-size: 0.875rem; font-weight: 600; }
 .nav-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -4562,6 +4573,7 @@ html.K_folded .phase-header.K_hasimg .K_zone { background: rgba(22,13,6,0.74); b
                  aria-label="Upload electric meter photo from gallery"
                  aria-describedby="meter-photo-0-status">
           <div id="meter-photo-0-preview-wrap" style="margin-top:var(--space-2);"></div>
+          <div class="s94-precheck" id="meter-precheck-0" role="status" aria-live="polite" hidden></div>
           <div class="upload-spinner" id="meter-spin-0"></div>
         </div>
         <!-- Water meter photo -->
@@ -4578,6 +4590,7 @@ html.K_folded .phase-header.K_hasimg .K_zone { background: rgba(22,13,6,0.74); b
                  aria-label="Upload water meter photo from gallery"
                  aria-describedby="meter-photo-1-status">
           <div id="meter-photo-1-preview-wrap" style="margin-top:var(--space-2);"></div>
+          <div class="s94-precheck" id="meter-precheck-1" role="status" aria-live="polite" hidden></div>
           <div class="upload-spinner" id="meter-spin-1"></div>
         </div>
       </div>
@@ -5030,6 +5043,7 @@ html.K_folded .phase-header.K_hasimg .K_zone { background: rgba(22,13,6,0.74); b
 <!-- ════════════════════════════════════════════════════════════
   BOTTOM NAV BAR
 ════════════════════════════════════════════════════════════ -->
+<div id="nav-cue" role="status" aria-live="polite" hidden></div>
 <nav id="bottom-bar" role="navigation" aria-label="Phase navigation">
   <button class="nav-btn" id="btn-prev" type="button" disabled
           aria-label="Go to previous phase">
@@ -6482,6 +6496,7 @@ function updateBottomBar() {
     btnSubmit.style.display = isLast ? '' : 'none';
     btnSubmit.disabled = !isPhaseValid(PHASE_COUNT - 1);
   }
+  S94_renderCue();
 }
 
 function isPhaseValid(phase) {
@@ -7782,6 +7797,115 @@ async function uploadPhotoDrive(slotOrId, dataUrl, fileName) {
   return null;
 }
 
+/* s94: instant meter check. After a meter photo is uploaded, ask verify-meter-photo (mode precheck) what it reads and show the answer under
+   the photo. Advisory only: a slow, failed or unavailable check shows nothing and never blocks the report. */
+const S94_PRECHECK_MS = 20000;
+async function S94_precheck(i) {
+  const photo = state.meterPhotos[i], box = el('meter-precheck-' + i);
+  if (!photo || !box || photo.status !== 'done' || !photo.fileId || photo._pc) return;
+  photo._pc = true;
+  const meter = i === 0 ? 'electric' : 'water';
+  const typedRaw = (el(i === 0 ? 'electricMeterReading' : 'waterMeterReading')?.value || '').trim();
+  const typed = typedRaw !== '' && Number.isFinite(Number(typedRaw)) ? Number(typedRaw) : undefined;
+  const show = (cls, text, retake) => {
+    if (state.meterPhotos[i] !== photo) return;          // replaced while we waited
+    box.className = 's94-precheck ' + cls; box.textContent = text; box.hidden = !text;
+    if (retake) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Retake photo';
+      b.addEventListener('click', () => el('meter-photo-' + i + '-cap')?.click());
+      box.appendChild(document.createElement('br')); box.appendChild(b);
+    }
+  };
+  show('checking', 'Checking the photo\u2026');
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), S94_PRECHECK_MS);
+  try {
+    const resp = await fetch(EDGE_BASE + '/verify-meter-photo', {
+      method: 'POST', headers: await staffHeaders(true), signal: ctl.signal,
+      body: JSON.stringify({ mode: 'precheck', path: photo.fileId, meter, typed }),
+    });
+    const r = await resp.json();
+    if (!r || r.ok !== true) return show('', '');
+    const note = typeof r.message === 'string' ? r.message : '';
+    if (r.status === 'pass') show('pass', '\u2713 ' + (r.reading != null ? 'Photo reads ' + r.reading + '.' : 'Photo looks clear.'));
+    else if (r.status === 'retake') show('retake', note || 'This photo is hard to read. Please retake it.', true);
+    else if (r.status === 'check_number') show('check_number', note || 'The photo reads ' + r.reading + '. Please check the number you typed.');
+    else show('', '');                                    // unavailable or unknown: say nothing
+  } catch { show('', ''); }
+  finally { clearTimeout(timer); }
+}
+
+/* s94: what is still needed on this screen, in plain words. One list feeds the cue line under the nav and the tap-to-scroll.
+   Each item: { t: words, id: element to scroll to }. Mirrors the gates in isPhase*Valid; never decides validity itself. */
+function S94_unmet(ph) {
+  const out = [], add = (t, id) => out.push({ t, id });
+  const val = id => (el(id)?.value || '').trim();
+  const more = (n, what, id) => add(n + ' more ' + what + (n > 1 ? 's' : ''), id);
+  const checks = p => { const u = K_gatedForPhase(p).filter(x => !K_answered(x.id)); if (u.length) add('answer ' + u.length + ' check' + (u.length > 1 ? 's' : ''), 'confirm-wrap-' + u[0].id); };
+  const ct = state.cleaningType;
+  if (ph === 0) {
+    if (!val('cleanerName')) add('your name', 'cleanerName');
+    if (!val('cleaningDate')) add('cleaning date', 'cleaningDate');
+    else if (ct !== 'mid_stay' && state.cleaningDateStatus === 'blocked') add('a different date (a guest is still in the unit)', 'cleaningDate');
+    if (ct === 'emergency') { if (!val('emergencyDescription')) add('what the issue is', 'emergencyDescription'); }
+    else if (ct !== 'mid_stay' && ct !== 'deep_clean' && !val('lastGuestName')) add('last guest name', 'lastGuestName');
+  } else if (ph === 1 && ct !== 'emergency') {
+    if (ct === 'mid_stay') { const n = MIDSTAY_PHOTO_MIN - state.precleanPhotos.length; if (n > 0) more(n, 'photo', 'preclean-photo-card'); }
+    else {
+      if (!val('electricMeterReading')) add('electric meter reading', 'electricMeterReading');
+      if (!val('waterMeterReading')) add('water meter reading', 'waterMeterReading');
+      if (state.meterPhotosSkipped !== true) {
+        if (!state.meterPhotos[0]) add('electric meter photo', 'meter-photo-0-btn');
+        if (!state.meterPhotos[1]) add('water meter photo', 'meter-photo-1-btn');
+      }
+      const n = PRECLEAN_PHOTO_MIN - state.precleanPhotos.length; if (n > 0) more(n, 'pre-clean photo', 'preclean-photo-card');
+    }
+  } else if (ph === 2 || ph === 5 || ph === 6) {
+    if (ph >= 5 && ct !== 'emergency') {
+      const n = (ct === 'mid_stay' ? MIDSTAY_PHOTO_MIN : AFTERCLEAN_PHOTO_MIN) - state.aftercleanPhotos.length;
+      if (n > 0) more(n, 'after-clean photo', 'afterclean-photo-card');
+    }
+    checks(ph);
+  } else if (ph === 4) {
+    const slots = K_missingSlots(), kn = K_KITCHEN_PHOTO_MIN - state.kitchenPhotos.length;
+    if (slots.length) add(slots.length + ' kitchen photo' + (slots.length > 1 ? 's' : ''), 'kitchen-photo-card');
+    else if (kitchenPhotosRequired() && kn > 0) more(kn, 'kitchen photo', 'kitchen-photo-card');
+    if (!state.supplyLogSaved && ct !== 'emergency') add('log supply usage', 'supply-usage-trigger-card');
+    checks(4);
+  }
+  return out;
+}
+
+function S94_renderCue() {
+  const box = el('nav-cue');
+  if (!box) return;
+  const ph = state.phase, last = ph === PHASE_COUNT - 1;
+  let list = [];
+  if (!isPhaseValid(ph)) {
+    list = S94_unmet(ph);
+    if (!list.length) list = [{ t: 'finish the open items above', id: null }];   // a gate with no known cause: say so, scroll nowhere
+  }
+  box.hidden = !list.length;
+  box.textContent = list.length ? (last ? 'To submit: ' : 'To continue: ') + list.map(x => x.t).join(' \u00B7 ') : '';
+  box._first = list[0] ? list[0].id : null;
+}
+
+function S94_scrollToFirst() {
+  const id = el('nav-cue')?._first, t = id && el(id);
+  if (!t) return;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  if (/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(t.tagName)) t.focus({ preventScroll: true });
+}
+
+function S94_initCue() {
+  el('nav-cue')?.addEventListener('click', S94_scrollToFirst);
+  // a disabled button swallows the tap (pointer-events:none), so the bar itself hears it
+  el('bottom-bar')?.addEventListener('click', e => {
+    if (e.target.closest('button:not(:disabled)')) return;
+    if (!isPhaseValid(state.phase)) S94_scrollToFirst();
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════
    METER PHOTO HANDLING
 ═══════════════════════════════════════════════════════════════ */
@@ -7848,7 +7972,7 @@ function initMeterPhotos() {
       if (!photo || photo.status !== 'failed') return;
       photo.status = 'queued';
       renderMeterThumb();
-      enqueuePhotoUpload(() => uploadPhotoRecord(photo, `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
+      enqueuePhotoUpload(() => uploadPhotoRecord(photo, `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); S94_precheck(i); }));
     }
 
     async function restoreMeterFromDraft(meta) {
@@ -7930,7 +8054,7 @@ function initMeterPhotos() {
         saveDraft();
         renderMeterNudge();
 
-        enqueuePhotoUpload(() => uploadPhotoRecord(state.meterPhotos[i], `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); }));
+        enqueuePhotoUpload(() => uploadPhotoRecord(state.meterPhotos[i], `meter_${i}`, () => { renderMeterThumb(); updatePhotoCounter(); S94_precheck(i); }));
 
       } catch (err) {
         if (spinEl) spinEl.style.display = 'none';
@@ -11640,6 +11764,7 @@ async function init() {
 
   // Meter photos
   initMeterPhotos();
+  S94_initCue();
 
   // Section photos (bedroom / kitchen)
   initSectionPhotos();

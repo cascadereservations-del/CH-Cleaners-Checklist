@@ -7,7 +7,7 @@ test('s94: meter photos are prechecked after upload, advisory only, 20 s limit',
   assert.match(html, /verify-meter-photo/);
   assert.match(html, /mode: 'precheck', path: photo\.fileId, meter, typed/);
   assert.match(html, /S94_PRECHECK_MS = 20000/);
-  assert.equal((html.match(/S94_precheck\(i\)/g) || []).length, 2, 'both upload callbacks run the precheck');
+  assert.equal((html.match(/updatePhotoCounter\(\); S94_precheck\(i\)/g) || []).length, 2, 'both upload callbacks run the precheck');
   assert.match(html, /id="meter-precheck-0"[^>]*aria-live="polite"/);
   assert.match(html, /id="meter-precheck-1"[^>]*aria-live="polite"/);
   assert.match(html, /el\('meter-photo-' \+ i \+ '-cap'\)\?\.click\(\)/, 'retake reopens the camera');
